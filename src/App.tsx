@@ -1,35 +1,44 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+//import "./App.css";
+import { Checkbox } from "./components/ui/checkbox";
+import { Card, CardContent } from "./components/ui/card";
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
     <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+      <div className="flex h-screen w-screen items-center justify-center">
+        <Card className="w-[700px]">
+          <CardContent>
+            <div className="items-top flex space-x-2">
+              <Checkbox id="space_semantic_search" />
+              <div className="grid gap-1.5 leading-none">
+                <label
+                  htmlFor="space_semantic_search"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Space Search
+                </label>
+                <p className="text-sm text-muted-foreground">
+                  Use semantic search to find Hugging Face Spaces.
+                </p>
+              </div>
+              <Checkbox id="paper_semantic_search" />
+              <div className="grid gap-1.5 leading-none">
+                <label
+                  htmlFor="paper_semantic_search"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Paper Search
+                </label>
+                <p className="text-sm text-muted-foreground">
+                  Use semantic search to find papers from xyz.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
     </>
-  )
+  );
 }
 
-export default App
+export default App;
