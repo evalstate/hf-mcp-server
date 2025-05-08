@@ -1,6 +1,7 @@
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import express from "express";
 import { createServer } from "./mcp-server.js";
+import { DEFAULT_MCP_PORT, DEFAULT_WEB_APP_PORT } from "./constants.js";
 
 console.error('Starting SSE server...');
 
@@ -11,8 +12,8 @@ let transport: SSEServerTransport;
 
 
 // Configuration with separate ports for MCP API and web app
-const MCP_PORT = process.env.MCP_PORT ? parseInt(process.env.MCP_PORT) : 3001;
-const WEB_APP_PORT = process.env.WEB_APP_PORT ? parseInt(process.env.WEB_APP_PORT) : 3000;
+const MCP_PORT = process.env.MCP_PORT ? parseInt(process.env.MCP_PORT) : DEFAULT_MCP_PORT;
+const WEB_APP_PORT = process.env.WEB_APP_PORT ? parseInt(process.env.WEB_APP_PORT) : DEFAULT_WEB_APP_PORT;
 const { server, cleanup } = createServer("sse", WEB_APP_PORT);
 
 app.get("/sse", async (req, res) => {

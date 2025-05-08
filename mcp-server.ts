@@ -29,15 +29,27 @@ import {
   formatSearchResults,
 } from "./src/services/semantic-search.js";
 
+// Import the settings service
+import { settingsService, AppSettings, ToolSettings } from "./src/services/settings.js";
+
+// Import shared constants
+import { TransportType, DEFAULT_WEB_APP_PORT } from "./constants.js";
+
+// Define type for registered tools
+interface RegisteredTool {
+  enable: () => void;
+  disable: () => void;
+  remove: () => void;
+}
+
 // Track the active transport type
-export type TransportType = 'stdio' | 'sse' | 'streamableHttp' | 'unknown';
 let activeTransport: TransportType = 'unknown';
 
 // Create an Express app to serve the React frontend and provide transport info
 const app = express();
 let webServer: any = null;
 
-export const createServer = (transportType: TransportType = 'unknown', webAppPort: number = 3000) => {
+export const createServer = (transportType: TransportType = 'unknown', webAppPort: number = DEFAULT_WEB_APP_PORT) => {
   const server = new McpServer(
   {
     name: "hf-mcp-server",
@@ -51,7 +63,8 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
   );
   activeTransport = transportType;
   // Define the semantic search tool using our service
-  server.tool(
+  // Define the semantic search tool
+  const spaceSearchTool = server.tool(
     "space_semantic_search",
     {
       query: z.string().min(1, "Search query is required"),
@@ -61,6 +74,80 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
       const results = await semanticSearch.search(query, limit);
       return {
         content: [{ type: "text", text: formatSearchResults(query, results) }],
+      };
+    }
+  );
+  
+  // Store the tool reference for later enable/disable
+  const registeredTools: { [toolId: string]: RegisteredTool } = {
+    space_semantic_search: spaceSearchTool
+  };
+  
+  // Initialize tool state based on settings
+  const initialSettings = settingsService.getSettings();
+  for (const [toolId, toolSettings] of Object.entries(initialSettings.tools)) {
+    if (registeredTools[toolId]) {
+      if (toolSettings.enabled) {
+        registeredTools[toolId].enable();
+        console.log(`Tool ${toolId} initialized as enabled`);
+      } else {
+        registeredTools[toolId].disable();
+        console.log(`Tool ${toolId} initialized as disabled`);
+      }
+    }
+  }
+  
+  // Define a text-based resource with the settings
+  server.resource(
+    "settings",
+    "/settings", 
+    async () => {
+      // Format settings as a resource with contents array containing a text item
+      const settings = settingsService.getSettings();
+      return {
+        contents: [
+          {
+            text: JSON.stringify(settings, null, 2),
+            uri: "/settings",
+            mimeType: "application/json"
+          }
+        ]
+      };
+    }
+  );
+  
+  // Create a standard API endpoint for settings update instead of MCP resource update
+  // since we're already using a REST API for the frontend
+  
+  // Tools settings management tool
+  server.tool(
+    "manage_tool_settings",
+    {
+      toolId: z.string().min(1, "Tool ID is required"),
+      enabled: z.boolean(),
+    },
+    async ({ toolId, enabled }: { toolId: string; enabled: boolean }) => {
+      // Update the settings in our service
+      const updatedSettings = settingsService.updateToolSettings(toolId, { enabled });
+      
+      // Enable or disable the MCP tool if it exists in our registry
+      if (registeredTools[toolId]) {
+        if (enabled) {
+          registeredTools[toolId].enable();
+          console.log(`Tool ${toolId} has been enabled`);
+        } else {
+          registeredTools[toolId].disable();
+          console.log(`Tool ${toolId} has been disabled`);
+        }
+      } else {
+        console.log(`Tool ${toolId} not found in registered tools`);
+      }
+      
+      return {
+        content: [{ 
+          type: "text", 
+          text: `The ${toolId} tool has been ${enabled ? "enabled" : "disabled"}.` 
+        }],
       };
     }
   );
@@ -75,6 +162,30 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
   // API endpoint to get the active transport
   app.get('/api/transport', (req, res) => {
     res.json({ transport: activeTransport });
+  });
+  
+  // API endpoint to get settings
+  app.get('/api/settings', (req, res) => {
+    res.json(settingsService.getSettings());
+  });
+  
+  // API endpoint to update tool settings
+  app.post('/api/settings/tools/:toolId', express.json(), (req, res) => {
+    const { toolId } = req.params;
+    const updatedSettings = settingsService.updateToolSettings(toolId, req.body as Partial<ToolSettings>);
+    
+    // Enable or disable the actual MCP tool if it exists
+    if (registeredTools[toolId]) {
+      if (req.body.enabled) {
+        registeredTools[toolId].enable();
+        console.log(`Tool ${toolId} has been enabled via API`);
+      } else {
+        registeredTools[toolId].disable();
+        console.log(`Tool ${toolId} has been disabled via API`);
+      }
+    }
+    
+    res.json(updatedSettings);
   });
   
   // For any other route, serve the index.html file (for SPA navigation)

@@ -3,6 +3,7 @@ import { InMemoryEventStore } from '@modelcontextprotocol/sdk/examples/shared/in
 import express, { Request, Response } from "express";
 import { createServer } from "./mcp-server.js";
 import { randomUUID } from 'node:crypto';
+import { DEFAULT_MCP_PORT, DEFAULT_WEB_APP_PORT } from "./constants.js";
 
 console.error('Starting Streamable HTTP server...');
 
@@ -12,8 +13,8 @@ const app = express();
 const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
 // Configuration with separate ports for MCP API and web app
-const MCP_PORT = process.env.MCP_PORT ? parseInt(process.env.MCP_PORT) : 3001;
-const WEB_APP_PORT = process.env.WEB_APP_PORT ? parseInt(process.env.WEB_APP_PORT) : 3000;
+const MCP_PORT = process.env.MCP_PORT ? parseInt(process.env.MCP_PORT) : DEFAULT_MCP_PORT;
+const WEB_APP_PORT = process.env.WEB_APP_PORT ? parseInt(process.env.WEB_APP_PORT) : DEFAULT_WEB_APP_PORT;
 
 const { server, cleanup } = createServer("streamableHttp", WEB_APP_PORT);
 
