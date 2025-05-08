@@ -12,5 +12,5 @@
     "rootDir": ".",
     "sourceMap": true
   },
-  "include": ["mcp-server.ts", "src/services/**/*.ts"]
+  "include": ["*.ts", "src/services/**/*.ts"]
 }

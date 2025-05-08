@@ -1,5 +1,5 @@
 // Import the semantic search service
-import { semanticSearch, SearchResult } from './src/services/semantic-search.js';
+import { semanticSearch, SearchResult, formatSearchResults } from './src/services/semantic-search.js';
 
 // Sample search query
 const testQuery = "image generation";
@@ -27,7 +27,7 @@ async function testSemanticSearch() {
     });
     
     // Format the results as markdown
-    const markdown = semanticSearch.formatSearchResults(results);
+    const markdown = formatSearchResults("the query", results);
     
     // Log the formatted markdown
     console.log("\nFormatted markdown table:");

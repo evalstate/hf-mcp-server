@@ -112,10 +112,10 @@ export type SearchParams = z.infer<typeof SearchParamsSchema>;
  */
 export const formatSearchResults = (query:string, results: SearchResult[]): string => {
   if (results.length === 0) {
-    return `No matching Hugging Face Spaces found for '${query}'. Try a different query.`;
+    return `No matching Hugging Face Spaces found for the query '${query}'. Try a different query.`;
   }
 
-  let markdown = `# Space Search Results for '${query}'\n\n`;
+  let markdown = `# Space Search Results for the query '${query}'\n\n`;
   markdown += "| Space | Description | Author | ID | Relevance |\n";
   markdown += "|-------|-------------|--------|----|-----------|\n";
 
@@ -137,8 +137,6 @@ export const formatSearchResults = (query:string, results: SearchResult[]): stri
       `| ${relevance} |\n`;
   }
 
-  markdown +=
-    "\nTo use one of these spaces, you can provide the ID in the format: `owner/space` or `owner/space/endpoint`";
   return markdown;
 };
 
