@@ -7,33 +7,60 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 type TransportInfo = {
   transport: "stdio" | "sse" | "streamableHttp" | "unknown";
 };
+
+type ToolSettings = {
+  enabled: boolean;
+};
+
+type AppSettings = {
+  tools: {
+    [toolId: string]: ToolSettings;
+  };
+};
+
 function App() {
   const [transportInfo, setTransportInfo] = useState<TransportInfo>({
     transport: "unknown",
   });
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<AppSettings>({
+    tools: {
+      space_semantic_search: { enabled: false },
+      paper_semantic_search: { enabled: false }
+    }
+  });
 
   useEffect(() => {
-    // Fetch transport information from the API
-    const fetchTransportInfo = async () => {
+    // Fetch transport information and settings from the API
+    const fetchData = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch("/api/transport");
-        if (!response.ok) {
-          throw new Error(`Failed to fetch transport info: ${response.status}`);
+        
+        // Fetch transport info
+        const transportResponse = await fetch("/api/transport");
+        if (!transportResponse.ok) {
+          throw new Error(`Failed to fetch transport info: ${transportResponse.status}`);
         }
-        const data = await response.json();
-        setTransportInfo(data);
+        const transportData = await transportResponse.json();
+        setTransportInfo(transportData);
+        
+        // Fetch settings
+        const settingsResponse = await fetch("/api/settings");
+        if (!settingsResponse.ok) {
+          throw new Error(`Failed to fetch settings: ${settingsResponse.status}`);
+        }
+        const settingsData = await settingsResponse.json();
+        setSettings(settingsData);
       } catch (err) {
-        console.error("Error fetching transport info:", err);
+        console.error("Error fetching data:", err);
         setError(err instanceof Error ? err.message : "Unknown error occurred");
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchTransportInfo();
+    fetchData();
   }, []);
 
   // Format the transport name for display
@@ -47,6 +74,40 @@ function App() {
         return "Streamable HTTP";
       default:
         return "Unknown";
+    }
+  };
+  
+  // Handle checkbox changes
+  const handleToolToggle = async (toolId: string, checked: boolean) => {
+    try {
+      const response = await fetch(`/api/settings/tools/${toolId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ enabled: checked }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to update tool settings: ${response.status}`);
+      }
+      
+      const updatedToolSettings = await response.json();
+      
+      // Update local state
+      setSettings(prevSettings => ({
+        ...prevSettings,
+        tools: {
+          ...prevSettings.tools,
+          [toolId]: updatedToolSettings
+        }
+      }));
+      
+      console.log(`${toolId} is now ${checked ? 'enabled' : 'disabled'}`);
+      
+    } catch (err) {
+      console.error(`Error updating tool settings:`, err);
+      alert(`Error updating ${toolId}: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
   };
 
@@ -76,25 +137,35 @@ function App() {
             </div>
 
             <div className="items-top flex space-x-2">
-              <Checkbox id="space_semantic_search" />
+              <Checkbox 
+                id="space_semantic_search" 
+                checked={settings.tools.space_semantic_search?.enabled || false}
+                onCheckedChange={(checked) => handleToolToggle("space_semantic_search", checked === true)}
+              />
               <div className="grid gap-1.5 leading-none">
                 <label
                   htmlFor="space_semantic_search"
                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
-                  Space Search
+                  Space Search {settings.tools.space_semantic_search?.enabled ? "(Enabled)" : "(Disabled)"}
                 </label>
                 <p className="text-sm text-muted-foreground">
                   Use semantic search to find Hugging Face Spaces.
                 </p>
               </div>
-              <Checkbox id="paper_semantic_search" />
+            </div>
+            <div className="items-top flex space-x-2 mt-4">
+              <Checkbox 
+                id="paper_semantic_search" 
+                checked={settings.tools.paper_semantic_search?.enabled || false}
+                onCheckedChange={(checked) => handleToolToggle("paper_semantic_search", checked === true)}
+              />
               <div className="grid gap-1.5 leading-none">
                 <label
                   htmlFor="paper_semantic_search"
                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
-                  Paper Search
+                  Paper Search {settings.tools.paper_semantic_search?.enabled ? "(Enabled)" : "(Disabled)"}
                 </label>
                 <p className="text-sm text-muted-foreground">
                   Use semantic search to find papers from xyz.

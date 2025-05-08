@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -12,11 +12,21 @@ COPY . .
 # Build the application
 RUN npm run build
 
+# Make startup script executable
+RUN chmod +x start.sh
+
 # Set environment variables
 ENV NODE_ENV=production
+# Default to SSE transport - can be overridden at runtime
+ENV TRANSPORT_TYPE=sse
+# Default ports - can be overridden at runtime
+ENV WEB_APP_PORT=3000
+ENV MCP_PORT=3001
+# HF_TOKEN can be provided at runtime
 
-# Expose port if needed (for web UI)
+# Expose ports
 EXPOSE 3000
+EXPOSE 3001
 
-# Run the server
-CMD ["npm", "run", "start:server"]
+# Run the startup script
+CMD ["./start.sh"]
