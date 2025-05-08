@@ -8,9 +8,14 @@ console.error('Starting Streamable HTTP server...');
 
 const app = express();
 
-const { server, cleanup } = createServer();
 
 const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+
+// Configuration with separate ports for MCP API and web app
+const MCP_PORT = process.env.MCP_PORT ? parseInt(process.env.MCP_PORT) : 3001;
+const WEB_APP_PORT = process.env.WEB_APP_PORT ? parseInt(process.env.WEB_APP_PORT) : 3000;
+
+const { server, cleanup } = createServer("streamableHttp", WEB_APP_PORT);
 
 app.post('/mcp', async (req: Request, res: Response) => {
   console.log('Received MCP POST request');
@@ -148,9 +153,8 @@ app.delete('/mcp', async (req: Request, res: Response) => {
 });
 
 // Start the server
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`MCP Streamable HTTP Server listening on port ${PORT}`);
+app.listen(MCP_PORT, () => {
+  console.log(`MCP Streamable HTTP Server listening on port ${MCP_PORT}`);
 });
 
 // Handle server shutdown

@@ -4,10 +4,11 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { createServer } from "./mcp-server.js";
 
 console.error('Starting default (STDIO) server...');
+const WEB_APP_PORT = process.env.WEB_APP_PORT ? parseInt(process.env.WEB_APP_PORT) : 3000;
 
 async function main() {
   const transport = new StdioServerTransport();
-  const {server, cleanup} = createServer();
+  const { server, cleanup } = createServer('stdio', WEB_APP_PORT);
 
   await server.connect(transport);
 
