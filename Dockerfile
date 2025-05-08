@@ -19,14 +19,12 @@ RUN chmod +x start.sh
 ENV NODE_ENV=production
 # Default to SSE transport - can be overridden at runtime
 ENV TRANSPORT_TYPE=sse
-# Default ports - can be overridden at runtime
-ENV WEB_APP_PORT=3000
-ENV MCP_PORT=3001
+# Default port - can be overridden at runtime
+ENV PORT=3000
 # HF_TOKEN can be provided at runtime
 
-# Expose ports
+# Expose port
 EXPOSE 3000
-EXPOSE 3001
 
 # Run the startup script
 CMD ["./start.sh"]

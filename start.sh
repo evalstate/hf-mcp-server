@@ -2,7 +2,10 @@
 
 # Default to stdio transport if not specified
 TRANSPORT_TYPE="${TRANSPORT_TYPE:-stdio}"
-echo "Starting MCP server with transport type: $TRANSPORT_TYPE"
+# Get port from environment or use default
+PORT="${PORT:-3000}"
+
+echo "Starting MCP server with transport type: $TRANSPORT_TYPE on port $PORT"
 
 # Check for HF_TOKEN
 if [ -n "$HF_TOKEN" ]; then
@@ -14,13 +17,13 @@ fi
 # Start the appropriate server based on transport type
 case "$TRANSPORT_TYPE" in
   stdio)
-    node dist/stdio.js
+    node dist/stdio.js --port "$PORT"
     ;;
   sse)
-    node dist/sse.js
+    node dist/sse.js --port "$PORT"
     ;;
   streamableHttp)
-    node dist/streamableHttp.js
+    node dist/streamableHttp.js --port "$PORT"
     ;;
   *)
     echo "Error: Invalid transport type '$TRANSPORT_TYPE'. Valid options are: stdio, sse, streamableHttp"

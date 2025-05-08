@@ -27,6 +27,20 @@ export function ConnectionInfo({ isLoading, error, transportInfo }: ConnectionIn
         return "Unknown";
     }
   };
+  
+  // Get the endpoint path for the transport
+  const getEndpointPath = () => {
+    switch (transportInfo.transport) {
+      case "sse":
+        return "/sse";
+      case "streamableHttp":
+        return "/mcp";
+      case "stdio":
+        return "stdin/stdout";
+      default:
+        return "unknown";
+    }
+  };
 
   return (
     <Card className="w-[500px]">
@@ -47,6 +61,9 @@ export function ConnectionInfo({ isLoading, error, transportInfo }: ConnectionIn
                 {transportInfo.port && (
                     <span className="ml-1">
                       on port <span className="font-mono">{transportInfo.port}</span>
+                      {transportInfo.transport !== "stdio" && (
+                        <span> with endpoint <span className="font-mono">{getEndpointPath()}</span></span>
+                      )}
                     </span>
                   )
                 }

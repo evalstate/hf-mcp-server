@@ -2,9 +2,17 @@
 
 import { createServer } from "./mcp-server.js";
 import { DEFAULT_WEB_APP_PORT } from "./constants.js";
+import minimist from 'minimist';
+
+// Parse command line arguments
+const argv = minimist(process.argv.slice(2), {
+  string: ['port'],
+  alias: { p: 'port' },
+  default: { port: process.env.WEB_APP_PORT || DEFAULT_WEB_APP_PORT.toString() }
+});
 
 console.error('Starting default (STDIO) server...');
-const WEB_APP_PORT = process.env.WEB_APP_PORT ? parseInt(process.env.WEB_APP_PORT) : DEFAULT_WEB_APP_PORT;
+const WEB_APP_PORT = parseInt(argv.port);
 
 async function main() {
   const { server, cleanup } = createServer('stdio', WEB_APP_PORT);

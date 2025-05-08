@@ -25,6 +25,20 @@ export function ConnectionFooter({ isLoading, error, transportInfo }: Connection
         return "Unknown";
     }
   };
+  
+  // Get the endpoint path for the transport
+  const getEndpointPath = () => {
+    switch (transportInfo.transport) {
+      case "sse":
+        return "/sse";
+      case "streamableHttp":
+        return "/mcp";
+      case "stdio":
+        return "stdin/stdout";
+      default:
+        return "unknown";
+    }
+  };
 
   if (isLoading) {
     return <div className="text-center text-xs text-muted-foreground py-2">Loading connection information...</div>;
@@ -40,10 +54,12 @@ export function ConnectionFooter({ isLoading, error, transportInfo }: Connection
         <div className="flex items-center gap-1">
           <span className="text-muted-foreground">Using</span>
           <span className="font-medium text-primary">{getTransportDisplayName()}</span>
-          {(transportInfo.transport === "sse" || transportInfo.transport === "streamableHttp") && 
-            transportInfo.port && (
+          {transportInfo.port && (
               <span className="text-muted-foreground">
                 on port <span className="font-mono">{transportInfo.port}</span>
+                {transportInfo.transport !== "stdio" && (
+                  <span> at <span className="font-mono">{getEndpointPath()}</span></span>
+                )}
               </span>
             )
           }

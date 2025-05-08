@@ -44,6 +44,9 @@ interface RegisteredTool {
   remove: () => void;
 }
 
+// Import minimist for parsing command line arguments
+import minimist from 'minimist';
+
 // Track the active transport type and port
 let activeTransport: TransportType = 'unknown';
 let activePort: number | undefined = undefined;
