@@ -2,6 +2,27 @@
 
 ## Docker Usage
 
+### Using NPM Scripts
+
+We provide several npm scripts to simplify Docker operations:
+
+```bash
+# Build the Docker image
+npm run docker:build
+
+# Run with default settings (SSE transport)
+npm run docker:run
+
+# Run with specific transport types
+npm run docker:run:sse
+npm run docker:run:stdio
+npm run docker:run:streamableHttp
+```
+
+These scripts automatically pass your HF_TOKEN environment variable to the container.
+
+### Manual Docker Commands
+
 Build the image:
 ```bash
 docker build -t hf-mcp-server .
