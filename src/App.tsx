@@ -6,6 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 
 type TransportInfo = {
   transport: "stdio" | "sse" | "streamableHttp" | "unknown";
+  port?: number;
+  hfTokenMasked?: string;
+  hfTokenSet?: boolean;
 };
 
 type ToolSettings = {
@@ -67,9 +70,9 @@ function App() {
   const getTransportDisplayName = () => {
     switch (transportInfo.transport) {
       case "stdio":
-        return "Standard IO";
+        return "STDIO";
       case "sse":
-        return "Server-Sent Events (SSE)";
+        return "SSE";
       case "streamableHttp":
         return "Streamable HTTP";
       default:
@@ -116,61 +119,87 @@ function App() {
       <div className="flex h-screen w-screen items-center justify-center">
         <Card className="w-[700px]">
           <CardHeader>
-            <CardTitle>Hugging Face MCP Tools</CardTitle>
+            <CardTitle>Hugging Face Search Tools (MCP)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="mb-6 rounded-lg bg-muted p-4">
-              <h2 className="mb-2 text-lg font-semibold">Active Transport</h2>
+            {/* Checkboxes in a flex row layout */}
+            <div className="flex flex-row gap-8 mb-6">
+              {/* First Checkbox */}
+              <div className="flex-1">
+                <div className="items-top flex space-x-2">
+                  <Checkbox 
+                    id="space_semantic_search" 
+                    checked={settings.tools.space_semantic_search?.enabled || false}
+                    onCheckedChange={(checked) => handleToolToggle("space_semantic_search", checked === true)}
+                  />
+                  <div className="grid gap-1.5 leading-none">
+                    <label
+                      htmlFor="space_semantic_search"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Space Search {settings.tools.space_semantic_search?.enabled ? "(Enabled)" : "(Disabled)"}
+                    </label>
+                    <p className="text-sm text-muted-foreground">
+                      Semantic Search for Hugging Face Spaces.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Second Checkbox */}
+              <div className="flex-1">
+                <div className="items-top flex space-x-2">
+                  <Checkbox 
+                    id="paper_semantic_search" 
+                    checked={settings.tools.paper_semantic_search?.enabled || false}
+                    onCheckedChange={(checked) => handleToolToggle("paper_semantic_search", checked === true)}
+                  />
+                  <div className="grid gap-1.5 leading-none">
+                    <label
+                      htmlFor="paper_semantic_search"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Paper Search {settings.tools.paper_semantic_search?.enabled ? "(Enabled)" : "(Disabled)"}
+                    </label>
+                    <p className="text-sm text-muted-foreground">
+                      Use semantic search to find papers.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-8 rounded-lg bg-muted p-4">
               {isLoading ? (
                 <p>Loading transport information...</p>
               ) : error ? (
                 <p className="text-destructive">Error: {error}</p>
               ) : (
-                <p className="font-medium">
-                  Currently using{" "}
-                  <span className="font-bold text-primary">
-                    {getTransportDisplayName()}
-                  </span>{" "}
-                  transport
-                </p>
+                <div>
+                  <p className="mb-2 text-xs">
+                    Using{" "}
+                    <span className="font-bold text-primary">
+                      {getTransportDisplayName()}
+                    </span>{" "}
+                    transport
+                    {(transportInfo.transport === "sse" || transportInfo.transport === "streamableHttp") && 
+                      transportInfo.port && (
+                        <span className="ml-1">
+                          on port <span className="font-mono">{transportInfo.port}</span>
+                        </span>
+                      )
+                    }
+                  </p>
+                  
+                  <p className={`text-xs mt-2 ${!transportInfo.hfTokenSet ? "text-red-500 font-semibold" : ""}`}>
+                    HF Token: {transportInfo.hfTokenSet ? (
+                      <span className="font-mono">{transportInfo.hfTokenMasked}</span>
+                    ) : (
+                      <span>⚠️ Not configured</span>
+                    )}
+                  </p>
+                </div>
               )}
-            </div>
-
-            <div className="items-top flex space-x-2">
-              <Checkbox 
-                id="space_semantic_search" 
-                checked={settings.tools.space_semantic_search?.enabled || false}
-                onCheckedChange={(checked) => handleToolToggle("space_semantic_search", checked === true)}
-              />
-              <div className="grid gap-1.5 leading-none">
-                <label
-                  htmlFor="space_semantic_search"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Space Search {settings.tools.space_semantic_search?.enabled ? "(Enabled)" : "(Disabled)"}
-                </label>
-                <p className="text-sm text-muted-foreground">
-                  Use semantic search to find Hugging Face Spaces.
-                </p>
-              </div>
-            </div>
-            <div className="items-top flex space-x-2 mt-4">
-              <Checkbox 
-                id="paper_semantic_search" 
-                checked={settings.tools.paper_semantic_search?.enabled || false}
-                onCheckedChange={(checked) => handleToolToggle("paper_semantic_search", checked === true)}
-              />
-              <div className="grid gap-1.5 leading-none">
-                <label
-                  htmlFor="paper_semantic_search"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Paper Search {settings.tools.paper_semantic_search?.enabled ? "(Enabled)" : "(Disabled)"}
-                </label>
-                <p className="text-sm text-muted-foreground">
-                  Use semantic search to find papers from xyz.
-                </p>
-              </div>
             </div>
           </CardContent>
         </Card>

@@ -33,7 +33,7 @@ import {
 import { settingsService, AppSettings, ToolSettings } from "./src/services/settings.js";
 
 // Import shared constants
-import { TransportType, DEFAULT_WEB_APP_PORT } from "./constants.js";
+import { TransportType, DEFAULT_WEB_APP_PORT, DEFAULT_MCP_PORT } from "./constants.js";
 
 // Define type for registered tools
 interface RegisteredTool {
@@ -42,14 +42,26 @@ interface RegisteredTool {
   remove: () => void;
 }
 
-// Track the active transport type
+// Track the active transport type and port
 let activeTransport: TransportType = 'unknown';
+let activePort: number | undefined = undefined;
+
+// Function to mask token (show first 4 and last 5 chars)
+const maskToken = (token: string): string => {
+  if (!token || token.length <= 9) return token;
+  return `${token.substring(0, 4)}...${token.substring(token.length - 5)}`;
+};
+
+// Get HF token from environment
+const getHfToken = (): string | undefined => {
+  return process.env.HF_TOKEN || process.env.HUGGING_FACE_TOKEN;
+};
 
 // Create an Express app to serve the React frontend and provide transport info
 const app = express();
 let webServer: any = null;
 
-export const createServer = (transportType: TransportType = 'unknown', webAppPort: number = DEFAULT_WEB_APP_PORT) => {
+export const createServer = (transportType: TransportType = 'unknown', webAppPort: number = DEFAULT_WEB_APP_PORT, mcpPort: number = DEFAULT_MCP_PORT) => {
   const server = new McpServer(
   {
     name: "hf-mcp-server",
@@ -61,7 +73,14 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
     },
   }
   );
+  
+  // Set active transport and port
   activeTransport = transportType;
+  
+  // Set the port for transports that use a port
+  if (transportType === 'sse' || transportType === 'streamableHttp') {
+    activePort = mcpPort;
+  }
   // Define the semantic search tool using our service
   // Define the semantic search tool
   const spaceSearchTool = server.tool(
@@ -159,9 +178,34 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
   
   app.use(express.static(distPath));
   
-  // API endpoint to get the active transport
+  // API endpoint to get the active transport, port, and masked token
   app.get('/api/transport', (req, res) => {
-    res.json({ transport: activeTransport });
+    const hfToken = getHfToken();
+    
+    // Define the type for transport info with all possible properties
+    type TransportInfoResponse = {
+      transport: TransportType;
+      hfTokenSet: boolean;
+      hfTokenMasked?: string;
+      port?: number;
+    };
+    
+    const transportInfo: TransportInfoResponse = { 
+      transport: activeTransport,
+      hfTokenSet: !!hfToken
+    };
+    
+    // Add masked token if it exists
+    if (hfToken) {
+      transportInfo.hfTokenMasked = maskToken(hfToken);
+    }
+    
+    // Add port if available for relevant transports
+    if (activePort && (activeTransport === 'sse' || activeTransport === 'streamableHttp')) {
+      transportInfo.port = activePort;
+    }
+    
+    res.json(transportInfo);
   });
   
   // API endpoint to get settings
@@ -186,18 +230,6 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
     }
     
     res.json(updatedSettings);
-  });
-  
-  // For any other route, serve the index.html file (for SPA navigation)
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
-
-  app.use(express.static(distPath));
-  
-  // API endpoint to get the active transport
-  app.get('/api/transport', (req, res) => {
-    res.json({ transport: activeTransport });
   });
   
   // For any other route, serve the index.html file (for SPA navigation)
