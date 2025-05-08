@@ -7,6 +7,8 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { InMemoryEventStore } from '@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js';
+import { randomUUID } from 'node:crypto';
 import {
   McpServer,
   ResourceTemplate,
@@ -33,7 +35,7 @@ import {
 import { settingsService, AppSettings, ToolSettings } from "./src/services/settings.js";
 
 // Import shared constants
-import { TransportType, DEFAULT_WEB_APP_PORT, DEFAULT_MCP_PORT } from "./constants.js";
+import { TransportType, DEFAULT_WEB_APP_PORT } from "./constants.js";
 
 // Define type for registered tools
 interface RegisteredTool {
@@ -61,7 +63,7 @@ const getHfToken = (): string | undefined => {
 const app = express();
 let webServer: any = null;
 
-export const createServer = (transportType: TransportType = 'unknown', webAppPort: number = DEFAULT_WEB_APP_PORT, mcpPort: number = DEFAULT_MCP_PORT) => {
+export const createServer = (transportType: TransportType = 'unknown', webAppPort: number = DEFAULT_WEB_APP_PORT) => {
   const server = new McpServer(
   {
     name: "hf-mcp-server",
@@ -77,9 +79,9 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
   // Set active transport and port
   activeTransport = transportType;
   
-  // Set the port for transports that use a port
+  // Since we're consolidating servers, we'll use the web app port for all transports
   if (transportType === 'sse' || transportType === 'streamableHttp') {
-    activePort = mcpPort;
+    activePort = webAppPort;
   }
   // Define the semantic search tool using our service
   // Define the semantic search tool
@@ -116,60 +118,7 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
     }
   }
   
-  // Define a text-based resource with the settings
-  server.resource(
-    "settings",
-    "/settings", 
-    async () => {
-      // Format settings as a resource with contents array containing a text item
-      const settings = settingsService.getSettings();
-      return {
-        contents: [
-          {
-            text: JSON.stringify(settings, null, 2),
-            uri: "/settings",
-            mimeType: "application/json"
-          }
-        ]
-      };
-    }
-  );
   
-  // Create a standard API endpoint for settings update instead of MCP resource update
-  // since we're already using a REST API for the frontend
-  
-  // Tools settings management tool
-  server.tool(
-    "manage_tool_settings",
-    {
-      toolId: z.string().min(1, "Tool ID is required"),
-      enabled: z.boolean(),
-    },
-    async ({ toolId, enabled }: { toolId: string; enabled: boolean }) => {
-      // Update the settings in our service
-      const updatedSettings = settingsService.updateToolSettings(toolId, { enabled });
-      
-      // Enable or disable the MCP tool if it exists in our registry
-      if (registeredTools[toolId]) {
-        if (enabled) {
-          registeredTools[toolId].enable();
-          console.log(`Tool ${toolId} has been enabled`);
-        } else {
-          registeredTools[toolId].disable();
-          console.log(`Tool ${toolId} has been disabled`);
-        }
-      } else {
-        console.log(`Tool ${toolId} not found in registered tools`);
-      }
-      
-      return {
-        content: [{ 
-          type: "text", 
-          text: `The ${toolId} tool has been ${enabled ? "enabled" : "disabled"}.` 
-        }],
-      };
-    }
-  );
 
   // Serve the React app from the dist directory
   const __filename = fileURLToPath(import.meta.url);
@@ -232,7 +181,172 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
     res.json(updatedSettings);
   });
   
+  // Add SSE transport handling to the main Express app
+  if (transportType === 'sse') {
+    // Add SSE endpoints to the main Express app
+    let sseTransport: SSEServerTransport;
+    
+    app.get("/sse", async (req, res) => {
+      console.log("Received SSE connection");
+      // Set the correct content type for SSE
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      
+      sseTransport = new SSEServerTransport("/message", res);
+      await server.connect(sseTransport);
+      
+      server.server.onclose = async () => {
+        await cleanup();
+        await server.close();
+        process.exit(0);
+      };
+    });
+    
+    app.post("/message", async (req, res) => {
+      console.log("Received SSE message");
+      await sseTransport.handlePostMessage(req, res);
+    });
+  }
+  
+  // Add Streamable HTTP transport handling to the main Express app
+  if (transportType === 'streamableHttp') {
+    // Setup for StreamableHTTP transport
+    const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+    
+    app.post('/mcp', async (req: any, res: any) => {
+      console.log('Received MCP POST request');
+      try {
+        // Check for existing session ID
+        const sessionId = req.headers['mcp-session-id'] as string | undefined;
+        let transport: StreamableHTTPServerTransport;
+        
+        if (sessionId && transports[sessionId]) {
+          // Reuse existing transport
+          transport = transports[sessionId];
+        } else if (!sessionId) {
+          // New initialization request
+          const eventStore = new InMemoryEventStore();
+          transport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: () => randomUUID(),
+            eventStore, // Enable resumability
+            onsessioninitialized: (sessionId) => {
+              console.log(`Session initialized with ID: ${sessionId}`);
+              transports[sessionId] = transport;
+            }
+          });
+          
+          // Set up onclose handler to clean up transport when closed
+          transport.onclose = () => {
+            const sid = transport.sessionId;
+            if (sid && transports[sid]) {
+              console.log(`Transport closed for session ${sid}, removing from transports map`);
+              delete transports[sid];
+            }
+          };
+          
+          // Connect the transport to the MCP server
+          await server.connect(transport);
+          
+          await transport.handleRequest(req, res);
+          return;
+        } else {
+          // Invalid request - no session ID or not initialization request
+          res.status(400).json({
+            jsonrpc: '2.0',
+            error: {
+              code: -32000,
+              message: 'Bad Request: No valid session ID provided',
+            },
+            id: req?.body?.id,
+          });
+          return;
+        }
+        
+        // Handle the request with existing transport
+        await transport.handleRequest(req, res);
+      } catch (error) {
+        console.error('Error handling MCP request:', error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            jsonrpc: '2.0',
+            error: {
+              code: -32603,
+              message: 'Internal server error',
+            },
+            id: req?.body?.id,
+          });
+        }
+      }
+    });
+    
+    // Handle GET requests for SSE streams
+    app.get('/mcp', async (req: any, res: any) => {
+      console.log('Received MCP GET request');
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      if (!sessionId || !transports[sessionId]) {
+        res.status(400).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32000,
+            message: 'Bad Request: No valid session ID provided',
+          },
+          id: req?.body?.id,
+        });
+        return;
+      }
+      
+      const transport = transports[sessionId];
+      await transport.handleRequest(req, res);
+    });
+    
+    // Handle DELETE requests for session termination
+    app.delete('/mcp', async (req: any, res: any) => {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      if (!sessionId || !transports[sessionId]) {
+        res.status(400).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32000,
+            message: 'Bad Request: No valid session ID provided',
+          },
+          id: req?.body?.id,
+        });
+        return;
+      }
+      
+      console.log(`Received session termination request for session ${sessionId}`);
+      
+      try {
+        const transport = transports[sessionId];
+        await transport.handleRequest(req, res);
+      } catch (error) {
+        console.error('Error handling session termination:', error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            jsonrpc: '2.0',
+            error: {
+              code: -32603,
+              message: 'Error handling session termination',
+            },
+            id: req?.body?.id,
+          });
+        }
+      }
+    });
+  }
+  
+  // Add STDIO transport handling
+  if (transportType === 'stdio') {
+    // STDIO transport is handled differently, as it uses stdin/stdout
+    const stdioTransport = new StdioServerTransport();
+    server.connect(stdioTransport).catch(error => {
+      console.error("Error connecting STDIO transport:", error);
+    });
+  }
+  
   // For any other route, serve the index.html file (for SPA navigation)
+  // IMPORTANT: This must be the LAST route defined
   app.get('*', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
   });
@@ -241,16 +355,19 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
   const startWebServer = () => {
     if (!webServer) {
       webServer = app.listen(webAppPort, () => {
-        console.log(`React app serving at http://localhost:${webAppPort}`);
+        console.log(`Server running at http://localhost:${webAppPort}`);
+        console.log(`Transport type: ${transportType}`);
       });
     }
   };
 
   const cleanup = async () => {
-    if (webServer) 
+    if (webServer) {
       console.log('Shutting down web server...');
       // improve mcp server & express shutdown handling
+    }
   };
+  
   startWebServer();
-  return { server, cleanup };  
+  return { server, cleanup, app };  
 }

@@ -110,7 +110,7 @@ function App() {
     paper_semantic_search: {
       id: "paper_semantic_search",
       label: "Paper Search",
-      description: "Find Researh Papers with semantic search.",
+      description: "Find Research Papers with semantic search.",
       settings: settings.tools.paper_semantic_search || { enabled: false }
     }
   };
@@ -151,14 +151,14 @@ function App() {
         
         <ToolsCard 
           title="Hugging Face Developer Tools" 
-          description="Build and integrate Gradio applications - ideal for platforms like Cursor, VSCode, Goose or Claude Code."
+          description="IDE focussed tools to build and integrate Gradio applications - use with Cursor, Goose, VSCode etc."
           tools={developerTools} 
           onToolToggle={handleToolToggle}
         />
         
         <ToolsCard 
           title="Hugging Face Administration Tools" 
-          description="Tools for administering Hugging Face Services."
+          description="Administer Hugging Face Services and Repositories."
           tools={adminTools} 
           onToolToggle={handleToolToggle}
         />

@@ -44,8 +44,7 @@ export function ConnectionInfo({ isLoading, error, transportInfo }: ConnectionIn
               <span className="font-medium w-24">Transport:</span>
               <span className="font-medium text-primary">
                 {getTransportDisplayName()}
-                {(transportInfo.transport === "sse" || transportInfo.transport === "streamableHttp") && 
-                  transportInfo.port && (
+                {transportInfo.port && (
                     <span className="ml-1">
                       on port <span className="font-mono">{transportInfo.port}</span>
                     </span>

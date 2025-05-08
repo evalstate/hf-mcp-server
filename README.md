@@ -30,7 +30,7 @@ docker build -t hf-mcp-server .
 
 Run with default settings (SSE transport):
 ```bash
-docker run -p 3000:3000 -p 3001:3001 hf-mcp-server
+docker run -p 3000:3000 hf-mcp-server
 ```
 
 Run with alternative transport:
@@ -39,13 +39,15 @@ Run with alternative transport:
 docker run -e TRANSPORT_TYPE=stdio hf-mcp-server
 
 # Use streamableHttp transport
-docker run -p 3000:3000 -p 3001:3001 -e TRANSPORT_TYPE=streamableHttp hf-mcp-server
+docker run -p 3000:3000 -e TRANSPORT_TYPE=streamableHttp hf-mcp-server
 ```
 
 With Hugging Face token:
 ```bash
-docker run -p 3000:3000 -p 3001:3001 -e HF_TOKEN=your_token_here hf-mcp-server
+docker run -p 3000:3000 -e HF_TOKEN=your_token_here hf-mcp-server
 ```
+
+Note: The server now runs all services (React app and MCP transport) on a single port (default: 3000).
 
 ## Design Notes
 

@@ -14,10 +14,10 @@
     "start:server": "node dist/mcp-server.js",
     "test:search": "tsx test-semantic-search.ts",
     "docker:build": "docker build -t hf-mcp-server .",
-    "docker:run": "docker run -p 3000:3000 -p 3001:3001 -e HF_TOKEN=${HF_TOKEN} hf-mcp-server",
-    "docker:run:sse": "docker run -p 3000:3000 -p 3001:3001 -e TRANSPORT_TYPE=sse -e HF_TOKEN=${HF_TOKEN} hf-mcp-server",
+    "docker:run": "docker run -p 3000:3000 -e HF_TOKEN=${HF_TOKEN} hf-mcp-server",
+    "docker:run:sse": "docker run -p 3000:3000 -e TRANSPORT_TYPE=sse -e HF_TOKEN=${HF_TOKEN} hf-mcp-server",
     "docker:run:stdio": "docker run -p 3000:3000 -e TRANSPORT_TYPE=stdio -e HF_TOKEN=${HF_TOKEN} hf-mcp-server",
-    "docker:run:streamableHttp": "docker run -p 3000:3000 -p 3001:3001 -e TRANSPORT_TYPE=streamableHttp -e HF_TOKEN=${HF_TOKEN} hf-mcp-server"
+    "docker:run:streamableHttp": "docker run -p 3000:3000 -e TRANSPORT_TYPE=streamableHttp -e HF_TOKEN=${HF_TOKEN} hf-mcp-server"
   },
   "bin": {
     "hf-mcp-server": "./dist/mcp-server.js"
