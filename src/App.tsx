@@ -104,13 +104,13 @@ function App() {
     space_semantic_search: {
       id: "space_semantic_search",
       label: "Space Search",
-      description: "Semantic Search for Hugging Face Spaces.",
+      description: "Find Spaces with semantic search.",
       settings: settings.tools.space_semantic_search || { enabled: false }
     },
     paper_semantic_search: {
       id: "paper_semantic_search",
       label: "Paper Search",
-      description: "Use semantic search to find papers.",
+      description: "Find Researh Papers with semantic search.",
       settings: settings.tools.paper_semantic_search || { enabled: false }
     }
   };
@@ -119,13 +119,13 @@ function App() {
     gradio_api_endpoints: {
       id: "gradio_api_endpoints",
       label: "Gradio API Endpoint details",
-      description: "Access Gradio API endpoints and configuration.",
+      description: "Access Gradio API endpoint details.",
       settings: settings.tools.gradio_api_endpoints || { enabled: false }
     },
     gradio_integration_docs: {
       id: "gradio_integration_docs",
       label: "Gradio Integration Documentation",
-      description: "Access documentation for Gradio integration.",
+      description: "Use Gradio integration instructions.",
       settings: settings.tools.gradio_integration_docs || { enabled: false }
     }
   };
@@ -144,21 +144,21 @@ function App() {
       <div className="flex h-screen w-screen items-center justify-center flex-col gap-6 pb-12">
         <ToolsCard 
           title="Hugging Face Search Tools (MCP)" 
-          description="Tools for finding and using Hugging Face content."
+          description="Find and use Hugging Face and Community content."
           tools={searchTools} 
           onToolToggle={handleToolToggle}
         />
         
         <ToolsCard 
           title="Hugging Face Developer Tools" 
-          description="Tools for developers integrating with Hugging Face/Gradio. Ideal for platforms like Cursor, Goose or Claude Code."
+          description="Build and integrate Gradio applications - ideal for platforms like Cursor, VSCode, Goose or Claude Code."
           tools={developerTools} 
           onToolToggle={handleToolToggle}
         />
         
         <ToolsCard 
           title="Hugging Face Administration Tools" 
-          description="Tools for working with Hugging Face Services. "
+          description="Tools for administering Hugging Face Services."
           tools={adminTools} 
           onToolToggle={handleToolToggle}
         />
