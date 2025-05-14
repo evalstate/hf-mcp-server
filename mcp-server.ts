@@ -126,6 +126,10 @@ export const createServer = async (transportType: TransportType = 'unknown', web
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
   
+  // Define the root directory (important for Vite to find the right files)
+  // In development mode, we need to go up one level from dist to the project root
+  const rootDir = isDev ? path.resolve(__dirname, '..') : __dirname;
+  
   // Configure API endpoints first (these need to be available in both dev and prod)
   app.get('/api/transport', (req, res) => {
     const hfToken = getHfToken();
@@ -345,23 +349,31 @@ export const createServer = async (transportType: TransportType = 'unknown', web
     // In development mode, use Vite's dev server middleware
     try {
       const { createServer: createViteServer } = await import('vite');
+      
+      // Create Vite server with proper HMR configuration - load config from default location
       const vite = await createViteServer({
-        server: { middlewareMode: true },
+        // Let Vite find the config file automatically
+        server: { 
+          middlewareMode: true,
+          hmr: true // Explicitly enable HMR
+        },
         appType: 'spa',
-        root: __dirname
+        root: rootDir
       });
       
       // Use Vite's middleware for dev server with HMR
       app.use(vite.middlewares);
       
-      console.log("Using Vite middleware in development mode");
+      console.log("Using Vite middleware in development mode with HMR enabled");
+      console.log(`Vite root directory: ${rootDir}`);
     } catch (err) {
       console.error("Error setting up Vite middleware:", err);
+      console.error(err);
       process.exit(1);
     }
   } else {
     // In production mode, serve static files from dist directory
-    const distPath = path.join(__dirname, 'dist');
+    const distPath = path.join(rootDir, 'dist');
     app.use(express.static(distPath));
     
     // For any other route in production, serve the index.html file (for SPA navigation)
@@ -375,7 +387,11 @@ export const createServer = async (transportType: TransportType = 'unknown', web
       webServer = app.listen(webAppPort, () => {
         console.log(`Server running at http://localhost:${webAppPort}`);
         console.log(`Transport type: ${transportType}`);
-        console.log(`Mode: ${isDev ? 'development' : 'production'}`);
+        console.log(`Mode: ${isDev ? 'development with HMR' : 'production'}`);
+        if (isDev) {
+          console.log(`HMR is active - frontend changes will be automatically reflected in the browser`);
+          console.log(`For server changes, use 'npm run dev:watch' to automatically rebuild and apply changes`);
+        }
       });
     }
   };
