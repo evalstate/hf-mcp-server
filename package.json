@@ -1,7 +1,7 @@
 {
   "name": "hf-mcp-server",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run watch:server\" \"vite\"",
@@ -23,7 +23,7 @@
     "hf-mcp-server": "./dist/mcp-server.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.11.0",
+    "@modelcontextprotocol/sdk": "^1.11.2",
     "@radix-ui/react-checkbox": "^1.2.3",
     "@radix-ui/react-label": "^2.1.4",
     "@tailwindcss/vite": "^4.1.5",

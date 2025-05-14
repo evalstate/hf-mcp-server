@@ -86,8 +86,6 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
   if (transportType === 'sse' || transportType === 'streamableHttp') {
     activePort = webAppPort;
   }
-  // Define the semantic search tool using our service
-  // Define the semantic search tool
   const spaceSearchTool = server.tool(
     "space_semantic_search",
     {
@@ -102,7 +100,6 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
     }
   );
   
-  // Store the tool reference for later enable/disable
   const registeredTools: { [toolId: string]: RegisteredTool } = {
     space_semantic_search: spaceSearchTool
   };
@@ -130,7 +127,6 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
   
   app.use(express.static(distPath));
   
-  // API endpoint to get the active transport, port, and masked token
   app.get('/api/transport', (req, res) => {
     const hfToken = getHfToken();
     
@@ -147,12 +143,10 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
       hfTokenSet: !!hfToken
     };
     
-    // Add masked token if it exists
     if (hfToken) {
       transportInfo.hfTokenMasked = maskToken(hfToken);
     }
     
-    // Add port if available for relevant transports
     if (activePort && (activeTransport === 'sse' || activeTransport === 'streamableHttp')) {
       transportInfo.port = activePort;
     }
@@ -184,7 +178,6 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
     res.json(updatedSettings);
   });
   
-  // Add SSE transport handling to the main Express app
   if (transportType === 'sse') {
     // Add SSE endpoints to the main Express app
     let sseTransport: SSEServerTransport;
@@ -212,7 +205,6 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
     });
   }
   
-  // Add Streamable HTTP transport handling to the main Express app
   if (transportType === 'streamableHttp') {
     // Setup for StreamableHTTP transport
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
@@ -349,12 +341,10 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
   }
   
   // For any other route, serve the index.html file (for SPA navigation)
-  // IMPORTANT: This must be the LAST route defined
   app.get('*', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
   });
 
-  // Start the web server if it's not already running
   const startWebServer = () => {
     if (!webServer) {
       webServer = app.listen(webAppPort, () => {
