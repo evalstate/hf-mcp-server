@@ -65,8 +65,10 @@ const getHfToken = (): string | undefined => {
 // Create an Express app to serve the React frontend and provide transport info
 const app = express();
 let webServer: any = null;
+// Determine if we're in development mode
+const isDev = process.env.NODE_ENV === 'development';
 
-export const createServer = (transportType: TransportType = 'unknown', webAppPort: number = DEFAULT_WEB_APP_PORT) => {
+export const createServer = async (transportType: TransportType = 'unknown', webAppPort: number = DEFAULT_WEB_APP_PORT) => {
   const server = new McpServer(
   {
     name: "hf-mcp-server",
@@ -120,13 +122,11 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
   
   
 
-  // Serve the React app from the dist directory
+  // Get the file paths
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
-  const distPath = path.join(__dirname);
   
-  app.use(express.static(distPath));
-  
+  // Configure API endpoints first (these need to be available in both dev and prod)
   app.get('/api/transport', (req, res) => {
     const hfToken = getHfToken();
     
@@ -340,16 +340,42 @@ export const createServer = (transportType: TransportType = 'unknown', webAppPor
     });
   }
   
-  // For any other route, serve the index.html file (for SPA navigation)
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
+  // Handle static file serving and SPA navigation based on mode
+  if (isDev) {
+    // In development mode, use Vite's dev server middleware
+    try {
+      const { createServer: createViteServer } = await import('vite');
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+        root: __dirname
+      });
+      
+      // Use Vite's middleware for dev server with HMR
+      app.use(vite.middlewares);
+      
+      console.log("Using Vite middleware in development mode");
+    } catch (err) {
+      console.error("Error setting up Vite middleware:", err);
+      process.exit(1);
+    }
+  } else {
+    // In production mode, serve static files from dist directory
+    const distPath = path.join(__dirname, 'dist');
+    app.use(express.static(distPath));
+    
+    // For any other route in production, serve the index.html file (for SPA navigation)
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
 
   const startWebServer = () => {
     if (!webServer) {
       webServer = app.listen(webAppPort, () => {
         console.log(`Server running at http://localhost:${webAppPort}`);
         console.log(`Transport type: ${transportType}`);
+        console.log(`Mode: ${isDev ? 'development' : 'production'}`);
       });
     }
   };

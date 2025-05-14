@@ -12,10 +12,14 @@ const argv = minimist(process.argv.slice(2), {
 });
 
 console.error('Starting default (STDIO) server...');
+
+// Set development mode environment variable
+process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+
 const WEB_APP_PORT = parseInt(argv.port);
 
 async function main() {
-  const { server, cleanup } = createServer('stdio', WEB_APP_PORT);
+  const { server, cleanup } = await createServer('stdio', WEB_APP_PORT);
 
   // Cleanup on exit
   process.on("SIGINT", async () => {
