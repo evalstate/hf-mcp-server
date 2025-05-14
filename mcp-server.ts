@@ -88,12 +88,22 @@ export const createServer = async (transportType: TransportType = 'unknown', web
   if (transportType === 'sse' || transportType === 'streamableHttp') {
     activePort = webAppPort;
   }
+
+  // "Hugging Face Spaces" are known by Qwen2.5/3, Sonnet/Haiku and OpenAI Models
   const spaceSearchTool = server.tool(
-    "space_semantic_search",
+    "space_search",
+    "Find Hugging Face Spaces with semantic search. Results are returned in a markdown table.",
     {
       query: z.string().min(1, "Search query is required"),
       limit: z.number().optional(),
     },
+    {
+     title: "Semantic Space Search",
+     destructiveHint: false,
+     readOnlyHint: true,
+     openWorldHint: true, 
+    },
+
     async ({ query, limit }) => {
       const results = await semanticSearch.search(query, limit);
       return {
