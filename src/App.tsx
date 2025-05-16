@@ -107,10 +107,16 @@ function App() {
       description: "Find Spaces with semantic search.",
       settings: settings.tools.space_semantic_search || { enabled: false }
     },
+    model_search: {
+      id: "model_search",
+      label: "Model Search",
+      description: "Find Models with configurable search parameters.",
+      settings: settings.tools.model_search || { enabled: false }
+    },    
     paper_semantic_search: {
       id: "paper_semantic_search",
-      label: "Paper Search",
-      description: "Find Research Papers with semantic search.",
+      label: "Papers Search",
+      description: "Find ML research papers with semantic search.",
       settings: settings.tools.paper_semantic_search || { enabled: false }
     }
   };

@@ -22,6 +22,9 @@ const defaultSettings: AppSettings = {
     space_semantic_search: {
       enabled: true,
     },
+    model_search: {
+      enabled: true,
+    },
     paper_semantic_search: {
       enabled: false,
     },

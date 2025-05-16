@@ -3,7 +3,6 @@
 import express from "express";
 import path, { format } from "path";
 import { fileURLToPath } from "url";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -11,25 +10,25 @@ import { InMemoryEventStore } from '@modelcontextprotocol/sdk/examples/shared/in
 import { randomUUID } from 'node:crypto';
 import {
   McpServer,
-  ResourceTemplate,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
-import {
-  CallToolRequestSchema,
-  ListResourcesRequestSchema,
-  ListToolsRequestSchema,
-  ReadResourceRequestSchema,
-  ToolSchema,
-  SamplingMessageSchema,
-  ToolAnnotationsSchema,
-} from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 // Import the semantic search service
 import {
   semanticSearch,
-  SearchParamsSchema,
   formatSearchResults,
 } from "./src/services/semantic-search.js";
+
+import {
+  modelSearch,
+  ModelSearchParamsSchema,
+} from "./src/services/model-search.js";
+
+// Import the papers search service
+import {
+  papersSearch,
+  formatSearchResults as formatPaperResults,
+} from "./src/services/papers-search.js";
 
 // Import the settings service
 import { settingsService, AppSettings, ToolSettings } from "./src/services/settings.js";
@@ -43,9 +42,6 @@ interface RegisteredTool {
   disable: () => void;
   remove: () => void;
 }
-
-// Import minimist for parsing command line arguments
-import minimist from 'minimist';
 
 // Track the active transport type and port
 let activeTransport: TransportType = 'unknown';
@@ -111,9 +107,64 @@ export const createServer = async (transportType: TransportType = 'unknown', web
       };
     }
   );
+
+  const modelSearchTool = server.tool(
+    "model_search",
+    "Search Hugging Face Models. Returns model information in JSON format.",
+    {
+      search: z.string().min(1, "Search query is required"),
+      limit: z.number().optional().default(5),
+      sort: z.enum(["trendingScore", "downloads", "likes"]).optional().default("trendingScore"),
+      direction: z.enum(["asc", "desc"]).optional().default("desc"),
+    },
+    {
+    title: "Model Search",
+    destructiveHint: false,
+    readOnlyHint: true,
+    openWorldHint: true, 
+    },
+    async ({ search, limit, sort, direction }) => {
+      const results = await modelSearch.search({
+        search,
+        limit: limit || 5,
+        sort: sort || "trendingScore",
+        direction: direction || "desc",
+      });
+      
+      return {
+        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+      };
+    }
+  );
+  
+  const paperSearchTool = server.tool(
+    "paper_search",
+    "Search for ML research papers on Hugging Face. Results are returned in a markdown table.",
+    {
+      query: z.string().min(1, "Search query is required"),
+      limit: z.number().optional().default(10),
+    },
+    {
+      title: "Paper Search",
+      destructiveHint: false,
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
+    async ({ query, limit }) => {
+      const results = await papersSearch.search(query, limit);
+      return {
+        content: [{ type: "text", text: formatPaperResults(query, results) }],
+      };
+    }
+  );
+
+// Add to registered tools
+// registeredTools["model_search"] = modelSearchTool;  
   
   const registeredTools: { [toolId: string]: RegisteredTool } = {
-    space_semantic_search: spaceSearchTool
+    space_semantic_search: spaceSearchTool,
+    model_search: modelSearchTool,
+    paper_semantic_search: paperSearchTool,
   };
   
   // Initialize tool state based on settings
@@ -137,9 +188,8 @@ export const createServer = async (transportType: TransportType = 'unknown', web
   const __dirname = path.dirname(__filename);
   
   // Define the root directory (important for Vite to find the right files)
-  // In development mode, we need to go up one level from dist to the project root
-  const rootDir = isDev ? path.resolve(__dirname, '..') : __dirname;
-  
+  const rootDir = isDev ? path.resolve(__dirname, '..') : path.resolve(__dirname);
+  // In production, the static files are in the same directory as the server code
   // Configure API endpoints first (these need to be available in both dev and prod)
   app.get('/api/transport', (req, res) => {
     const hfToken = getHfToken();
@@ -383,7 +433,7 @@ export const createServer = async (transportType: TransportType = 'unknown', web
     }
   } else {
     // In production mode, serve static files from dist directory
-    const distPath = path.join(rootDir, 'dist');
+    const distPath = rootDir
     app.use(express.static(distPath));
     
     // For any other route in production, serve the index.html file (for SPA navigation)
