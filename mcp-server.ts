@@ -88,7 +88,7 @@ export const createServer = async (
     "space_search",
     "Find Hugging Face Spaces with semantic search. " +
       "Results are returned in a markdown table." +
-      "Include links to the spaces when presenting the results.",
+      "Include links to the space when presenting the results.",
     {
       query: z.string().min(1, "Search query is required"),
       limit: z.number().optional(),
@@ -140,10 +140,11 @@ export const createServer = async (
     }
   );
 
+  /** NB Claude models are extremely sensitive to tool descriptions/length  */
   const paperSearchTool = server.tool(
     "paper_search",
     "Search for Machine Learning research papers on Hugging Face. " +
-      "When presenting the results include 'Link to paper'. " +
+      "Include 'Link to paper' When presenting the results. " +
       "Consider whether tabulating matches user intent.",
     {
       query: z.string().min(3, "Supply at least one search term"),
