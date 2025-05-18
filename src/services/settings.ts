@@ -26,7 +26,7 @@ const defaultSettings: AppSettings = {
       enabled: true,
     },
     paper_semantic_search: {
-      enabled: false,
+      enabled: true,
     },
   },
 };
@@ -52,18 +52,21 @@ export const settingsService = {
   /**
    * Update settings for a specific tool
    */
-  updateToolSettings(toolId: string, newSettings: Partial<ToolSettings>): ToolSettings {
+  updateToolSettings(
+    toolId: string,
+    newSettings: Partial<ToolSettings>
+  ): ToolSettings {
     // Create tool settings if they don't exist
     if (!settings.tools[toolId]) {
       settings.tools[toolId] = { enabled: false };
     }
-    
+
     // Update settings
     settings.tools[toolId] = {
       ...settings.tools[toolId],
       ...newSettings,
     };
-    
+
     return { ...settings.tools[toolId] };
   },
 

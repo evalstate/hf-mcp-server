@@ -18,7 +18,7 @@ RUN chmod +x start.sh
 # Set environment variables
 ENV NODE_ENV=production
 # Default to SSE transport - can be overridden at runtime
-ENV TRANSPORT_TYPE=sse
+ENV TRANSPORT_TYPE=streamableHttp
 # Default port - can be overridden at runtime
 ENV PORT=3000
 # HF_TOKEN can be provided at runtime

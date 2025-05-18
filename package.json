@@ -4,10 +4,10 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "tsc -b tsconfig.server.json && cross-env NODE_ENV=development node dist/sse.js",
+    "dev": "tsc -b tsconfig.server.json && cross-env NODE_ENV=development node dist/streamableHttp.js",
     "dev:stdio": "tsc -b tsconfig.server.json && cross-env NODE_ENV=development node dist/stdio.js",
     "dev:http": "tsc -b tsconfig.server.json && cross-env NODE_ENV=development node dist/streamableHttp.js",
-    "dev:watch": "concurrently \"npm run watch:server\" \"cross-env NODE_ENV=development node dist/sse.js\"",
+    "dev:watch": "concurrently \"npm run watch:server\" \"cross-env NODE_ENV=development node dist/streamableHttp.js\"",
     "build": "npm run build:server && tsc -b && vite build",
     "build:server": "tsc -b tsconfig.server.json",
     "lint": "eslint .",
