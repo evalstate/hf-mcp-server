@@ -18,7 +18,7 @@ The Web Application and HTTP Transports start by default on Port 3000.
 
 SSE and StreamableHTTP services are available at `/sse` and `/mcp` respectively. Although though not strictly enforced by the specification this is common convention.
 
-> ![TIP]
+> [!TIP]
 > The Web Application allows you to switch tools on and off. For STDIO, SSE and StreamableHTTP this will send a ToolListChangedNotification to the MCP Client. In StreamableHTTPJSON mode the tool will not be listed when the client next requests the tool lists.
 
 ## Docker Usage
