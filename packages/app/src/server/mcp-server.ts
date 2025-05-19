@@ -12,6 +12,8 @@ import {
   SEMANTIC_SEARCH_TOOL_CONFIG,
   ModelSearchTool,
   MODEL_SEARCH_TOOL_CONFIG,
+  ModelDetailTool,
+  MODEL_DETAIL_TOOL_CONFIG,
   PaperSearchTool,
   PAPER_SEARCH_TOOL_CONFIG,
 } from "@hf-mcp/mcp";
@@ -100,18 +102,32 @@ export const createServer = async (
     MODEL_SEARCH_TOOL_CONFIG.description,
     MODEL_SEARCH_TOOL_CONFIG.schema.shape,
     MODEL_SEARCH_TOOL_CONFIG.annotations,
-    async ({ search, limit, sort, direction }) => {
+    async (params) => {
       const hfToken = getHfToken();
       const modelSearch = new ModelSearchTool(hfToken);
-      const results = await modelSearch.search({
-        search,
-        limit: limit || 5,
-        sort: sort || "trendingScore",
-        direction: direction || "desc",
-      });
+      const results = await modelSearch.searchWithParams(params);
 
       return {
-        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+        content: [{ type: "text", text: results }],
+      };
+    }
+  );
+
+  const modelDetailTool = server.tool(
+    MODEL_DETAIL_TOOL_CONFIG.name,
+    MODEL_DETAIL_TOOL_CONFIG.description,
+    MODEL_DETAIL_TOOL_CONFIG.schema.shape,
+    MODEL_DETAIL_TOOL_CONFIG.annotations,
+    async (params) => {
+      const hfToken = getHfToken();
+      const modelDetail = new ModelDetailTool(hfToken);
+      const results = await modelDetail.getDetails(
+        params.model_id, 
+        params.include_files
+      );
+
+      return {
+        content: [{ type: "text", text: results }],
       };
     }
   );
@@ -134,6 +150,7 @@ export const createServer = async (
   const registeredTools: { [toolId: string]: RegisteredTool } = {
     [SEMANTIC_SEARCH_TOOL_CONFIG.name]: spaceSearchTool,
     [MODEL_SEARCH_TOOL_CONFIG.name]: modelSearchTool,
+    [MODEL_DETAIL_TOOL_CONFIG.name]: modelDetailTool,
     [PAPER_SEARCH_TOOL_CONFIG.name]: paperSearchTool,
   };
 

@@ -29,8 +29,10 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<AppSettings>({
     tools: {
-      space_search: { enabled: false }, 
-      paper_search: { enabled: false }  ,
+      space_search: { enabled: false },
+      model_search: { enabled: false },
+      model_detail: { enabled: false },
+      paper_search: { enabled: false },
     }
   });
 
@@ -110,9 +112,15 @@ function App() {
     model_search: {
       id: "model_search",
       label: "Model Search",
-      description: "Find Models with configurable search parameters.",
+      description: "Search for ML models with filters for task, library, etc.",
       settings: settings.tools.model_search || { enabled: false }
-    },    
+    },
+    model_detail: {
+      id: "model_detail",
+      label: "Model Details",
+      description: "Get detailed information about a specific model.",
+      settings: settings.tools.model_detail || { enabled: false }
+    },
     paper_search: { // Changed from paper_semantic_search
       id: "paper_search",
       label: "Papers Search",

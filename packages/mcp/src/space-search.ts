@@ -36,7 +36,7 @@ export const SEMANTIC_SEARCH_TOOL_CONFIG = {
     "Results are returned in a markdown table. " +
     "Include links to the space when presenting the results.",
   schema: z.object({
-    query: z.string().min(1, "Search query is required"),
+    query: z.string().min(1, "Search query is required").max(50,"Query too long"),
     limit: z.number().optional().default(RESULTS_TO_RETURN),
   }),
   annotations: {

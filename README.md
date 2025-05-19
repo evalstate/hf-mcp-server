@@ -1,5 +1,26 @@
 # HF Services MCP Server
 
+## Quick Guide
+
+This repo contains:
+
+ - MCP Tool Implementations for connecting to the HuggingFace API for integration to an MCP Server
+ - A Web Application and set of Transports for deploying the MCP Server.
+
+The following modes are supported:
+
+- STDIO 
+- SSE (To be deprecated, but still commonly deployed).
+- StreamableHTTP
+- StreamableHTTP in Stateless JSON Mode (**StreamableHTTPJson**)
+
+The Web Application and HTTP Transports start by default on Port 3000. 
+
+SSE and StreamableHTTP services are available at `/sse` and `/mcp` respectively. Although though not strictly enforced by the specification this is common convention.
+
+> ![TIP]
+> The Web Application allows you to switch tools on and off. For STDIO, SSE and StreamableHTTP this will send a ToolListChangedNotification to the MCP Client. In StreamableHTTPJSON mode the tool will not be listed when the client next requests the tool lists.
+
 ## Docker Usage
 
 ### Using NPM Scripts
@@ -133,5 +154,3 @@ npm run start:json
 ```
 
 These commands automatically set up the proper flags for enabling JSON response mode.
-
-## Design Notes

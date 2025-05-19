@@ -20,7 +20,7 @@ export const PAPER_SEARCH_TOOL_CONFIG = {
   name: "paper_search",
   description: "Search for Machine Learning research papers on Hugging Face. " +
     "Include 'Link to paper' When presenting the results. " +
-    "Consider whether tabulating matches user intent.",
+    "Consider whether tabulating matches user intent. The",
   schema: z.object({
   query: z
     .string()

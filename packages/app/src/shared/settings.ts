@@ -25,6 +25,9 @@ const defaultSettings: AppSettings = {
     model_search: {
       enabled: true,
     },
+    model_detail: {
+      enabled: true,
+    },
     paper_search: { // Changed from paper_semantic_search to match PAPER_SEARCH_TOOL_CONFIG.name
       enabled: true,
     },
