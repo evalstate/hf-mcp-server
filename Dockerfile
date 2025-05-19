@@ -1,23 +1,24 @@
 FROM node:22-alpine
 
+RUN corepack enable pnpm
+
 WORKDIR /app
 
 # Copy package files and install dependencies
-COPY package*.json ./
-RUN npm ci
-
+COPY pnpm-workspace.yaml pnpm-lock.yaml package*.json ./
+RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN pnpm run build
 
 # Make startup script executable
 RUN chmod +x start.sh
 
 # Set environment variables
 ENV NODE_ENV=production
-# Default to SSE transport - can be overridden at runtime
+# Default to HTTP transport - can be overridden at runtime
 ENV TRANSPORT_TYPE=streamableHttp
 # Default port - can be overridden at runtime
 ENV PORT=3000

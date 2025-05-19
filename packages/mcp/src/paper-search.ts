@@ -206,21 +206,21 @@ export function authors(
   return `**Authors:** ${f.join(", ")}`;
 }
 
-/**
- * Escapes special markdown characters in a string
- * @param text The text to escape
- * @returns The escaped text
- */
-function escapeMarkdown(text: string): string {
-  if (!text) return "";
-  // Replace pipe characters and newlines for table compatibility
-  // Plus additional markdown formatting characters for better safety
-  return text
-    .replace(/\|/g, "\\|")
-    .replace(/\n/g, " ")
-    .replace(/\*/g, "\\*")
-    .replace(/_/g, "\\_")
-    .replace(/~/g, "\\~")
-    .replace(/>/g, "\\>")
-    .replace(/#/g, "\\#");
-}
+// /**
+//  * Escapes special markdown characters in a string
+//  * @param text The text to escape
+//  * @returns The escaped text
+//  */
+// function escapeMarkdown(text: string): string {
+//   if (!text) return "";
+//   // Replace pipe characters and newlines for table compatibility
+//   // Plus additional markdown formatting characters for better safety
+//   return text
+//     .replace(/\|/g, "\\|")
+//     .replace(/\n/g, " ")
+//     .replace(/\*/g, "\\*")
+//     .replace(/_/g, "\\_")
+//     .replace(/~/g, "\\~")
+//     .replace(/>/g, "\\>")
+//     .replace(/#/g, "\\#");
+// }

@@ -15,21 +15,15 @@ import { z } from "zod";
 import {
   semanticSearch,
   formatSearchResults,
-} from "./src/services/semantic-search.js";
-
-import { modelSearch } from "./src/services/model-search.js";
-
-// Import the papers search service
-import {
-  PaperSearchParamsSchema,
+  modelSearch,
   PaperSearchService,
-} from "./src/services/paper-search.js";
+} from "@hf-mcp/mcp";
 
 // Import the settings service
-import { settingsService, ToolSettings } from "./src/services/settings.js";
+import { settingsService, ToolSettings } from "../shared/settings.js";
 
 // Import shared constants
-import { TransportType, DEFAULT_WEB_APP_PORT } from "./constants.js";
+import { TransportType, DEFAULT_WEB_APP_PORT } from "../constants.js";
 
 // Define type for registered tools
 interface RegisteredTool {

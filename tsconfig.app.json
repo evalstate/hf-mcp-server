@@ -29,5 +29,5 @@
       ]
     }
   },
-  "include": ["src"]
+  "include": ["src", "packages/mcp/src/model-search.ts", "packages/mcp/src/paper-search.ts", "packages/mcp/src/semantic-search.ts", "packages/app/src/shared/settings.ts", "packages/app/src/web/main.tsx"]
 }

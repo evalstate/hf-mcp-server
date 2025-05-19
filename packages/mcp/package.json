@@ -1,0 +1,21 @@
+{
+  "name": "@hf-mcp/mcp",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./semantic": "./dist/semantic-search.js",
+    "./model": "./dist/model-search.js",
+    "./paper": "./dist/paper-search.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "zod": "^3.24.4"
+  }
+}

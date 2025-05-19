@@ -1,13 +1,13 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
-import { authors, PaperSearchResult } from "../../src/services/paper-search.js";
-import { published } from "../../src/services/paper-search.js";
+import { authors, PaperSearchResult } from "../src/paper-search.js";
+import { published } from "../src/paper-search.js";
 import { readFileSync } from "fs";
 import path from "path";
 
 describe("PaperSearchService", () => {
   let kazakh: PaperSearchResult[];
   function loadTestData(filename: string) {
-    const filePath = path.join(__dirname, "../services/fixtures", filename);
+    const filePath = path.join(__dirname, "../test/fixtures", filename);
     const fileContent = readFileSync(filePath, "utf-8");
     return JSON.parse(fileContent) as PaperSearchResult[];
   }
