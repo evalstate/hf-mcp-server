@@ -188,7 +188,7 @@ export const createServer = async (
   // Define the root directory (important for Vite to find the right files)
   const rootDir = isDev
     ? path.resolve(__dirname, "..")
-    : path.resolve(__dirname);
+    : path.resolve(__dirname, "..", "web");
   // In production, the static files are in the same directory as the server code
   // Configure API endpoints first (these need to be available in both dev and prod)
   app.get("/api/transport", (req, res) => {
