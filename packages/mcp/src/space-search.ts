@@ -1,6 +1,5 @@
 import { z } from "zod";
-
-// Token will be passed via constructor instead of global config
+import { HfApiCall } from "./hf-api-call.js";
 
 // Define the SearchResult interface
 interface SearchResult {
@@ -17,6 +16,12 @@ interface SearchResult {
   };
   semanticRelevancyScore?: number; // Score from semantic search API
   emoji?: string; // Emoji for the space
+}
+
+// Define input types for space search
+interface SpaceSearchParams {
+  q: string;
+  sdk: string;
 }
 
 // Default number of results to return
@@ -42,25 +47,20 @@ export const SEMANTIC_SEARCH_TOOL_CONFIG = {
   }
 } as const;
 
-
 /**
  * Service for searching Hugging Face Spaces semantically
  */
-export class SemanticSearchService {
-  private readonly apiUrl: string;
-  private readonly hfToken: string | undefined;
-
+export class SemanticSearchService extends HfApiCall<SpaceSearchParams, SearchResult[]> {
   /**
    * Creates a new semantic search service
-   * @param hfToken Optional Hugging Face token for API access
    * @param apiUrl The URL of the Hugging Face semantic search API
+   * @param hfToken Optional Hugging Face token for API access
    */
   constructor(
     hfToken?: string,
-    apiUrl = "https://huggingface.co/api/spaces/semantic-search"
+    apiUrl = "https://huggingface.co/api/spaces/semantic-search",
   ) {
-    this.apiUrl = apiUrl;
-    this.hfToken = hfToken;
+    super(apiUrl, hfToken);
   }
 
   /**
@@ -83,26 +83,8 @@ export class SemanticSearchService {
         throw new Error('Search query must be a string');
       }
 
-      const url =
-        `${this.apiUrl}?` + new URLSearchParams({ q: query, sdk: "gradio" }).toString();
-
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-
-      if (this.hfToken) {
-        headers["Authorization"] = `Bearer ${this.hfToken}`;
-      }
-
-      const response = await fetch(url, { headers });
-
-      if (!response.ok) {
-        throw new Error(
-          `Search request failed: ${response.status} ${response.statusText}`,
-        );
-      }
-
-      const results = (await response.json()) as SearchResult[];
+      const url = this.buildUrl({ q: query, sdk: "gradio" });
+      const results = await this.fetchFromApi<SearchResult[]>(url);
 
       // Filter by SDK type if specified in the API response
       // Note: We keep this filter since the API might return mixed results
@@ -117,7 +99,6 @@ export class SemanticSearchService {
     }
   }
 }
-
 
 // Create a schema validator for search parameters
 export const SearchParamsSchema = SEMANTIC_SEARCH_TOOL_CONFIG.schema;

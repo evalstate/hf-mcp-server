@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { HfApiCall } from "./hf-api-call.js";
 
 /** {
   "error": "\"inferenceProviders[0]\" must be one of [black-forest-labs, cohere, cerebras, fal-ai, featherless-ai, fireworks-ai, groq, hf-inference, hyperbolic, nebius, novita, nscale, replicate, sambanova, together]"
@@ -30,11 +31,18 @@ export const MODEL_SEARCH_TOOL_CONFIG = {
 
 export type ModelSearchParams = z.infer<typeof MODEL_SEARCH_TOOL_CONFIG.schema>;
 
-// Define the model search service
-export class ModelSearchService {
-  private readonly apiUrl: string;
-  private readonly hfToken: string | undefined;
+// Define internal params type for API call
+interface ModelApiParams {
+  search: string;
+  limit: string;
+  sort: string;
+  direction: string;
+  full: string;
+  config: string;
+}
 
+// Define the model search service
+export class ModelSearchService extends HfApiCall<ModelApiParams, any> {
   /**
    * Creates a new model search service
    * @param hfToken Optional Hugging Face token for API access
@@ -44,50 +52,25 @@ export class ModelSearchService {
     hfToken?: string,
     apiUrl = "https://huggingface.co/api/models"
   ) {
-    this.apiUrl = apiUrl;
-    this.hfToken = hfToken;
+    super(apiUrl,hfToken);
   }
 
   async search(params: ModelSearchParams): Promise<any> {
     try {
-      // Map the sort value to the actual API parameter
-
       // Build the query parameters
-      const queryParams = new URLSearchParams({
+      const queryParams: Record<string, string> = {
         search: params.search,
         limit: params.limit.toString(),
         sort: params.sort,
-        direction: "-1",
+        direction: "-1", // trending only supports -1
         full: "false",
         config: "false",
-      });
-      // trending only supports -1
-
-      // Prepare headers
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
       };
 
-      if (this.hfToken) {
-        headers["Authorization"] = `Bearer ${this.hfToken}`;
-      }
-
-
-      console.log("Making request to:", `${this.apiUrl}?${queryParams}`);
-      // Make the API request
-      const response = await fetch(`${this.apiUrl}?${queryParams}`, {
-        headers,
-      });
-
-
-      if (!response.ok) {
-        throw new Error(
-          `Model search request failed: ${response.status} ${response.statusText}`
-        );
-      }
-
-      // Return the raw JSON results
-      return await response.json();
+      console.log("Making request to:", `${this.apiUrl}?${new URLSearchParams(queryParams)}`);
+      
+      // Make the API request and return the raw JSON results
+      return await this.fetchFromApi<any>(this.buildUrl(queryParams));
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Failed to search for models: ${error.message}`);
@@ -96,4 +79,3 @@ export class ModelSearchService {
     }
   }
 }
-

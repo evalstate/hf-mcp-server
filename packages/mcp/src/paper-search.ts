@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { HfApiCall } from "./hf-api-call.js";
 
 // https://github.com/huggingface/huggingface_hub/blob/a26b93e8ba0b51ce76ce5c2044896587c47c6b60/src/huggingface_hub/hf_api.py#L1481-L1542
 // Raw JSON response for https://hf.co/api/papers/search?q=llama%203%20herd Llama Herd is ~50,000 tokens
@@ -58,30 +59,32 @@ export interface PaperSearchResult {
   isAuthorParticipating?: boolean;
 }
 
+// Define input types for paper search
+interface PaperSearchParams {
+  q: string;
+}
+
 /**
  * Service for searching Hugging Face Papers
  */
-export class PaperSearchService {
-  private readonly apiUrl: string;
-  private readonly hfToken: string | undefined;
-
+export class PaperSearchService extends HfApiCall<PaperSearchParams, PaperSearchResult[]> {
   /**
    * Creates a new papers search service
    * @param apiUrl The URL of the Hugging Face papers search API
+   * @param hfToken Optional Hugging Face token for API access
    */
   constructor(
     hfToken?: string,
     apiUrl = "https://huggingface.co/api/papers/search"
   ) {
-    this.apiUrl = apiUrl;
-    this.hfToken = hfToken;
+    super(apiUrl, hfToken);
   }
 
   /**
    * Searches for papers on the Hugging Face Hub
    * @param query Search query string (e.g. "llama", "attention")
    * @param limit Maximum number of results to return
-   * @returns Array of normalized paper objects
+   * @returns Formatted string with paper information
    */
   async search(
     query: string,
@@ -90,30 +93,10 @@ export class PaperSearchService {
     try {
       if (!query) return "No query";
 
-      const url = new URL(this.apiUrl);
-      url.searchParams.append("q", query);
-
-      // Prepare headers
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-
-      if (this.hfToken) {
-        headers["Authorization"] = `Bearer ${this.hfToken}`;
-      }
-      const response = await fetch(url.toString(), { headers });
-
-      if (!response.ok) {
-        throw new Error(
-          `Papers search request failed: ${response.status.toString()} ${
-            response.statusText
-          }`
-        );
-      }
-
-      // Parse the response
-      const papers = (await response.json()) as PaperSearchResult[];
-      if (0 === papers.length) return `No papers found for query '${query}'`;
+      const url = this.buildUrl({ q: query });
+      const papers = await this.fetchFromApi<PaperSearchResult[]>(url);
+      
+      if (papers.length === 0) return `No papers found for query '${query}'`;
       return formatSearchResults(query, papers.slice(0, limit));
     } catch (error) {
       if (error instanceof Error) {
