@@ -3,7 +3,7 @@ import { z } from "zod";
 // Token will be passed via constructor instead of global config
 
 // Define the SearchResult interface
-export interface SearchResult {
+interface SearchResult {
   id: string;
   sdk: string;
   likes?: number;
