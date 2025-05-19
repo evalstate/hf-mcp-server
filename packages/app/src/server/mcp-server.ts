@@ -75,7 +75,7 @@ export const createServer = async (
   activeTransport = transportType;
 
   // Since we're consolidating servers, we'll use the web app port for all transports
-  if (transportType === "sse" || transportType === "streamableHttp") {
+  if (transportType === "sse" || transportType === "streamableHttp" || transportType === "streamableHttpJson") {
     activePort = webAppPort;
   }
 
@@ -183,16 +183,18 @@ export const createServer = async (
       transportInfo.hfTokenMasked = maskToken(hfToken);
     }
 
-    if (
-      activePort &&
-      (activeTransport === "sse" || activeTransport === "streamableHttp")
-    ) {
+    // Set port information for all HTTP transports
+    if (activePort && 
+        (activeTransport === "sse" || 
+         activeTransport === "streamableHttp" || 
+         activeTransport === "streamableHttpJson")) {
       transportInfo.port = activePort;
     }
     
-    // Add JSON response mode info if applicable
-    if (activeTransport === "streamableHttp" && transportOptions.enableJsonResponse !== undefined) {
-      transportInfo.jsonResponseEnabled = transportOptions.enableJsonResponse;
+    // Add JSON response mode info for both JSON transport type and streamableHttp with JSON enabled
+    if (activeTransport === "streamableHttpJson" || 
+        (activeTransport === "streamableHttp" && transportOptions.enableJsonResponse === true)) {
+      transportInfo.jsonResponseEnabled = true;
     }
 
     res.json(transportInfo);

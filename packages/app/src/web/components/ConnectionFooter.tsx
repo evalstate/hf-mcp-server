@@ -21,7 +21,6 @@ export function ConnectionFooter({ isLoading, error, transportInfo }: Connection
       case "sse":
         return "SSE";
       case "streamableHttp":
-        return "Streamable HTTP";
       case "streamableHttpJson":
         return "Streamable HTTP";
       default:
@@ -44,10 +43,15 @@ export function ConnectionFooter({ isLoading, error, transportInfo }: Connection
     }
   };
 
+  // Check if using JSON mode
+  const isJsonMode = () => {
+    return transportInfo.transport === "streamableHttpJson" || 
+           (transportInfo.transport === "streamableHttp" && transportInfo.jsonResponseEnabled === true);
+  };
+
   // Get mode badge based on transport type
   const getModeBadge = () => {
-    if (transportInfo.transport === "streamableHttpJson" || 
-        (transportInfo.transport === "streamableHttp" && transportInfo.jsonResponseEnabled)) {
+    if (isJsonMode()) {
       // For JSON mode - green badge with "JSON (stateless)"
       return (
         <span className="ml-1.5 px-1.5 py-0.5 bg-green-100 text-green-800 text-[10px] rounded-sm whitespace-nowrap">
@@ -80,6 +84,10 @@ export function ConnectionFooter({ isLoading, error, transportInfo }: Connection
   if (error) {
     return <div className="text-center text-xs text-destructive py-2">Error: {error}</div>;
   }
+  
+  // Ensure we always have port info for HTTP transports
+  const shouldShowPort = transportInfo.transport !== "stdio";
+  const port = transportInfo.port || (shouldShowPort ? 3000 : undefined);
 
   return (
     <div className="fixed bottom-0 left-0 w-full bg-muted/50 border-t border-border py-2 px-4">
@@ -88,19 +96,16 @@ export function ConnectionFooter({ isLoading, error, transportInfo }: Connection
           <span className="text-muted-foreground">Using</span>
           <span className="font-medium text-primary">{getTransportDisplayName()}</span>
           
-          {transportInfo.port && (
+          {transportInfo.transport === "stdio" && (
             <span className="text-muted-foreground flex items-center">
-              on port <span className="font-mono mx-1">{transportInfo.port}</span>
-              {transportInfo.transport !== "stdio" && (
-                <span>at <span className="font-mono mx-1">{getEndpointPath()}</span></span>
-              )}
-              {getModeBadge()}
+              using <span className="font-mono mx-1">{getEndpointPath()}</span>
             </span>
           )}
           
-          {!transportInfo.port && transportInfo.transport === "stdio" && (
+          {shouldShowPort && (
             <span className="text-muted-foreground flex items-center">
-              using <span className="font-mono mx-1">{getEndpointPath()}</span>
+              on port <span className="font-mono mx-1">{port}</span>
+              at <span className="font-mono mx-1">{getEndpointPath()}</span>
               {getModeBadge()}
             </span>
           )}
