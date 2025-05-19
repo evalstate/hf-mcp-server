@@ -9,7 +9,7 @@
     "outDir": "./dist",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "rootDir": ".",
+    "rootDir": "./src",
     "sourceMap": true
   },
   "include": ["src/server/**/*.ts","src/shared/**/*"]
