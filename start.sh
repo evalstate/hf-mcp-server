@@ -14,7 +14,9 @@ else
   echo "Warning: HF_TOKEN not found in environment"
 fi
 
-DIST_PATH="packages/app/dist/server"
+cd packages/app
+
+DIST_PATH="dist/server"
 
 # Start the appropriate server based on transport type
 case "$TRANSPORT_TYPE" in

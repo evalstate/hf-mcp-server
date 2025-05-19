@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: "./dist/web",
+    outDir: path.resolve(__dirname, "./dist/web"),
     emptyOutDir: false, // This prevents deleting mcp-server.js during builds
   },
   root: path.resolve(__dirname, "./src/web"),
