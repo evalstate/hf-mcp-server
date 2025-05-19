@@ -4,6 +4,8 @@
 TRANSPORT_TYPE="${TRANSPORT_TYPE:-stdio}"
 # Get port from environment or use default
 PORT="${PORT:-3000}"
+# Other options
+JSON_MODE="${JSON_MODE:-false}"
 
 echo "Starting MCP server with transport type: $TRANSPORT_TYPE on port $PORT"
 
@@ -27,10 +29,20 @@ case "$TRANSPORT_TYPE" in
     node $DIST_PATH/sse.js --port "$PORT"
     ;;
   streamableHttp)
-    node $DIST_PATH/streamableHttp.js --port "$PORT"
+    # Check if JSON mode is enabled
+    if [ "$JSON_MODE" = "true" ]; then
+      echo "JSON response mode enabled"
+      node $DIST_PATH/streamableHttp.js --port "$PORT" --json
+    else
+      node $DIST_PATH/streamableHttp.js --port "$PORT"
+    fi
+    ;;
+  streamableHttpJson)
+    echo "Using streamableHttpJson transport type (JSON response mode enabled)"
+    node $DIST_PATH/streamableHttp.js --port "$PORT" --json
     ;;
   *)
-    echo "Error: Invalid transport type '$TRANSPORT_TYPE'. Valid options are: stdio, sse, streamableHttp"
+    echo "Error: Invalid transport type '$TRANSPORT_TYPE'. Valid options are: stdio, sse, streamableHttp, streamableHttpJson"
     exit 1
     ;;
 esac

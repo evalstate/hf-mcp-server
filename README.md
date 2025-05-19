@@ -40,6 +40,11 @@ docker run -e TRANSPORT_TYPE=stdio hf-mcp-server
 
 # Use streamableHttp transport
 docker run -p 3000:3000 -e TRANSPORT_TYPE=streamableHttp hf-mcp-server
+
+# Use streamableHttp transport with JSON mode
+docker run -p 3000:3000 -e TRANSPORT_TYPE=streamableHttpJson hf-mcp-server
+# Or
+docker run -p 3000:3000 -e TRANSPORT_TYPE=streamableHttp -e JSON_MODE=true hf-mcp-server
 ```
 
 With Hugging Face token:
@@ -55,13 +60,18 @@ You can run the server using one of the following commands:
 
 ```bash
 # For STDIO transport (for terminal/CLI use)
-node dist/stdio.js
+node dist/server/stdio.js
 
 # For SSE transport (for web applications)
-node dist/sse.js
+node dist/server/sse.js
 
 # For Streamable HTTP transport
-node dist/streamableHttp.js
+node dist/server/streamableHttp.js
+
+# For Streamable HTTP transport with JSON mode
+node dist/server/streamableHttp.js --json
+# or with shorthand
+node dist/server/streamableHttp.js -j
 ```
 
 ### Command Line Arguments
@@ -70,24 +80,58 @@ You can specify the port to use via command line arguments:
 
 ```bash
 # Run with a specific port
-node dist/sse.js --port 8080
+node dist/server/sse.js --port 8080
 # or with shorthand
-node dist/sse.js -p 8080
+node dist/server/sse.js -p 8080
+```
+
+For StreamableHttp transport, you can enable JSON mode:
+```bash
+node dist/server/streamableHttp.js --json
+# or with shorthand
+node dist/server/streamableHttp.js -j
 ```
 
 ### Environment Variables
 
 The server respects the following environment variables:
 - `PORT` or `WEB_APP_PORT`: The port to run the server on (default: 3000)
-- `TRANSPORT_TYPE`: The transport type to use (stdio, sse, or streamableHttp)
+- `TRANSPORT_TYPE`: The transport type to use (stdio, sse, streamableHttp, or streamableHttpJson)
+- `JSON_MODE`: Set to "true" to enable JSON mode when using streamableHttp transport
 - `HF_TOKEN`: Your Hugging Face API token
 
 ### Transport Endpoints
 
 The different transport types use the following endpoints:
 - SSE: `/sse` (with message endpoint at `/message`)
-- Streamable HTTP: `/mcp`
+- Streamable HTTP: `/mcp` (regular or JSON mode)
 - STDIO: Uses stdin/stdout directly, no HTTP endpoint
 
-## Design Notes
+## Transport Types
 
+### StreamableHttp with JSON Mode
+
+The StreamableHttp transport can operate in two modes:
+- **Session-Based Mode**: Returns event-stream responses for streaming. Uses sessionIdGenerator for proper SSE handling. Shows a blue "Session Based" badge in the UI.
+- **JSON Stateless Mode**: Returns JSON responses, which can be easier to work with in some client implementations. Does not use sessionIdGenerator as it's not needed for JSON responses. Shows a green "JSON (stateless)" badge in the UI.
+
+You can specify JSON mode in several ways:
+1. Using the `--json` or `-j` flag when running the server directly
+2. Using the `streamableHttpJson` transport type in Docker
+3. Setting `JSON_MODE=true` environment variable with `streamableHttp` transport type
+
+### npm Scripts for JSON Mode
+
+The package.json includes dedicated scripts for running in JSON mode:
+
+```bash
+# Development with JSON mode
+npm run dev:json
+
+# Production with JSON mode
+npm run start:json
+```
+
+These commands automatically set up the proper flags for enabling JSON response mode.
+
+## Design Notes

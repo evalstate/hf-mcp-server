@@ -26,15 +26,23 @@ export class StreamableHttpTransport extends BaseTransport {
         } else if (!sessionId) {
           // New initialization request
           const eventStore = new InMemoryEventStore();
-          transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => randomUUID(),
-            enableJsonResponse, // Add JSON mode toggle
+          
+          // Create appropriate config based on JSON mode
+          const transportConfig: any = {
+            enableJsonResponse,
             eventStore, // Enable resumability
-            onsessioninitialized: (sessionId) => {
+            onsessioninitialized: (sessionId: string) => {
               console.log(`Session initialized with ID: ${sessionId}`);
               this.transports[sessionId] = transport;
             },
-          });
+          };
+          
+          // Only add sessionIdGenerator for non-JSON mode
+          if (!enableJsonResponse) {
+            transportConfig.sessionIdGenerator = () => randomUUID();
+          }
+          
+          transport = new StreamableHTTPServerTransport(transportConfig);
 
           // Set up onclose handler to clean up transport when closed
           transport.onclose = () => {
@@ -141,6 +149,11 @@ export class StreamableHttpTransport extends BaseTransport {
 
     console.log("StreamableHTTP transport routes initialized");
     console.log(`JSON Response mode: ${enableJsonResponse ? "enabled" : "disabled"}`);
+    if (enableJsonResponse) {
+      console.log("SessionIdGenerator: undefined (not needed in JSON mode)");
+    } else {
+      console.log("SessionIdGenerator: randomUUID (used for SSE streaming)");
+    }
   }
 
   async cleanup(): Promise<void> {

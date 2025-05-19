@@ -18,15 +18,23 @@ if (values.json) {
   console.error("JSON response mode enabled");
 }
 
+// Set development mode environment variable
 process.env.NODE_ENV = process.env.NODE_ENV || "production";
 
+// Configuration with single port for both the web app and MCP API
 const port = parseInt(values.port as string || process.env.WEB_APP_PORT || DEFAULT_WEB_APP_PORT.toString());
 
 async function start() {
+  const useJsonMode = values.json || false;
+  
+  // Choose the appropriate transport type and options
+  const transportType = useJsonMode ? "streamableHttpJson" : "streamableHttp";
+  const transportOptions = { enableJsonResponse: useJsonMode };
+  
   const { server, cleanup } = await createServer(
-    "streamableHttp",
+    transportType,
     port,
-    { enableJsonResponse: values.json || false }
+    transportOptions
   );
 
   // Handle server shutdown

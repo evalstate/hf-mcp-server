@@ -1,8 +1,9 @@
 interface TransportInfo {
-  transport: "stdio" | "sse" | "streamableHttp" | "unknown";
+  transport: "stdio" | "sse" | "streamableHttp" | "streamableHttpJson" | "unknown";
   port?: number;
   hfTokenMasked?: string;
   hfTokenSet?: boolean;
+  jsonResponseEnabled?: boolean;
 }
 
 interface ConnectionFooterProps {
@@ -21,6 +22,8 @@ export function ConnectionFooter({ isLoading, error, transportInfo }: Connection
         return "SSE";
       case "streamableHttp":
         return "Streamable HTTP";
+      case "streamableHttpJson":
+        return "Streamable HTTP";
       default:
         return "Unknown";
     }
@@ -32,12 +35,42 @@ export function ConnectionFooter({ isLoading, error, transportInfo }: Connection
       case "sse":
         return "/sse";
       case "streamableHttp":
+      case "streamableHttpJson":
         return "/mcp";
       case "stdio":
         return "stdin/stdout";
       default:
         return "unknown";
     }
+  };
+
+  // Get mode badge based on transport type
+  const getModeBadge = () => {
+    if (transportInfo.transport === "streamableHttpJson" || 
+        (transportInfo.transport === "streamableHttp" && transportInfo.jsonResponseEnabled)) {
+      // For JSON mode - green badge with "JSON (stateless)"
+      return (
+        <span className="ml-1.5 px-1.5 py-0.5 bg-green-100 text-green-800 text-[10px] rounded-sm whitespace-nowrap">
+          JSON (stateless)
+        </span>
+      );
+    } else if (transportInfo.transport === "streamableHttp") {
+      // For non-JSON StreamableHttp - blue badge with "Session Based"
+      return (
+        <span className="ml-1.5 px-1.5 py-0.5 bg-blue-100 text-blue-800 text-[10px] rounded-sm whitespace-nowrap">
+          Session Based
+        </span>
+      );
+    } else if (transportInfo.transport === "sse") {
+      // For SSE - purple badge
+      return (
+        <span className="ml-1.5 px-1.5 py-0.5 bg-purple-100 text-purple-800 text-[10px] rounded-sm whitespace-nowrap">
+          Event Stream
+        </span>
+      );
+    }
+    
+    return null;
   };
 
   if (isLoading) {
@@ -54,15 +87,23 @@ export function ConnectionFooter({ isLoading, error, transportInfo }: Connection
         <div className="flex items-center gap-1">
           <span className="text-muted-foreground">Using</span>
           <span className="font-medium text-primary">{getTransportDisplayName()}</span>
+          
           {transportInfo.port && (
-              <span className="text-muted-foreground">
-                on port <span className="font-mono">{transportInfo.port}</span>
-                {transportInfo.transport !== "stdio" && (
-                  <span> at <span className="font-mono">{getEndpointPath()}</span></span>
-                )}
-              </span>
-            )
-          }
+            <span className="text-muted-foreground flex items-center">
+              on port <span className="font-mono mx-1">{transportInfo.port}</span>
+              {transportInfo.transport !== "stdio" && (
+                <span>at <span className="font-mono mx-1">{getEndpointPath()}</span></span>
+              )}
+              {getModeBadge()}
+            </span>
+          )}
+          
+          {!transportInfo.port && transportInfo.transport === "stdio" && (
+            <span className="text-muted-foreground flex items-center">
+              using <span className="font-mono mx-1">{getEndpointPath()}</span>
+              {getModeBadge()}
+            </span>
+          )}
         </div>
         
         <div className="flex items-center gap-1">

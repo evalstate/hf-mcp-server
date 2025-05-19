@@ -24,6 +24,9 @@ export class TransportFactory {
       case "sse":
         return new SseTransport(server, app);
       case "streamableHttp":
+      case "streamableHttpJson":
+        // For both streamableHttp and streamableHttpJson, use same class
+        // enableJsonResponse parameter will be passed separately
         return new StreamableHttpTransport(server, app);
       default:
         throw new Error(`Unsupported transport type: ${type}`);
