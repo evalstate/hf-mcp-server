@@ -42,7 +42,7 @@ interface ModelApiParams {
 }
 
 // Define the model search service
-export class ModelSearchService extends HfApiCall<ModelApiParams, any> {
+export class ModelSearchTool extends HfApiCall<ModelApiParams, any> {
   /**
    * Creates a new model search service
    * @param hfToken Optional Hugging Face token for API access

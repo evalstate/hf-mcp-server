@@ -1,27 +1,25 @@
+#!/usr/bin/env node
+
 import { createServer } from "./mcp-server.js";
 import { DEFAULT_WEB_APP_PORT } from "../constants.js";
-import minimist from "minimist";
+import { parseArgs } from "node:util";
 
 // Parse command line arguments
-const argv = minimist(process.argv.slice(2), {
-  string: ["port"],
-  alias: { p: "port" },
-  default: {
-    port: process.env.WEB_APP_PORT || DEFAULT_WEB_APP_PORT.toString(),
+const { values } = parseArgs({
+  options: {
+    port: { type: "string", short: "p" }
   },
+  args: process.argv.slice(2)
 });
 
 console.error("Starting SSE server...");
 
-// Set development mode environment variable
 process.env.NODE_ENV = process.env.NODE_ENV || "production";
 
-// Configuration with single port for both the web app and MCP API
-const WEB_APP_PORT = parseInt(argv.port);
+const port = parseInt(values.port as string || process.env.WEB_APP_PORT || DEFAULT_WEB_APP_PORT.toString());
 
-// Start the server (async)
 async function start() {
-  const { server, cleanup } = await createServer("sse", WEB_APP_PORT);
+  const { server, cleanup } = await createServer("sse", port);
 
   // Handle server shutdown
   process.on("SIGINT", async () => {

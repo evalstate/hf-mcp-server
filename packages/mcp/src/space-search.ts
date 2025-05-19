@@ -50,7 +50,7 @@ export const SEMANTIC_SEARCH_TOOL_CONFIG = {
 /**
  * Service for searching Hugging Face Spaces semantically
  */
-export class SemanticSearchService extends HfApiCall<SpaceSearchParams, SearchResult[]> {
+export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SearchResult[]> {
   /**
    * Creates a new semantic search service
    * @param apiUrl The URL of the Hugging Face semantic search API

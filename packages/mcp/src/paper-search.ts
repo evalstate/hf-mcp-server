@@ -67,7 +67,7 @@ interface PaperSearchParams {
 /**
  * Service for searching Hugging Face Papers
  */
-export class PaperSearchService extends HfApiCall<PaperSearchParams, PaperSearchResult[]> {
+export class PaperSearchTool extends HfApiCall<PaperSearchParams, PaperSearchResult[]> {
   /**
    * Creates a new papers search service
    * @param apiUrl The URL of the Hugging Face papers search API

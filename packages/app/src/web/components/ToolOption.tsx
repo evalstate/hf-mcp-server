@@ -10,7 +10,7 @@ interface ToolOptionProps {
 
 export function ToolOption({ id, label, description, isEnabled, onToggle }: ToolOptionProps) {
   return (
-    <div className="flex-1">
+    <div>
       <div className="items-top flex space-x-2">
         <Checkbox 
           id={id} 

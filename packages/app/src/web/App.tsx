@@ -104,7 +104,7 @@ function App() {
     space_search: { // Changed from space_semantic_search
       id: "space_search",
       label: "Space Search",
-      description: "Find Spaces with semantic search.",
+      description: "Find Gradio Hugging Face Spaces.",
       settings: settings.tools.space_search || { enabled: false }
     },
     model_search: {
@@ -116,7 +116,7 @@ function App() {
     paper_search: { // Changed from paper_semantic_search
       id: "paper_search",
       label: "Papers Search",
-      description: "Find ML research papers with semantic search.",
+      description: "Find Machine Learning Research Papers.",
       settings: settings.tools.paper_search || { enabled: false }
     }
   };

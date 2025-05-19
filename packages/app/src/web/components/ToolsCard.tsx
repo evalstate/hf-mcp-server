@@ -27,7 +27,7 @@ export function ToolsCard({ title, description, tools, onToolToggle }: ToolsCard
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-row gap-8 mb-6">
+        <div className="grid grid-cols-2 gap-6 mb-6">
           {Object.entries(tools).map(([toolId, tool]) => (
             <ToolOption
               key={toolId}

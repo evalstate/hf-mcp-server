@@ -1,24 +1,18 @@
 #!/usr/bin/env node
 
 import express from "express";
-import path, { format } from "path";
+import path from "path";
 import { fileURLToPath } from "url";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { InMemoryEventStore } from "@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js";
-import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
 
 // Import the search services
 import {
-  SemanticSearchService,
+  SpaceSearchTool,
   formatSearchResults,
   SEMANTIC_SEARCH_TOOL_CONFIG,
-  ModelSearchService,
+  ModelSearchTool,
   MODEL_SEARCH_TOOL_CONFIG,
-  PaperSearchService,
+  PaperSearchTool,
   PAPER_SEARCH_TOOL_CONFIG,
 } from "@hf-mcp/mcp";
 
@@ -27,6 +21,10 @@ import { settingsService, ToolSettings } from "../shared/settings.js";
 
 // Import shared constants
 import { TransportType, DEFAULT_WEB_APP_PORT } from "../constants.js";
+
+// Import the transport factory
+import { TransportFactory } from "./transport/transport-factory.js";
+import { BaseTransport, TransportOptions } from "./transport/base-transport.js";
 
 // Define type for registered tools
 interface RegisteredTool {
@@ -58,7 +56,8 @@ const isDev = process.env.NODE_ENV === "development";
 
 export const createServer = async (
   transportType: TransportType = "unknown",
-  webAppPort: number = DEFAULT_WEB_APP_PORT
+  webAppPort: number = DEFAULT_WEB_APP_PORT,
+  transportOptions: TransportOptions = {}
 ) => {
   const server = new McpServer(
     {
@@ -88,7 +87,7 @@ export const createServer = async (
     SEMANTIC_SEARCH_TOOL_CONFIG.annotations,
     async ({ query, limit }) => {
       const hfToken = getHfToken();
-      const semanticSearch = new SemanticSearchService(hfToken);
+      const semanticSearch = new SpaceSearchTool(hfToken);
       const results = await semanticSearch.search(query, limit);
       return {
         content: [{ type: "text", text: formatSearchResults(query, results) }],
@@ -103,7 +102,7 @@ export const createServer = async (
     MODEL_SEARCH_TOOL_CONFIG.annotations,
     async ({ search, limit, sort, direction }) => {
       const hfToken = getHfToken();
-      const modelSearch = new ModelSearchService(hfToken);
+      const modelSearch = new ModelSearchTool(hfToken);
       const results = await modelSearch.search({
         search,
         limit: limit || 5,
@@ -125,15 +124,12 @@ export const createServer = async (
     PAPER_SEARCH_TOOL_CONFIG.annotations,
     async ({ query, limit }) => {
       const hfToken = getHfToken();
-      const results = await new PaperSearchService(hfToken).search(query, limit);
+      const results = await new PaperSearchTool(hfToken).search(query, limit);
       return {
         content: [{ type: "text", text: results }],
       };
     }
   );
-
-  // Add to registered tools
-  // registeredTools["model_search"] = modelSearchTool;
 
   const registeredTools: { [toolId: string]: RegisteredTool } = {
     [SEMANTIC_SEARCH_TOOL_CONFIG.name]: spaceSearchTool,
@@ -163,6 +159,7 @@ export const createServer = async (
   const rootDir = isDev
     ? path.resolve(__dirname, "..")
     : path.resolve(__dirname, "..", "web");
+    
   // In production, the static files are in the same directory as the server code
   // Configure API endpoints first (these need to be available in both dev and prod)
   app.get("/api/transport", (req, res) => {
@@ -174,6 +171,7 @@ export const createServer = async (
       hfTokenSet: boolean;
       hfTokenMasked?: string;
       port?: number;
+      jsonResponseEnabled?: boolean;
     };
 
     const transportInfo: TransportInfoResponse = {
@@ -190,6 +188,11 @@ export const createServer = async (
       (activeTransport === "sse" || activeTransport === "streamableHttp")
     ) {
       transportInfo.port = activePort;
+    }
+    
+    // Add JSON response mode info if applicable
+    if (activeTransport === "streamableHttp" && transportOptions.enableJsonResponse !== undefined) {
+      transportInfo.jsonResponseEnabled = transportOptions.enableJsonResponse;
     }
 
     res.json(transportInfo);
@@ -222,171 +225,18 @@ export const createServer = async (
     res.json(updatedSettings);
   });
 
-  if (transportType === "sse") {
-    // Add SSE endpoints to the main Express app
-    let sseTransport: SSEServerTransport;
-
-    app.get("/sse", async (req, res) => {
-      console.log("Received SSE connection");
-      // Set the correct content type for SSE
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-
-      sseTransport = new SSEServerTransport("/message", res);
-      await server.connect(sseTransport);
-
-      server.server.onclose = async () => {
-        await cleanup();
-        await server.close();
-        process.exit(0);
-      };
-    });
-
-    app.post("/message", async (req, res) => {
-      console.log("Received SSE message");
-      await sseTransport.handlePostMessage(req, res);
-    });
-  }
-
-  if (transportType === "streamableHttp") {
-    // Setup for StreamableHTTP transport
-    const transports: { [sessionId: string]: StreamableHTTPServerTransport } =
-      {};
-
-    app.post("/mcp", async (req: any, res: any) => {
-      console.log("Received MCP POST request");
-      try {
-        // Check for existing session ID
-        const sessionId = req.headers["mcp-session-id"] as string | undefined;
-        let transport: StreamableHTTPServerTransport;
-
-        if (sessionId && transports[sessionId]) {
-          // Reuse existing transport
-          transport = transports[sessionId];
-        } else if (!sessionId) {
-          // New initialization request
-          const eventStore = new InMemoryEventStore();
-          transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => randomUUID(),
-            eventStore, // Enable resumability
-            onsessioninitialized: (sessionId) => {
-              console.log(`Session initialized with ID: ${sessionId}`);
-              transports[sessionId] = transport;
-            },
-          });
-
-          // Set up onclose handler to clean up transport when closed
-          transport.onclose = () => {
-            const sid = transport.sessionId;
-            if (sid && transports[sid]) {
-              console.log(
-                `Transport closed for session ${sid}, removing from transports map`
-              );
-              delete transports[sid];
-            }
-          };
-
-          // Connect the transport to the MCP server
-          await server.connect(transport);
-
-          await transport.handleRequest(req, res);
-          return;
-        } else {
-          // Invalid request - no session ID or not initialization request
-          res.status(400).json({
-            jsonrpc: "2.0",
-            error: {
-              code: -32000,
-              message: "Bad Request: No valid session ID provided",
-            },
-            id: req?.body?.id,
-          });
-          return;
-        }
-
-        // Handle the request with existing transport
-        await transport.handleRequest(req, res);
-      } catch (error) {
-        console.error("Error handling MCP request:", error);
-        if (!res.headersSent) {
-          res.status(500).json({
-            jsonrpc: "2.0",
-            error: {
-              code: -32603,
-              message: "Internal server error",
-            },
-            id: req?.body?.id,
-          });
-        }
-      }
-    });
-
-    // Handle GET requests for SSE streams
-    app.get("/mcp", async (req: any, res: any) => {
-      console.log("Received MCP GET request");
-      const sessionId = req.headers["mcp-session-id"] as string | undefined;
-      if (!sessionId || !transports[sessionId]) {
-        res.status(400).json({
-          jsonrpc: "2.0",
-          error: {
-            code: -32000,
-            message: "Bad Request: No valid session ID provided",
-          },
-          id: req?.body?.id,
-        });
-        return;
-      }
-
-      const transport = transports[sessionId];
-      await transport.handleRequest(req, res);
-    });
-
-    // Handle DELETE requests for session termination
-    app.delete("/mcp", async (req: any, res: any) => {
-      const sessionId = req.headers["mcp-session-id"] as string | undefined;
-      if (!sessionId || !transports[sessionId]) {
-        res.status(400).json({
-          jsonrpc: "2.0",
-          error: {
-            code: -32000,
-            message: "Bad Request: No valid session ID provided",
-          },
-          id: req?.body?.id,
-        });
-        return;
-      }
-
-      console.log(
-        `Received session termination request for session ${sessionId}`
-      );
-
-      try {
-        const transport = transports[sessionId];
-        await transport.handleRequest(req, res);
-      } catch (error) {
-        console.error("Error handling session termination:", error);
-        if (!res.headersSent) {
-          res.status(500).json({
-            jsonrpc: "2.0",
-            error: {
-              code: -32603,
-              message: "Error handling session termination",
-            },
-            id: req?.body?.id,
-          });
-        }
-      }
-    });
-  }
-
-  // Add STDIO transport handling
-  if (transportType === "stdio") {
-    // STDIO transport is handled differently, as it uses stdin/stdout
-    const stdioTransport = new StdioServerTransport();
-    server.connect(stdioTransport).catch((error) => {
-      console.error("Error connecting STDIO transport:", error);
-    });
+  // Initialize transport based on the transport type
+  let transport: BaseTransport | undefined;
+  if (transportType !== "unknown") {
+    try {
+      transport = TransportFactory.createTransport(transportType, server, app);
+      await transport.initialize({
+        port: webAppPort,
+        ...transportOptions
+      });
+    } catch (error) {
+      console.error(`Error initializing ${transportType} transport:`, error);
+    }
   }
 
   // Handle static file serving and SPA navigation based on mode
@@ -449,6 +299,11 @@ export const createServer = async (
     if (webServer) {
       console.log("Shutting down web server...");
       // improve mcp server & express shutdown handling
+    }
+    
+    // Clean up transport if initialized
+    if (transport) {
+      await transport.cleanup();
     }
   };
 
