@@ -19,13 +19,13 @@ export interface AppSettings {
 // Default settings
 const defaultSettings: AppSettings = {
   tools: {
-    space_semantic_search: {
+    space_search: { // Changed from space_semantic_search to match SEMANTIC_SEARCH_TOOL_CONFIG.name
       enabled: true,
     },
     model_search: {
       enabled: true,
     },
-    paper_semantic_search: {
+    paper_search: { // Changed from paper_semantic_search to match PAPER_SEARCH_TOOL_CONFIG.name
       enabled: true,
     },
   },

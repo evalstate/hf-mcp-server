@@ -1,10 +1,6 @@
 import { z } from "zod";
 
-// Import configuration
-// You should adjust this based on where your config is defined
-export const config = {
-  hfToken: process.env.HF_TOKEN || "",
-};
+// Token will be passed via constructor instead of global config
 
 // Define the SearchResult interface
 export interface SearchResult {
@@ -26,19 +22,45 @@ export interface SearchResult {
 // Default number of results to return
 const RESULTS_TO_RETURN = 10;
 
+export const SemanticSearchDescription = 
+  "Search Hugging Face Spaces with semantic search.";
+
+export const SEMANTIC_SEARCH_TOOL_CONFIG = {
+  name: "space_search",
+  description: "Find Hugging Face Spaces with semantic search. " +
+    "Results are returned in a markdown table. " +
+    "Include links to the space when presenting the results.",
+  schema: z.object({
+    query: z.string().min(1, "Search query is required"),
+    limit: z.number().optional().default(RESULTS_TO_RETURN),
+  }),
+  annotations: {
+    title: "Semantic Space Search",
+    destructiveHint: false,
+    readOnlyHint: true,
+    openWorldHint: true,
+  }
+} as const;
+
 
 /**
  * Service for searching Hugging Face Spaces semantically
  */
 export class SemanticSearchService {
   private readonly apiUrl: string;
+  private readonly hfToken: string | undefined;
 
   /**
    * Creates a new semantic search service
+   * @param hfToken Optional Hugging Face token for API access
    * @param apiUrl The URL of the Hugging Face semantic search API
    */
-  constructor(apiUrl?: string) {
-    this.apiUrl = apiUrl || "https://huggingface.co/api/spaces/semantic-search";
+  constructor(
+    hfToken?: string,
+    apiUrl = "https://huggingface.co/api/spaces/semantic-search"
+  ) {
+    this.apiUrl = apiUrl;
+    this.hfToken = hfToken;
   }
 
   /**
@@ -68,8 +90,8 @@ export class SemanticSearchService {
         "Content-Type": "application/json",
       };
 
-      if (config.hfToken) {
-        headers["Authorization"] = `Bearer ${config.hfToken}`;
+      if (this.hfToken) {
+        headers["Authorization"] = `Bearer ${this.hfToken}`;
       }
 
       const response = await fetch(url, { headers });
@@ -98,12 +120,9 @@ export class SemanticSearchService {
 
 
 // Create a schema validator for search parameters
-export const SearchParamsSchema = z.object({
-  query: z.string().min(1, "Search query is required"),
-  limit: z.number().optional().default(RESULTS_TO_RETURN),
-});
+export const SearchParamsSchema = SEMANTIC_SEARCH_TOOL_CONFIG.schema;
 
-export type SearchParams = z.infer<typeof SearchParamsSchema>;
+export type SearchParams = z.infer<typeof SEMANTIC_SEARCH_TOOL_CONFIG.schema>;
 
 /**
  * Formats search results as a markdown table for MCP friendly output
@@ -159,6 +178,3 @@ function escapeMarkdown(text: string): string {
     .replace(/>/g, "\\>")
     .replace(/#/g, "\\#");
 }
-
-// Export a singleton instance for easy import
-export const semanticSearch = new SemanticSearchService();

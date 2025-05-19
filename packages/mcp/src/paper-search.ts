@@ -11,18 +11,29 @@ import { z } from "zod";
 
 export const PaperSearchDescription =
   "Search Hugging Face for Machine Learning research papers.";
-export const PaperSearchParamsSchema = z.object({
+
+export const DEFAULT_AUTHORS_TO_SHOW = 8;
+const RESULTS_TO_RETURN = 10;
+
+export const PAPER_SEARCH_TOOL_CONFIG = {
+  name: "paper_search",
+  description: "Search for Machine Learning research papers on Hugging Face. " +
+    "Include 'Link to paper' When presenting the results. " +
+    "Consider whether tabulating matches user intent.",
+  schema: z.object({
   query: z
     .string()
     .min(3, "Supply at least one search term")
     .max(200, "Query too long"),
   limit: z.number().optional().default(10),
-});
-
-export const DEFAULT_AUTHORS_TO_SHOW = 8;
-const RESULTS_TO_RETURN = 10;
-
-export type PaperSearchParams = z.infer<typeof PaperSearchParamsSchema>;
+}),
+  annotations: {
+    title: "Paper Search",
+    destructiveHint: false,
+    readOnlyHint: true,
+    openWorldHint: true,
+  }
+} as const;
 
 interface Author {
   name?: string;

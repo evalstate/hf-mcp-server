@@ -1,29 +1,51 @@
 import { z } from "zod";
 
-
-
 /** {
   "error": "\"inferenceProviders[0]\" must be one of [black-forest-labs, cohere, cerebras, fal-ai, featherless-ai, fireworks-ai, groq, hf-inference, hyperbolic, nebius, novita, nscale, replicate, sambanova, together]"
 } */
 // https://github.com/huggingface/huggingface_hub/blob/main/docs/source/en/guides/search.md
 // Define the search parameters
 
+export const ModelSearchDescription = 
+  "Search Hugging Face Models for machine learning.";
 
-export const ModelSearchParamsSchema = z.object({
-  search: z.string().min(1, "Search query is required"),
-  limit: z.number().int().positive().default(5),
-  sort: z.enum(["trendingScore", "downloads", "likes"]).default("likes"),
-  direction: z.enum(["asc", "desc"]).default("desc"),
-});
+const RESULTS_TO_RETURN = 5;
 
-export type ModelSearchParams = z.infer<typeof ModelSearchParamsSchema>;
+export const MODEL_SEARCH_TOOL_CONFIG = {
+  name: "model_search",
+  description: "Search Hugging Face Models. Returns model information in JSON format.",
+  schema: z.object({
+    search: z.string().min(1, "Search query is required"),
+    limit: z.number().int().positive().default(RESULTS_TO_RETURN),
+    sort: z.enum(["trendingScore", "downloads", "likes"]).default("trendingScore"),
+    direction: z.enum(["asc", "desc"]).default("desc"),
+  }),
+  annotations: {
+    title: "Model Search",
+    destructiveHint: false,
+    readOnlyHint: true,
+    openWorldHint: true,
+  }
+} as const;
+
+export type ModelSearchParams = z.infer<typeof MODEL_SEARCH_TOOL_CONFIG.schema>;
 
 // Define the model search service
 export class ModelSearchService {
   private readonly apiUrl: string;
+  private readonly hfToken: string | undefined;
 
-  constructor(apiUrl?: string) {
-    this.apiUrl = apiUrl || "https://huggingface.co/api/models";
+  /**
+   * Creates a new model search service
+   * @param hfToken Optional Hugging Face token for API access
+   * @param apiUrl The URL of the Hugging Face models API
+   */
+  constructor(
+    hfToken?: string,
+    apiUrl = "https://huggingface.co/api/models"
+  ) {
+    this.apiUrl = apiUrl;
+    this.hfToken = hfToken;
   }
 
   async search(params: ModelSearchParams): Promise<any> {
@@ -41,16 +63,13 @@ export class ModelSearchService {
       });
       // trending only supports -1
 
-      // Get the HF token from environment
-      const hfToken = process.env.HF_TOKEN || "";
-
       // Prepare headers
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
       };
 
-      if (hfToken) {
-        headers["Authorization"] = `Bearer ${hfToken}`;
+      if (this.hfToken) {
+        headers["Authorization"] = `Bearer ${this.hfToken}`;
       }
 
 
@@ -78,5 +97,3 @@ export class ModelSearchService {
   }
 }
 
-// Export a singleton instance for easy import
-export const modelSearch = new ModelSearchService();

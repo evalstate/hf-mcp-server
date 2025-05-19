@@ -29,8 +29,8 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<AppSettings>({
     tools: {
-      space_semantic_search: { enabled: false },
-      paper_semantic_search: { enabled: false }
+      space_search: { enabled: false }, 
+      paper_search: { enabled: false }  ,
     }
   });
 
@@ -101,11 +101,11 @@ function App() {
   };
 
   const searchTools = {
-    space_semantic_search: {
-      id: "space_semantic_search",
+    space_search: { // Changed from space_semantic_search
+      id: "space_search",
       label: "Space Search",
       description: "Find Spaces with semantic search.",
-      settings: settings.tools.space_semantic_search || { enabled: false }
+      settings: settings.tools.space_search || { enabled: false }
     },
     model_search: {
       id: "model_search",
@@ -113,11 +113,11 @@ function App() {
       description: "Find Models with configurable search parameters.",
       settings: settings.tools.model_search || { enabled: false }
     },    
-    paper_semantic_search: {
-      id: "paper_semantic_search",
+    paper_search: { // Changed from paper_semantic_search
+      id: "paper_search",
       label: "Papers Search",
       description: "Find ML research papers with semantic search.",
-      settings: settings.tools.paper_semantic_search || { enabled: false }
+      settings: settings.tools.paper_search || { enabled: false }
     }
   };
 

@@ -11,12 +11,15 @@ import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-// Import the semantic search service
+// Import the search services
 import {
-  semanticSearch,
+  SemanticSearchService,
   formatSearchResults,
-  modelSearch,
+  SEMANTIC_SEARCH_TOOL_CONFIG,
+  ModelSearchService,
+  MODEL_SEARCH_TOOL_CONFIG,
   PaperSearchService,
+  PAPER_SEARCH_TOOL_CONFIG,
 } from "@hf-mcp/mcp";
 
 // Import the settings service
@@ -79,22 +82,13 @@ export const createServer = async (
 
   // "Hugging Face Spaces" are known by Qwen2.5/3, Sonnet/Haiku and OpenAI Models
   const spaceSearchTool = server.tool(
-    "space_search",
-    "Find Hugging Face Spaces with semantic search. " +
-      "Results are returned in a markdown table." +
-      "Include links to the space when presenting the results.",
-    {
-      query: z.string().min(1, "Search query is required"),
-      limit: z.number().optional(),
-    },
-    {
-      title: "Semantic Space Search",
-      destructiveHint: false,
-      readOnlyHint: true,
-      openWorldHint: true,
-    },
-
+    SEMANTIC_SEARCH_TOOL_CONFIG.name,
+    SEMANTIC_SEARCH_TOOL_CONFIG.description,
+    SEMANTIC_SEARCH_TOOL_CONFIG.schema.shape,
+    SEMANTIC_SEARCH_TOOL_CONFIG.annotations,
     async ({ query, limit }) => {
+      const hfToken = getHfToken();
+      const semanticSearch = new SemanticSearchService(hfToken);
       const results = await semanticSearch.search(query, limit);
       return {
         content: [{ type: "text", text: formatSearchResults(query, results) }],
@@ -103,24 +97,13 @@ export const createServer = async (
   );
 
   const modelSearchTool = server.tool(
-    "model_search",
-    "Search Hugging Face Models. Returns model information in JSON format.",
-    {
-      search: z.string().min(1, "Search query is required"),
-      limit: z.number().optional().default(5),
-      sort: z
-        .enum(["trendingScore", "downloads", "likes"])
-        .optional()
-        .default("trendingScore"),
-      direction: z.enum(["asc", "desc"]).optional().default("desc"),
-    },
-    {
-      title: "Model Search",
-      destructiveHint: false,
-      readOnlyHint: true,
-      openWorldHint: true,
-    },
+    MODEL_SEARCH_TOOL_CONFIG.name,
+    MODEL_SEARCH_TOOL_CONFIG.description,
+    MODEL_SEARCH_TOOL_CONFIG.schema.shape,
+    MODEL_SEARCH_TOOL_CONFIG.annotations,
     async ({ search, limit, sort, direction }) => {
+      const hfToken = getHfToken();
+      const modelSearch = new ModelSearchService(hfToken);
       const results = await modelSearch.search({
         search,
         limit: limit || 5,
@@ -136,22 +119,13 @@ export const createServer = async (
 
   /** NB Claude models are extremely sensitive to tool descriptions/length  */
   const paperSearchTool = server.tool(
-    "paper_search",
-    "Search for Machine Learning research papers on Hugging Face. " +
-      "Include 'Link to paper' When presenting the results. " +
-      "Consider whether tabulating matches user intent.",
-    {
-      query: z.string().min(3, "Supply at least one search term"),
-      limit: z.number().optional().default(10),
-    },
-    {
-      title: "Paper Search",
-      destructiveHint: false,
-      readOnlyHint: true,
-      openWorldHint: true,
-    },
+    PAPER_SEARCH_TOOL_CONFIG.name,
+    PAPER_SEARCH_TOOL_CONFIG.description,
+    PAPER_SEARCH_TOOL_CONFIG.schema.shape,
+    PAPER_SEARCH_TOOL_CONFIG.annotations,
     async ({ query, limit }) => {
-      const results = await new PaperSearchService().search(query, limit);
+      const hfToken = getHfToken();
+      const results = await new PaperSearchService(hfToken).search(query, limit);
       return {
         content: [{ type: "text", text: results }],
       };
@@ -162,9 +136,9 @@ export const createServer = async (
   // registeredTools["model_search"] = modelSearchTool;
 
   const registeredTools: { [toolId: string]: RegisteredTool } = {
-    space_semantic_search: spaceSearchTool,
-    model_search: modelSearchTool,
-    paper_semantic_search: paperSearchTool,
+    [SEMANTIC_SEARCH_TOOL_CONFIG.name]: spaceSearchTool,
+    [MODEL_SEARCH_TOOL_CONFIG.name]: modelSearchTool,
+    [PAPER_SEARCH_TOOL_CONFIG.name]: paperSearchTool,
   };
 
   // Initialize tool state based on settings
