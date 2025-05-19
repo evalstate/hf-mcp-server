@@ -14,16 +14,18 @@ else
   echo "Warning: HF_TOKEN not found in environment"
 fi
 
+DIST_PATH="packages/app/dist/server"
+
 # Start the appropriate server based on transport type
 case "$TRANSPORT_TYPE" in
   stdio)
-    node dist/stdio.js --port "$PORT"
+    node $DIST_PATH/stdio.js --port "$PORT"
     ;;
   sse)
-    node dist/sse.js --port "$PORT"
+    node $DIST_PATH/sse.js --port "$PORT"
     ;;
   streamableHttp)
-    node dist/streamableHttp.js --port "$PORT"
+    node $DIST_PATH/streamableHttp.js --port "$PORT"
     ;;
   *)
     echo "Error: Invalid transport type '$TRANSPORT_TYPE'. Valid options are: stdio, sse, streamableHttp"
