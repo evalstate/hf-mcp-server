@@ -16,6 +16,7 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
+    "@huggingface/hub": "^2.1.0",
     "zod": "^3.24.4"
   },
   "devDependencies": {

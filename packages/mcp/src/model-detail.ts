@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { HfApiCall } from "./hf-api-call.js";
+import { modelInfo, type ModelEntry } from "@huggingface/hub";
 import { 
   formatDate, 
   formatNumber, 
@@ -15,7 +15,6 @@ export const MODEL_DETAIL_TOOL_CONFIG = {
   description: "Get detailed information about a specific model on Hugging Face Hub.",
   schema: z.object({
     model_id: z.string().min(1, "Model ID is required").describe("Model ID (e.g., microsoft/DialoGPT-large)"),
-    include_files: z.boolean().optional().default(false).describe("Include file listing"),
   }),
   annotations: {
     title: "Model Details",
@@ -27,65 +26,117 @@ export const MODEL_DETAIL_TOOL_CONFIG = {
 
 export type ModelDetailParams = z.infer<typeof MODEL_DETAIL_TOOL_CONFIG.schema>;
 
-// Model Detail Result Interface
-export interface ModelDetailResult {
-  id: string;
+// Extended model entry interface with additional fields
+interface ExtendedModelEntry extends ModelEntry {
   author?: string;
-  downloads?: number;
   downloadsAllTime?: number;
-  likes?: number;
-  private?: boolean;
-  gated?: boolean | string;
-  pipeline_tag?: string;
   library_name?: string;
   tags?: string[];
-  createdAt?: string;
-  lastModified?: string;
+  createdAt?: string; // Keep as string since hub library returns string
   config?: Record<string, any>;
   transformersInfo?: TransformersInfo;
   safetensors?: SafeTensorsInfo;
   siblings?: RepoSibling[];
   cardData?: Record<string, any>;
   inference?: string;
-}
-
-// API parameters interface
-interface ModelDetailApiParams {
-  [key: string]: string;
+  pipeline_tag?: string;
+  "model-index"?: Array<{
+    name: string;
+    results: Array<{
+      task: {
+        type: string;
+        name: string;
+      };
+      dataset: {
+        name: string;
+        type: string;
+      };
+      metrics: Array<{
+        type: string;
+        value: number;
+        name: string;
+      }>;
+    }>;
+  }>;
+  spaces?: Array<{
+    id: string;
+    name: string;
+    title?: string;
+  }>;
 }
 
 /**
- * Service for getting detailed model information
+ * Service for getting detailed model information using the official huggingface.js library
  */
-export class ModelDetailTool extends HfApiCall<ModelDetailApiParams, ModelDetailResult> {
+export class ModelDetailTool {
+  private readonly hubUrl?: string;
+  private readonly accessToken?: string;
+
   /**
    * Creates a new model detail service
    * @param hfToken Optional Hugging Face token for API access
-   * @param apiUrl The URL of the Hugging Face models API
+   * @param hubUrl Optional custom hub URL
    */
   constructor(
     hfToken?: string,
-    apiUrl = "https://huggingface.co/api/models"
+    hubUrl?: string
   ) {
-    super(apiUrl, hfToken);
+    this.accessToken = hfToken;
+    this.hubUrl = hubUrl;
   }
 
   /**
    * Get detailed information about a specific model
    * 
    * @param modelId The model ID to get details for (e.g., microsoft/DialoGPT-large)
-   * @param includeFiles Whether to include file listing in the response
    * @returns Formatted string with model details
    */
-  async getDetails(modelId: string, includeFiles: boolean = false): Promise<string> {
+  async getDetails(modelId: string): Promise<string> {
     try {
-      const url = new URL(`${this.apiUrl}/${modelId}`);
-      if (includeFiles) {
-        url.searchParams.append("blobs", "true");
-      }
-      
-      const model = await this.fetchFromApi<ModelDetailResult>(url);
-      return formatModelDetails(model, includeFiles);
+      // Define additional fields we want to retrieve (only those available in the hub library)
+      const additionalFields: Array<
+        | "author"
+        | "downloadsAllTime" 
+        | "library_name"
+        | "tags"
+        | "config"
+        | "transformersInfo"
+        | "safetensors"
+        | "cardData"
+        | "model-index"
+        | "spaces"
+      > = [
+        "author",
+        "downloadsAllTime",
+        "library_name",
+        "tags",
+        "config",
+        "transformersInfo",
+        "safetensors",
+        "cardData",
+        "model-index",
+        "spaces"
+      ];
+
+      const model = await modelInfo({
+        name: modelId,
+        additionalFields,
+        ...(this.accessToken && { credentials: { accessToken: this.accessToken } }),
+        ...(this.hubUrl && { hubUrl: this.hubUrl })
+      });
+
+      // Cast model-index and spaces to their expected types
+      const modelWithExtras: ExtendedModelEntry = {
+        ...model,
+        pipeline_tag: model.task,
+        id: modelId, // Ensure we have the full ID
+        createdAt: model.updatedAt.toISOString(), // Convert Date to string
+        config: model.config as Record<string, any> | undefined, // Type assertion for config
+        "model-index": (model as any)["model-index"] as ExtendedModelEntry["model-index"],
+        spaces: (model as any).spaces as ExtendedModelEntry["spaces"],
+      };
+
+      return formatModelDetails(modelWithExtras);
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Failed to get model details: ${error.message}`);
@@ -96,16 +147,16 @@ export class ModelDetailTool extends HfApiCall<ModelDetailApiParams, ModelDetail
 }
 
 // Formatting Function
-function formatModelDetails(model: ModelDetailResult, includeFiles: boolean): string {
+function formatModelDetails(model: ExtendedModelEntry & { id: string }): string {
   const r: string[] = [];
-  const [author, name] = model.id.includes('/') ? model.id.split('/') : ['', model.id];
+  const [author, name] = model.name.includes('/') ? model.name.split('/') : ['', model.name];
   
-  r.push(`# ${model.id}`);
+  r.push(`# ${model.name}`);
   r.push("");
   
   // Overview section
   r.push("## Overview");
-  if (author) r.push(`- **Author:** ${author}`);
+  if (author || model.author) r.push(`- **Author:** ${author || model.author}`);
   if (model.pipeline_tag) r.push(`- **Task:** ${model.pipeline_tag}`);
   if (model.library_name) r.push(`- **Library:** ${model.library_name}`);
   
@@ -117,7 +168,7 @@ function formatModelDetails(model: ModelDetailResult, includeFiles: boolean): st
   }
   
   if (model.createdAt) r.push(`- **Created:** ${formatDate(model.createdAt)}`);
-  if (model.lastModified) r.push(`- **Updated:** ${formatDate(model.lastModified)}`);
+  if (model.updatedAt) r.push(`- **Updated:** ${formatDate(model.updatedAt.toISOString())}`);
   
   const status = [];
   if (model.gated) status.push("🔒 Gated");
@@ -159,36 +210,79 @@ function formatModelDetails(model: ModelDetailResult, includeFiles: boolean): st
     r.push("");
   }
   
-  // Files
-  if (includeFiles && model.siblings && model.siblings.length > 0) {
-    r.push(`## Files (${model.siblings.length} total)`);
+  // Model Card Metadata
+  if (model.cardData) {
+    const metadata = [];
     
-    // Sort files by size (largest first)
-    const sortedFiles = [...model.siblings].sort((a, b) => (b.size || 0) - (a.size || 0));
-    
-    for (const file of sortedFiles.slice(0, 10)) { // Show top 10 files
-      const size = file.size ? ` (${formatBytes(file.size)})` : '';
-      r.push(`- ${file.rfilename}${size}`);
+    if (model.cardData.language) {
+      const languages = Array.isArray(model.cardData.language) 
+        ? model.cardData.language.join(", ") 
+        : model.cardData.language;
+      metadata.push(`- **Language:** ${languages}`);
     }
     
-    if (model.siblings.length > 10) {
-      r.push(`- *... and ${model.siblings.length - 10} more files*`);
+    if (model.cardData.license) {
+      metadata.push(`- **License:** ${model.cardData.license}`);
+    }
+    
+    if (model.cardData.datasets) {
+      const datasets = Array.isArray(model.cardData.datasets) 
+        ? model.cardData.datasets.join(", ") 
+        : model.cardData.datasets;
+      metadata.push(`- **Datasets:** ${datasets}`);
+    }
+    
+    if (model.cardData.finetuned_from) {
+      metadata.push(`- **Fine-tuned from:** ${model.cardData.finetuned_from}`);
+    }
+    
+    if (metadata.length > 0) {
+      r.push("## Metadata");
+      r.push(...metadata);
+      r.push("");
+    }
+  }
+  
+  // Benchmark results
+  if (model["model-index"] && model["model-index"].length > 0) {
+    r.push("## Benchmarks");
+    
+    for (const benchmark of model["model-index"]) {
+      if (benchmark.results && benchmark.results.length > 0) {
+        for (const result of benchmark.results) {
+          const taskName = result.task?.name || result.task?.type || "Unknown task";
+          const datasetName = result.dataset?.name || "Unknown dataset";
+          
+          r.push(`- **${taskName} on ${datasetName}:**`);
+          
+          if (result.metrics && result.metrics.length > 0) {
+            for (const metric of result.metrics) {
+              const metricName = metric.name || metric.type || "Score";
+              r.push(`  - ${metricName}: ${metric.value}`);
+            }
+          }
+        }
+      }
     }
     r.push("");
   }
   
-  // Usage example
-  if (model.library_name === 'transformers') {
-    r.push("## Usage Example");
-    r.push("```python");
-    r.push("from transformers import AutoTokenizer, AutoModel");
-    r.push(`tokenizer = AutoTokenizer.from_pretrained("${model.id}")`);
-    r.push(`model = AutoModel.from_pretrained("${model.id}")`);
-    r.push("```");
+  // Related Spaces
+  if (model.spaces && model.spaces.length > 0) {
+    r.push("## Demo Spaces");
+    for (const space of model.spaces.slice(0, 5)) {
+      const title = space.title || space.name;
+      r.push(`- [${title}](https://huggingface.co/spaces/${space.id})`);
+    }
+    
+    if (model.spaces.length > 5) {
+      r.push(`- *... and ${model.spaces.length - 5} more spaces*`);
+    }
     r.push("");
   }
+
   
-  r.push(`**Link:** [https://hf.co/${model.id}](https://hf.co/${model.id})`);
+  r.push(`**Link:** [https://hf.co/${model.name}](https://hf.co/${model.name})`);
   
   return r.join("\n");
 }

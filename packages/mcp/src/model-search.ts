@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { HfApiCall } from "./hf-api-call.js";
+import { listModels, type ModelEntry } from "@huggingface/hub";
+import type { PipelineType } from "@huggingface/hub";
 import { formatDate, formatNumber } from "./model-utils.js";
 
 export const ModelSearchDescription = "Search Hugging Face Models for machine learning.";
@@ -7,18 +8,15 @@ export const ModelSearchDescription = "Search Hugging Face Models for machine le
 // Model Search Tool Configuration
 export const MODEL_SEARCH_TOOL_CONFIG = {
   name: "model_search",
-  description: "Search for Machine Learning models on Hugging Face Hub. " +
-    "Include model links when presenting results. " +
-    "Consider tabulating results if it matches user intent.",
+  description: "Find ML models on Hugging Face by name, author, task type, or library. Returns detailed info about matching models including downloads, likes, tags, and direct links.",
   schema: z.object({
-    query: z.string().optional().describe("Search term for model name/description"),
-    author: z.string().optional().describe("Filter by author/organization"),
-    task: z.string().optional().describe("Filter by task (e.g., text-generation, image-classification)"),
-    library: z.string().optional().describe("Filter by library (e.g., transformers, diffusers)"),
-    sort: z.enum(["trendingScore", "downloads", "likes", "createdAt"]).optional().default("trendingScore"),
-    limit: z.number().min(1).max(100).optional().default(20),
-    search: z.string().optional().describe("Alternative to query - search term for model name/description"),
-    direction: z.enum(["asc", "desc"]).optional().default("desc"),
+    query: z.string().optional().describe("Search term for finding models by name or description"),
+    author: z.string().optional().describe("Organization or user who created the model (e.g., 'google', 'meta-llama', 'microsoft')"),
+    task: z.string().optional().describe("Model task type (e.g., 'text-generation', 'image-classification', 'translation')"),
+    library: z.string().optional().describe("Framework the model uses (e.g., 'transformers', 'diffusers', 'timm')"),
+    limit: z.number().min(1).max(100).optional().default(20).describe("Maximum number of results to return (1-100)"),
+    sort: z.enum(["trendingScore", "downloads", "likes", "createdAt"]).optional().default("trendingScore")
+      .describe("How to order results (trending, download count, likes, or creation date)"),
   }),
   annotations: {
     title: "Model Search",
@@ -28,81 +26,104 @@ export const MODEL_SEARCH_TOOL_CONFIG = {
   }
 } as const;
 
-// Response Interface
-export interface ModelSearchResult {
-  id: string;
-  author?: string;
-  downloads?: number;
-  likes?: number;
-  private?: boolean;
-  gated?: boolean | string;
-  pipeline_tag?: string;
-  library_name?: string;
-  tags?: string[];
-  createdAt?: string;
-  lastModified?: string;
-}
-
 // Define search parameter types
 export type ModelSearchParams = z.infer<typeof MODEL_SEARCH_TOOL_CONFIG.schema>;
 
-// API parameters interface
-interface ModelApiParams {
-  [key: string]: string;
+// Extended ModelEntry interface to include more fields we want
+interface ExtendedModelEntry extends ModelEntry {
+  author?: string;
+  library_name?: string;
+  tags?: string[];
+  createdAt?: string;
+  downloadsAllTime?: number;
+  pipeline_tag?: string;
 }
 
+// Define common fields we want to retrieve from the API
+const ADDITIONAL_FIELDS = [
+  "author",
+  "library_name", 
+  "tags",
+  "downloadsAllTime"
+] as any[];
+
 /**
- * Service for searching Hugging Face Models
+ * Service for searching Hugging Face Models using the official huggingface.js library
  */
-export class ModelSearchTool extends HfApiCall<ModelApiParams, ModelSearchResult[]> {
+export class ModelSearchTool {
+  private readonly hubUrl?: string;
+  private readonly accessToken?: string;
+
   /**
    * Creates a new model search service
    * @param hfToken Optional Hugging Face token for API access
-   * @param apiUrl The URL of the Hugging Face models API
+   * @param hubUrl Optional custom hub URL
    */
   constructor(
     hfToken?: string,
-    apiUrl = "https://huggingface.co/api/models"
+    hubUrl?: string
   ) {
-    super(apiUrl, hfToken);
+    this.accessToken = hfToken;
+    this.hubUrl = hubUrl;
   }
 
-  // Maintain backwards compatibility with the original method signature
-  async search(
-    query?: string,
-    author?: string,
-    task?: string,
-    library?: string,
-    sort: string = "trendingScore",
-    limit: number = 20,
-    direction: string = "desc"
-  ): Promise<string> {
+  /**
+   * Search for models with detailed parameters
+   */
+  async searchWithParams(params: ModelSearchParams): Promise<string> {
     try {
-      const params: ModelApiParams = {};
+      // Convert our params to the format expected by the hub library
+      const searchParams: {
+        query?: string;
+        owner?: string;
+        task?: PipelineType;
+        tags?: string[];
+      } = {};
+
+      // Handle query parameter
+      if (params.query) {
+        searchParams.query = params.query;
+      }
       
-      // Support both query and search parameters
-      if (query) params.search = query;
-      if (author) params.author = author;
-      if (sort) params.sort = sort;
-      if (limit) params.limit = limit.toString();
-      if (direction) params.direction = direction;
+      if (params.author) {
+        searchParams.owner = params.author;
+      }
       
-      // Handle filters (task and library go into filter parameter)
-      const filters: string[] = [];
-      if (task) filters.push(task);
-      if (library) filters.push(library);
-      if (filters.length > 0) {
-        params.filter = filters.join(",");
+      if (params.task) {
+        searchParams.task = params.task as PipelineType;
       }
 
-      const url = this.buildUrl(params);
-      const models = await this.fetchFromApi<ModelSearchResult[]>(url);
+      // Add library as a tag filter if specified
+      if (params.library) {
+        searchParams.tags = [params.library];
+      }
+
+      const models: ExtendedModelEntry[] = [];
+      
+      // Collect results from the async generator
+      for await (const model of listModels({
+        search: searchParams,
+        additionalFields: ADDITIONAL_FIELDS,
+        limit: params.limit,
+        ...(this.accessToken && { credentials: { accessToken: this.accessToken } }),
+        ...(this.hubUrl && { hubUrl: this.hubUrl })
+      })) {
+        models.push({
+          ...model,
+          pipeline_tag: model.task,
+          createdAt: model.updatedAt.toISOString(),
+        } as ExtendedModelEntry);
+      }
+      
+      // Sort results based on the sort parameter
+      const sortBy = params.sort || "trendingScore";
+      this.sortModels(models, sortBy, "desc");
       
       if (models.length === 0) {
         return `No models found for the given criteria.`;
       }
       
-      return formatSearchResults(models, { query, author, task, library });
+      return formatSearchResults(models, params);
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Failed to search for models: ${error.message}`);
@@ -111,24 +132,60 @@ export class ModelSearchTool extends HfApiCall<ModelApiParams, ModelSearchResult
     }
   }
 
-  // Add an alternative search method that accepts a params object
-  async searchWithParams(params: ModelSearchParams): Promise<string> {
-    return this.search(
-      params.query || params.search,
-      params.author,
-      params.task,
-      params.library,
-      params.sort,
-      params.limit,
-      params.direction
-    );
+  /**
+   * Simple search by text query (convenience method)
+   */
+  async searchByQuery(query: string, limit: number = 20): Promise<string> {
+    return this.searchWithParams({ query, limit, sort: "trendingScore" });
+  }
+
+  /**
+   * Search by author/organization
+   */
+  async searchByAuthor(author: string, limit: number = 20): Promise<string> {
+    return this.searchWithParams({ author, limit, sort: "trendingScore" });
+  }
+
+  /**
+   * Search by task
+   */
+  async searchByTask(task: string, limit: number = 20): Promise<string> {
+    return this.searchWithParams({ task, limit, sort: "trendingScore" });
+  }
+
+  /**
+   * Search by library
+   */
+  async searchByLibrary(library: string, limit: number = 20): Promise<string> {
+    return this.searchWithParams({ library, limit, sort: "trendingScore" });
+  }
+
+  private sortModels(models: ExtendedModelEntry[], sort: string, direction: string): void {
+    const mult = direction === "desc" ? -1 : 1;
+    
+    models.sort((a, b) => {
+      switch (sort) {
+        case "downloads":
+          return mult * ((b.downloads || 0) - (a.downloads || 0));
+        case "likes":
+          return mult * ((b.likes || 0) - (a.likes || 0));
+        case "createdAt":
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return mult * (bTime - aTime);
+        case "trendingScore":
+        default:
+          // Default sorting by downloads as a proxy for trending
+          return mult * ((b.downloads || 0) - (a.downloads || 0));
+      }
+    });
   }
 }
 
 // Formatting Function
 function formatSearchResults(
-  models: ModelSearchResult[], 
-  params: { query?: string; author?: string; task?: string; library?: string }
+  models: ExtendedModelEntry[], 
+  params: Partial<ModelSearchParams>
 ): string {
   const r: string[] = [];
   
@@ -147,9 +204,9 @@ function formatSearchResults(
   r.push("");
 
   for (const model of models) {
-    const [author, name] = model.id.includes('/') ? model.id.split('/') : ['', model.id];
+    const [author, name] = model.name.includes('/') ? model.name.split('/') : ['', model.name];
     
-    r.push(`## ${model.id}`);
+    r.push(`## ${model.name}`);
     r.push("");
     
     // Basic info line
@@ -186,11 +243,11 @@ function formatSearchResults(
     if (model.createdAt) {
       r.push(`**Created:** ${formatDate(model.createdAt)}`);
     }
-    if (model.lastModified && model.lastModified !== model.createdAt) {
-      r.push(`**Updated:** ${formatDate(model.lastModified)}`);
+    if (model.updatedAt && model.updatedAt.toISOString() !== model.createdAt) {
+      r.push(`**Updated:** ${formatDate(model.updatedAt.toISOString())}`);
     }
     
-    r.push(`**Link:** [https://hf.co/${model.id}](https://hf.co/${model.id})`);
+    r.push(`**Link:** [https://hf.co/${model.name}](https://hf.co/${model.name})`);
     r.push("");
     r.push("---");
     r.push("");
