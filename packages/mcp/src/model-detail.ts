@@ -1,13 +1,6 @@
 import { z } from 'zod';
 import { modelInfo, type ModelEntry } from '@huggingface/hub';
-import {
-	formatDate,
-	formatNumber,
-	formatBytes,
-	TransformersInfo,
-	SafeTensorsInfo,
-	RepoSibling,
-} from './model-utils.js';
+import { formatDate, formatNumber, formatBytes, TransformersInfo, SafeTensorsInfo } from './model-utils.js';
 
 // Model Detail Tool Configuration
 export const MODEL_DETAIL_TOOL_CONFIG = {
@@ -36,7 +29,6 @@ interface ExtendedModelEntry extends ModelEntry {
 	config?: Record<string, any>;
 	transformersInfo?: TransformersInfo;
 	safetensors?: SafeTensorsInfo;
-	siblings?: RepoSibling[];
 	cardData?: Record<string, any>;
 	inference?: string;
 	pipeline_tag?: string;
@@ -269,7 +261,7 @@ function formatModelDetails(model: ExtendedModelEntry & { id: string }): string 
 		r.push('## Demo Spaces');
 		for (const space of model.spaces.slice(0, 5)) {
 			const title = space.title || space.name;
-			r.push(`- [${title}](https://huggingface.co/spaces/${space.id})`);
+			r.push(`- [${title}](https://hf.co/spaces/${space.id})`);
 		}
 
 		if (model.spaces.length > 5) {

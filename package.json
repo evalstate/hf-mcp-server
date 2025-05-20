@@ -14,8 +14,13 @@
     "clean": "pnpm run --recursive clean"
   },
   "devDependencies": {
-    "typescript": "~5.8.3",
+    "@eslint/js": "^9.27.0",
+    "@typescript-eslint/eslint-plugin": "^8.32.1",
+    "@typescript-eslint/parser": "^8.32.1",
     "concurrently": "^9.1.2",
-    "cross-env": "^7.0.3"
+    "cross-env": "^7.0.3",
+    "eslint-plugin-prettier": "^5.4.0",
+    "globals": "^16.1.0",
+    "typescript": "~5.8.3"
   }
 }
