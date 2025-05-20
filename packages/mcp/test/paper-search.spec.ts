@@ -37,13 +37,13 @@ describe('PaperSearchService', () => {
 	});
 
 	it('shows us hf profiles for authors when known ', () => {
-		expect(authors(kazakh[2]?.paper?.authors || [], 1)).toBe(
+		expect(authors(kazakh[2]?.paper?.authors || [])).toBe(
 			'**Authors:** Rustem Yeshpanov ([yeshpanovrustem](https://hf.co/yeshpanovrustem)), Huseyin Atakan Varol'
 		);
 	});
 
 	it('shows us hf profiles when known ', () => {
-		expect(authors(kazakh[2]?.paper?.authors || [], 1)).toBe(
+		expect(authors(kazakh[2]?.paper?.authors || [])).toBe(
 			'**Authors:** Rustem Yeshpanov ([yeshpanovrustem](https://hf.co/yeshpanovrustem)), Huseyin Atakan Varol'
 		);
 	});
