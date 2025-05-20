@@ -122,8 +122,7 @@ export const createServer = async (
       const hfToken = getHfToken();
       const modelDetail = new ModelDetailTool(hfToken);
       const results = await modelDetail.getDetails(
-        params.model_id, 
-        params.include_files
+        params.model_id
       );
 
       return {

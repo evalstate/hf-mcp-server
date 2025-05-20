@@ -103,6 +103,12 @@ function App() {
   };
 
   const searchTools = {
+    paper_search: { // Changed from paper_semantic_search
+      id: "paper_search",
+      label: "Papers Search",
+      description: "Find Machine Learning Research Papers.",
+      settings: settings.tools.paper_search || { enabled: false }
+    },
     space_search: { // Changed from space_semantic_search
       id: "space_search",
       label: "Space Search",
@@ -121,12 +127,6 @@ function App() {
       description: "Get detailed information about a specific model.",
       settings: settings.tools.model_detail || { enabled: false }
     },
-    paper_search: { // Changed from paper_semantic_search
-      id: "paper_search",
-      label: "Papers Search",
-      description: "Find Machine Learning Research Papers.",
-      settings: settings.tools.paper_search || { enabled: false }
-    }
   };
 
   const developerTools = {
