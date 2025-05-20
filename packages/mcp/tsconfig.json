@@ -17,6 +17,7 @@
     "composite": true,
     "declarationMap": true,
     "sourceMap": true,
+    "rootDir": "src",
     "lib": [
       "es2022",
       "dom",
@@ -24,8 +25,7 @@
     ]
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx"
+    "src/**/*.ts"
   ],
   "exclude": [
     "node_modules",

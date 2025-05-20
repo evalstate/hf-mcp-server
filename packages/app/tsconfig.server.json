@@ -21,7 +21,9 @@
       "es2022",
       "dom",
       "dom.iterable"
-    ]
+    ],
+    "rootDir": "src",
+    "baseUrl": "src"
   },
   "include": [
     "src/server/**/*.ts",

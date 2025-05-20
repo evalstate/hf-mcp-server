@@ -87,7 +87,7 @@ export const createServer = async (
 		SEMANTIC_SEARCH_TOOL_CONFIG.description,
 		SEMANTIC_SEARCH_TOOL_CONFIG.schema.shape,
 		SEMANTIC_SEARCH_TOOL_CONFIG.annotations,
-		async ({ query, limit }) => {
+		async ({ query, limit }: { query: string, limit?: number }) => {
 			const hfToken = getHfToken();
 			const semanticSearch = new SpaceSearchTool(hfToken);
 			const results = await semanticSearch.search(query, limit);
@@ -102,7 +102,7 @@ export const createServer = async (
 		MODEL_SEARCH_TOOL_CONFIG.description,
 		MODEL_SEARCH_TOOL_CONFIG.schema.shape,
 		MODEL_SEARCH_TOOL_CONFIG.annotations,
-		async (params) => {
+		async (params: { query?: string, model_type?: string, sort?: "downloads" | "likes" | "lastModified", direction?: string, limit?: number }) => {
 			const hfToken = getHfToken();
 			const modelSearch = new ModelSearchTool(hfToken);
 			const results = await modelSearch.searchWithParams(params);
@@ -118,7 +118,7 @@ export const createServer = async (
 		MODEL_DETAIL_TOOL_CONFIG.description,
 		MODEL_DETAIL_TOOL_CONFIG.schema.shape,
 		MODEL_DETAIL_TOOL_CONFIG.annotations,
-		async (params) => {
+		async (params: { model_id: string }) => {
 			const hfToken = getHfToken();
 			const modelDetail = new ModelDetailTool(hfToken);
 			const results = await modelDetail.getDetails(params.model_id);
@@ -135,7 +135,7 @@ export const createServer = async (
 		PAPER_SEARCH_TOOL_CONFIG.description,
 		PAPER_SEARCH_TOOL_CONFIG.schema.shape,
 		PAPER_SEARCH_TOOL_CONFIG.annotations,
-		async ({ query, limit }) => {
+		async ({ query, limit }: { query: string, limit?: number }) => {
 			const hfToken = getHfToken();
 			const results = await new PaperSearchTool(hfToken).search(query, limit);
 			return {

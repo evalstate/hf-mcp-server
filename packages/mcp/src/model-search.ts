@@ -69,7 +69,7 @@ export class ModelSearchTool {
 	/**
 	 * Search for models with detailed parameters
 	 */
-	async searchWithParams(params: ModelSearchParams): Promise<string> {
+	async searchWithParams(params: Partial<ModelSearchParams>): Promise<string> {
 		try {
 			// Convert our params to the format expected by the hub library
 			const searchParams: {
