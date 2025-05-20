@@ -1,5 +1,4 @@
-import { randomUUID } from 'crypto';
-import { BaseTransport, TransportOptions } from './base-transport.js';
+import { BaseTransport, type TransportOptions } from './base-transport.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 
 export class SseTransport extends BaseTransport {
@@ -58,8 +57,13 @@ export class SseTransport extends BaseTransport {
 
 		for (const id of transportIds) {
 			try {
-				await this.sseTransports[id].close();
-				delete this.sseTransports[id];
+				const transport = this.sseTransports[id];
+				if (transport) {
+					await transport.close();
+					delete this.sseTransports[id];
+				} else {
+					console.error('Transport not found for ID:', id);
+				}
 			} catch (err) {
 				console.error(`Error closing SSE transport ${id}:`, err);
 			}

@@ -201,7 +201,7 @@ export class ModelDetailTool {
 						const name = parts.length > 1 ? parts[1] : spaceId;
 						return {
 							id: spaceId,
-							name: name,
+							name: name || spaceId, // Ensure name is always a string
 							title: name, // Default to name if title not available
 						};
 					});

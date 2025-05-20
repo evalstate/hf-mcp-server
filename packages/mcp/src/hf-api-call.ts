@@ -1,9 +1,6 @@
-import type { RequestInit } from 'node-fetch';
-import fetch from 'node-fetch';
-
 /**
  * Base API client for Hugging Face HTTP APIs
- * 
+ *
  * @template TParams - Type for API parameters
  * @template TResponse - Type for API response
  */
@@ -19,7 +16,7 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 
 	/**
 	 * Fetches data from the API with proper error handling and authentication
-	 * 
+	 *
 	 * @template T - Response type (defaults to TResponse)
 	 * @param url - The URL to fetch from
 	 * @param options - Fetch options
@@ -56,7 +53,7 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 
 	/**
 	 * Builds a URL with query parameters
-	 * 
+	 *
 	 * @param params - Key-value pairs of query parameters
 	 * @returns A URL object with the query parameters appended
 	 */
@@ -76,7 +73,7 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 
 	/**
 	 * Builds a URL with the given parameters and makes an API request
-	 * 
+	 *
 	 * @template T - Response type (defaults to TResponse)
 	 * @param params - The parameters to include in the URL
 	 * @param options - Additional fetch options
