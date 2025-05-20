@@ -60,7 +60,7 @@ export const createServer = async (
 	transportType: TransportType = 'unknown',
 	webAppPort: number = DEFAULT_WEB_APP_PORT,
 	transportOptions: TransportOptions = {}
-) => {
+): Promise<{ server: McpServer; cleanup: () => Promise<void>; app: express.Application }> => {
 	const server = new McpServer(
 		{
 			name: 'hf-mcp-server',
