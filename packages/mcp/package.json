@@ -11,7 +11,7 @@
     "./paper": "./dist/paper-search.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --declaration",
     "test": "vitest run",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",

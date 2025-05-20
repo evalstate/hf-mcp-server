@@ -14,6 +14,7 @@
     "module": "NodeNext",
     "outDir": "dist",
     "declaration": true,
+    "declarationDir": "dist",
     "composite": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -22,7 +23,8 @@
       "es2022",
       "dom",
       "dom.iterable"
-    ]
+    ],
+    "emitDeclarationOnly": false
   },
   "include": [
     "src/**/*.ts"

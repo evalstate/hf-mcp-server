@@ -104,7 +104,7 @@ export const createServer = async (
 		MODEL_SEARCH_TOOL_CONFIG.annotations,
 		async (params: { query?: string, model_type?: string, sort?: "downloads" | "likes" | "lastModified", direction?: string, limit?: number }) => {
 			const hfToken = getHfToken();
-			const modelSearch = new ModelSearchTool(hfToken);
+			const modelSearch = new ModelSearchTool(hfToken, undefined);
 			const results = await modelSearch.searchWithParams(params);
 
 			return {
@@ -120,7 +120,7 @@ export const createServer = async (
 		MODEL_DETAIL_TOOL_CONFIG.annotations,
 		async (params: { model_id: string }) => {
 			const hfToken = getHfToken();
-			const modelDetail = new ModelDetailTool(hfToken);
+			const modelDetail = new ModelDetailTool(hfToken, undefined);
 			const results = await modelDetail.getDetails(params.model_id);
 
 			return {
