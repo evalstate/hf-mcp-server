@@ -1,47 +1,68 @@
-import { BaseTransport, TransportOptions } from "./base-transport.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { randomUUID } from 'crypto';
+import { BaseTransport, TransportOptions } from './base-transport.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 
-/**
- * Implementation of SSE transport
- */
 export class SseTransport extends BaseTransport {
-  private transport: SSEServerTransport | null = null;
+	// Store multiple SSE transport instances
+	private sseTransports: Record<string, SSEServerTransport> = {};
 
-  async initialize(options: TransportOptions): Promise<void> {
-    // Add SSE endpoints to the Express app
-    this.app.get("/sse", async (req, res) => {
-      console.log("Received SSE connection");
-      // Set the correct content type for SSE
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
+	async initialize(options: TransportOptions): Promise<void> {
+		// SSE endpoint for client connections
+		this.app.get('/sse', async (req, res) => {
+			console.log('Received SSE connection');
 
-      this.transport = new SSEServerTransport("/message", res);
-      await this.server.connect(this.transport);
+			// Create dedicated transport for this connection
+			const transport = new SSEServerTransport('/message', res);
+			const sessionId = transport.sessionId;
 
-      this.server.server.onclose = async () => {
-        await this.cleanup();
-        await this.server.close();
-        process.exit(0);
-      };
-    });
+			// Store in our collection
+			this.sseTransports[sessionId] = transport;
 
-    this.app.post("/message", async (req, res) => {
-      console.log("Received SSE message");
-      if (this.transport) {
-        await this.transport.handlePostMessage(req, res);
-      } else {
-        res.status(500).json({
-          error: "SSE transport not initialized"
-        });
-      }
-    });
+			// Clean up on connection close
+			res.on('close', () => {
+				console.log(`SSE connection closed: ${sessionId}`);
+				delete this.sseTransports[sessionId];
+			});
 
-    console.log("SSE transport routes initialized");
-  }
+			// Connect to server
+			await this.server.connect(transport);
 
-  async cleanup(): Promise<void> {
-    console.log("Cleaning up SSE transport");
-    // SSE doesn't require special cleanup beyond what the server will do
-  }
+			// Note: No need to set server.onclose here
+		});
+
+		// Handle messages for all SSE sessions
+		this.app.post('/message', async (req, res) => {
+			console.log('Received SSE message');
+
+			// Extract sessionId from query parameters
+			const sessionId = req.query.sessionId as string;
+
+			if (sessionId && this.sseTransports[sessionId]) {
+				// Handle message with the appropriate transport
+				await this.sseTransports[sessionId].handlePostMessage(req, res);
+			} else {
+				res.status(404).json({
+					error: 'Session not found',
+				});
+			}
+		});
+
+		console.log('SSE transport routes initialized');
+	}
+
+	async cleanup(): Promise<void> {
+		console.log('Cleaning up SSE transport');
+
+		// Close all active SSE connections
+		const transportIds = Object.keys(this.sseTransports);
+
+		for (const id of transportIds) {
+			try {
+				await this.sseTransports[id].close();
+				delete this.sseTransports[id];
+			} catch (err) {
+				console.error(`Error closing SSE transport ${id}:`, err);
+			}
+		}
+	}
 }

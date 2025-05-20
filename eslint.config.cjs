@@ -4,6 +4,8 @@ module.exports = [
   
   // Global settings
   {
+    ignores: ['**/dist/**', '**/node_modules/**', '**/build/**'],
+    files: ['**/*.{ts,tsx,js,jsx,mjs,cjs}'],
     languageOptions: {
       ecmaVersion: 2020,
       sourceType: 'module',

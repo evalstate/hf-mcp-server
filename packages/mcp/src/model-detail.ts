@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { modelInfo, type ModelEntry } from '@huggingface/hub';
-import { formatDate, formatNumber, formatBytes, TransformersInfo, SafeTensorsInfo } from './model-utils.js';
+import { modelInfo } from '@huggingface/hub';
+import { formatDate, formatNumber } from './model-utils.js';
 
 // Model Detail Tool Configuration
 export const MODEL_DETAIL_TOOL_CONFIG = {
@@ -19,37 +19,49 @@ export const MODEL_DETAIL_TOOL_CONFIG = {
 
 export type ModelDetailParams = z.infer<typeof MODEL_DETAIL_TOOL_CONFIG.schema>;
 
-// Extended model entry interface with additional fields
-interface ExtendedModelEntry extends ModelEntry {
+// Clean interface design with explicit data availability
+
+// Required core information that should always be available
+interface ModelBasicInfo {
+	id: string; // Model ID
+	name: string; // Model name
+	downloads: number;
+	likes: number;
+	private: boolean;
+	gated: false | 'auto' | 'manual';
+	updatedAt: Date;
+}
+
+// Optional but reliable information with simple types
+interface ModelExtendedInfo {
 	author?: string;
-	downloadsAllTime?: number;
 	library_name?: string;
+	pipeline_tag?: string; // Task type
+	downloadsAllTime?: number;
 	tags?: string[];
-	createdAt?: string; // Keep as string since hub library returns string
-	config?: Record<string, any>;
-	transformersInfo?: TransformersInfo;
-	safetensors?: SafeTensorsInfo;
-	cardData?: Record<string, any>;
-	inference?: string;
-	pipeline_tag?: string;
-	'model-index'?: Array<{
-		name: string;
-		results: Array<{
-			task: {
-				type: string;
-				name: string;
-			};
-			dataset: {
-				name: string;
-				type: string;
-			};
-			metrics: Array<{
-				type: string;
-				value: number;
-				name: string;
-			}>;
-		}>;
-	}>;
+}
+
+// Technical details that need validation
+interface ModelTechnicalDetails {
+	modelType?: string; // From config.model_type if exists
+	vocabSize?: number; // From config.vocab_size if exists
+	parameters?: number; // From safetensors.total if exists
+	modelClass?: string; // From transformersInfo.auto_model if exists
+}
+
+// Metadata from cardData with careful extraction
+interface ModelMetadata {
+	language?: string | string[];
+	license?: string | string[];
+	datasets?: string | string[];
+	fineTunedFrom?: string;
+}
+
+// Complete model information structure
+interface ModelInformation extends ModelBasicInfo {
+	extended?: ModelExtendedInfo;
+	technical?: ModelTechnicalDetails;
+	metadata?: ModelMetadata;
 	spaces?: Array<{
 		id: string;
 		name: string;
@@ -83,18 +95,7 @@ export class ModelDetailTool {
 	async getDetails(modelId: string): Promise<string> {
 		try {
 			// Define additional fields we want to retrieve (only those available in the hub library)
-			const additionalFields: Array<
-				| 'author'
-				| 'downloadsAllTime'
-				| 'library_name'
-				| 'tags'
-				| 'config'
-				| 'transformersInfo'
-				| 'safetensors'
-				| 'cardData'
-				| 'model-index'
-				| 'spaces'
-			> = [
+			const additionalFields = [
 				'author',
 				'downloadsAllTime',
 				'library_name',
@@ -103,29 +104,114 @@ export class ModelDetailTool {
 				'transformersInfo',
 				'safetensors',
 				'cardData',
-				'model-index',
 				'spaces',
-			];
+			] as const;
 
-			const model = await modelInfo({
+			const modelData = await modelInfo<(typeof additionalFields)[number]>({
 				name: modelId,
-				additionalFields,
+				additionalFields: Array.from(additionalFields),
 				...(this.accessToken && { credentials: { accessToken: this.accessToken } }),
 				...(this.hubUrl && { hubUrl: this.hubUrl }),
 			});
 
-			// Cast model-index and spaces to their expected types
-			const modelWithExtras: ExtendedModelEntry = {
-				...model,
-				pipeline_tag: model.task,
-				id: modelId, // Ensure we have the full ID
-				createdAt: model.updatedAt.toISOString(), // Convert Date to string
-				config: model.config as Record<string, any> | undefined, // Type assertion for config
-				'model-index': (model as any)['model-index'] as ExtendedModelEntry['model-index'],
-				spaces: (model as any).spaces as ExtendedModelEntry['spaces'],
+			// Build the structured model information
+			const modelDetails: ModelInformation = {
+				// Basic info (required fields)
+				id: modelId,
+				name: modelData.name,
+				downloads: modelData.downloads,
+				likes: modelData.likes,
+				private: modelData.private,
+				gated: modelData.gated,
+				updatedAt: modelData.updatedAt,
+
+				// Extended info (optional but reliable fields)
+				extended: {
+					author: modelData.author,
+					library_name: modelData.library_name,
+					pipeline_tag: modelData.task,
+					downloadsAllTime: modelData.downloadsAllTime,
+					tags: modelData.tags,
+				},
 			};
 
-			return formatModelDetails(modelWithExtras);
+			// Technical details (requires validation)
+			const technical: ModelTechnicalDetails = {};
+
+			// Extract config details safely if they exist
+			if (modelData.config && typeof modelData.config === 'object') {
+				const config = modelData.config as Record<string, unknown>;
+				if ('model_type' in config && typeof config.model_type === 'string') {
+					technical.modelType = config.model_type;
+				}
+				if ('vocab_size' in config && typeof config.vocab_size === 'number') {
+					technical.vocabSize = config.vocab_size;
+				}
+			}
+
+			// Extract safe tensors info
+			if (modelData.safetensors && typeof modelData.safetensors.total === 'number') {
+				technical.parameters = modelData.safetensors.total;
+			}
+
+			// Extract transformers info
+			if (modelData.transformersInfo && modelData.transformersInfo.auto_model) {
+				technical.modelClass = modelData.transformersInfo.auto_model;
+			}
+
+			// Only add technical section if we have data
+			if (Object.keys(technical).length > 0) {
+				modelDetails.technical = technical;
+			}
+
+			// Metadata from card data
+			if (modelData.cardData) {
+				const metadata: ModelMetadata = {};
+				const cardData = modelData.cardData as Record<string, unknown>;
+
+				if ('language' in cardData) {
+					metadata.language = cardData.language as string | string[];
+				}
+
+				if ('license' in cardData) {
+					metadata.license = cardData.license as string | string[];
+				}
+
+				if ('datasets' in cardData) {
+					metadata.datasets = cardData.datasets as string | string[];
+				}
+
+				if ('finetuned_from' in cardData) {
+					metadata.fineTunedFrom = cardData.finetuned_from as string;
+				}
+
+				// Only add metadata section if we have data
+				if (Object.keys(metadata).length > 0) {
+					modelDetails.metadata = metadata;
+				}
+			}
+
+			// Extract spaces information if available
+			const spaces = modelData.spaces;
+			if (Array.isArray(spaces) && spaces.length > 0) {
+				try {
+					modelDetails.spaces = spaces.map((spaceId) => {
+						// Format is typically username/spacename
+						const parts = spaceId.split('/');
+						const name = parts.length > 1 ? parts[1] : spaceId;
+						return {
+							id: spaceId,
+							name: name,
+							title: name, // Default to name if title not available
+						};
+					});
+					// eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
+				} catch (ignoreUnformattedSpaces) {
+					console.error(`Error  processing spaces for model ${modelId}:`);
+				}
+			}
+
+			return formatModelDetails(modelDetails);
 		} catch (error) {
 			if (error instanceof Error) {
 				throw new Error(`Failed to get model details: ${error.message}`);
@@ -136,93 +222,112 @@ export class ModelDetailTool {
 }
 
 // Formatting Function
-function formatModelDetails(model: ExtendedModelEntry & { id: string }): string {
+function formatModelDetails(model: ModelInformation): string {
 	const r: string[] = [];
-	const [author, name] = model.name.includes('/') ? model.name.split('/') : ['', model.name];
+	const [authorFromName] = model.name.includes('/') ? model.name.split('/') : ['', model.name];
 
 	r.push(`# ${model.name}`);
 	r.push('');
 
-	// Overview section
+	// Overview section - using only reliable fields
 	r.push('## Overview');
-	if (author || model.author) r.push(`- **Author:** ${author || model.author}`);
-	if (model.pipeline_tag) r.push(`- **Task:** ${model.pipeline_tag}`);
-	if (model.library_name) r.push(`- **Library:** ${model.library_name}`);
 
+	// Author - from extended info or parsed from name
+	if (model.extended?.author || authorFromName) {
+		r.push(`- **Author:** ${model.extended?.author || authorFromName}`);
+	}
+
+	// Task type
+	if (model.extended?.pipeline_tag) {
+		r.push(`- **Task:** ${model.extended.pipeline_tag}`);
+	}
+
+	// Library
+	if (model.extended?.library_name) {
+		r.push(`- **Library:** ${model.extended.library_name}`);
+	}
+
+	// Statistics
 	const stats = [];
-	if (model.downloadsAllTime) stats.push(`**Downloads:** ${formatNumber(model.downloadsAllTime)}`);
-	if (model.likes) stats.push(`**Likes:** ${model.likes}`);
+	if (model.extended?.downloadsAllTime) {
+		stats.push(`**Downloads:** ${formatNumber(model.extended.downloadsAllTime)}`);
+	}
+	if (model.likes) {
+		stats.push(`**Likes:** ${model.likes}`);
+	}
 	if (stats.length > 0) {
 		r.push(`- ${stats.join(' | ')}`);
 	}
 
-	if (model.createdAt) r.push(`- **Created:** ${formatDate(model.createdAt)}`);
-	if (model.updatedAt) r.push(`- **Updated:** ${formatDate(model.updatedAt.toISOString())}`);
+	// Dates
+	r.push(`- **Updated:** ${formatDate(model.updatedAt.toISOString())}`);
 
+	// Status indicators
 	const status = [];
 	if (model.gated) status.push('🔒 Gated');
 	if (model.private) status.push('🔐 Private');
-	if (model.inference) status.push(`🚀 Inference API: ${model.inference}`);
 	if (status.length > 0) {
 		r.push(`- **Status:** ${status.join(' | ')}`);
 	}
 	r.push('');
 
-	// Technical Details
-	if (model.transformersInfo || model.safetensors || model.config) {
+	// Technical Details - only if we have validated information
+	if (model.technical && Object.keys(model.technical).length > 0) {
 		r.push('## Technical Details');
 
-		if (model.transformersInfo?.auto_model) {
-			r.push(`- **Model Class:** ${model.transformersInfo.auto_model}`);
+		if (model.technical.modelClass) {
+			r.push(`- **Model Class:** ${model.technical.modelClass}`);
 		}
 
-		if (model.safetensors?.total) {
-			r.push(`- **Parameters:** ${formatNumber(model.safetensors.total)}`);
+		if (model.technical.parameters) {
+			r.push(`- **Parameters:** ${formatNumber(model.technical.parameters)}`);
 		}
 
-		if (model.config) {
-			const configKeys = Object.keys(model.config);
-			if (configKeys.includes('model_type')) {
-				r.push(`- **Architecture:** ${model.config.model_type}`);
-			}
-			if (configKeys.includes('vocab_size')) {
-				r.push(`- **Vocab Size:** ${formatNumber(model.config.vocab_size)}`);
-			}
+		if (model.technical.modelType) {
+			r.push(`- **Architecture:** ${model.technical.modelType}`);
 		}
+
+		if (model.technical.vocabSize) {
+			r.push(`- **Vocab Size:** ${formatNumber(model.technical.vocabSize)}`);
+		}
+
 		r.push('');
 	}
 
-	// Tags
-	if (model.tags && model.tags.length > 0) {
+	// Tags - reliable field from extended info
+	if (model.extended?.tags && model.extended.tags.length > 0) {
 		r.push('## Tags');
-		r.push(model.tags.map((tag) => `\`${tag}\``).join(' '));
+		r.push(model.extended.tags.map((tag) => `\`${tag}\``).join(' '));
 		r.push('');
 	}
 
-	// Model Card Metadata
-	if (model.cardData) {
+	// Metadata - carefully extracted and validated
+	if (model.metadata) {
 		const metadata = [];
 
-		if (model.cardData.language) {
-			const languages = Array.isArray(model.cardData.language)
-				? model.cardData.language.join(', ')
-				: model.cardData.language;
+		if (model.metadata.language) {
+			const languages = Array.isArray(model.metadata.language)
+				? model.metadata.language.join(', ')
+				: model.metadata.language;
 			metadata.push(`- **Language:** ${languages}`);
 		}
 
-		if (model.cardData.license) {
-			metadata.push(`- **License:** ${model.cardData.license}`);
+		if (model.metadata.license) {
+			const license = Array.isArray(model.metadata.license)
+				? model.metadata.license.join(', ')
+				: model.metadata.license;
+			metadata.push(`- **License:** ${license}`);
 		}
 
-		if (model.cardData.datasets) {
-			const datasets = Array.isArray(model.cardData.datasets)
-				? model.cardData.datasets.join(', ')
-				: model.cardData.datasets;
+		if (model.metadata.datasets) {
+			const datasets = Array.isArray(model.metadata.datasets)
+				? model.metadata.datasets.join(', ')
+				: model.metadata.datasets;
 			metadata.push(`- **Datasets:** ${datasets}`);
 		}
 
-		if (model.cardData.finetuned_from) {
-			metadata.push(`- **Fine-tuned from:** ${model.cardData.finetuned_from}`);
+		if (model.metadata.fineTunedFrom) {
+			metadata.push(`- **Fine-tuned from:** ${model.metadata.fineTunedFrom}`);
 		}
 
 		if (metadata.length > 0) {
@@ -232,31 +337,7 @@ function formatModelDetails(model: ExtendedModelEntry & { id: string }): string 
 		}
 	}
 
-	// Benchmark results
-	if (model['model-index'] && model['model-index'].length > 0) {
-		r.push('## Benchmarks');
-
-		for (const benchmark of model['model-index']) {
-			if (benchmark.results && benchmark.results.length > 0) {
-				for (const result of benchmark.results) {
-					const taskName = result.task?.name || result.task?.type || 'Unknown task';
-					const datasetName = result.dataset?.name || 'Unknown dataset';
-
-					r.push(`- **${taskName} on ${datasetName}:**`);
-
-					if (result.metrics && result.metrics.length > 0) {
-						for (const metric of result.metrics) {
-							const metricName = metric.name || metric.type || 'Score';
-							r.push(`  - ${metricName}: ${metric.value}`);
-						}
-					}
-				}
-			}
-		}
-		r.push('');
-	}
-
-	// Related Spaces
+	// Spaces - processed with validation
 	if (model.spaces && model.spaces.length > 0) {
 		r.push('## Demo Spaces');
 		for (const space of model.spaces.slice(0, 5)) {
@@ -270,6 +351,7 @@ function formatModelDetails(model: ExtendedModelEntry & { id: string }): string 
 		r.push('');
 	}
 
+	// Link is reliable - based on model name which is required
 	r.push(`**Link:** [https://hf.co/${model.name}](https://hf.co/${model.name})`);
 
 	return r.join('\n');

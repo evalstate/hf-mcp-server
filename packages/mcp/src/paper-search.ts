@@ -93,8 +93,7 @@ export class PaperSearchTool extends HfApiCall<PaperSearchParams, PaperSearchRes
     try {
       if (!query) return "No query";
 
-      const url = this.buildUrl({ q: query });
-      const papers = await this.fetchFromApi<PaperSearchResult[]>(url);
+      const papers = await this.callApi<PaperSearchResult[]>({ q: query });
       
       if (papers.length === 0) return `No papers found for query '${query}'`;
       return formatSearchResults(query, papers.slice(0, limit));

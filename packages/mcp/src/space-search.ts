@@ -77,10 +77,8 @@ export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SearchResult[]
 				throw new Error('Search query must be a string');
 			}
 
-			const url = this.buildUrl({ q: query, sdk: 'gradio' });
-			const results = await this.fetchFromApi<SearchResult[]>(url);
+			const results = await this.callApi<SearchResult[]>({ q: query, sdk: 'gradio' });
 
-			// Note: We keep this filter since the API might return mixed results
 			return results.filter((result) => result.sdk === 'gradio').slice(0, limit);
 		} catch (error) {
 			if (error instanceof Error) {

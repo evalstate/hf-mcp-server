@@ -15,13 +15,15 @@
     "test": "vitest run",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint 'src/**/*.ts'"
   },
   "dependencies": {
     "@huggingface/hub": "^2.1.0",
+    "node-fetch": "^3.3.2",
     "zod": "^3.24.4"
   },
   "devDependencies": {
-    "@types/node": "^22.15.18"
+    "@types/node": "^22.15.18",
+    "@types/node-fetch": "^2.6.12"
   }
 }
