@@ -5,16 +5,56 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist'] },
+  { ignores: ['dist/**', 'node_modules/**'] },
+  
+  // Server-side TypeScript files - use strict config
   {
+    files: ['src/server/**/*.ts', 'src/shared/**/*.ts'],
     extends: [js.configs.recommended, ...tseslint.configs.strictTypeChecked],
-    files: ['**/*.{ts,tsx}'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.node,
+      parserOptions: {
+        project: './tsconfig.server.json',
+        tsconfigRootDir: import.meta.dirname,
+      }
+    },
+    rules: {
+      // Strict TypeScript rules
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unsafe-assignment': 'error',
+      '@typescript-eslint/no-unsafe-member-access': 'error',
+      '@typescript-eslint/no-unsafe-call': 'error',
+      '@typescript-eslint/no-unsafe-return': 'error',
+      '@typescript-eslint/no-unsafe-argument': 'error',
+      '@typescript-eslint/explicit-module-boundary-types': 'error',
+      '@typescript-eslint/consistent-type-imports': 'error',
+      '@typescript-eslint/no-unused-vars': ['error', { 
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_'
+      }],
+      '@typescript-eslint/no-non-null-assertion': 'error',
+      '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
+      
+      // Relaxed rules for certain patterns
+      '@typescript-eslint/no-empty-function': 'off',
+      '@typescript-eslint/no-empty-interface': 'off',
+      
+      // General ESLint rules
+      'no-constant-condition': 'off',
+    }
+  },
+  
+  // Client-side React/TypeScript files
+  {
+    files: ['src/web/**/*.{ts,tsx}'],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
-      parserOptions:{
-        project: ['./tsconfig.server.json', './tsconfig.web.json', './tsconfig.node.json'],
-        tsconfigRootDir: import.meta.dirname,        
+      parserOptions: {
+        project: './tsconfig.web.json',
+        tsconfigRootDir: import.meta.dirname,
       }
     },
     plugins: {
@@ -27,6 +67,25 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
+      // Relaxed TypeScript rules for React components
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': ['error', { 
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_'
+      }],
+      '@typescript-eslint/consistent-type-imports': 'error',
+    },
+  },
+  
+  // Vite config files
+  {
+    files: ['vite.config.ts'],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    languageOptions: {
+      parserOptions: {
+        project: './tsconfig.node.json',
+        tsconfigRootDir: import.meta.dirname,
+      }
     },
   },
 )

@@ -121,8 +121,10 @@ function formatSearchResults(query: string, papers: PaperSearchResult[]): string
 
 		if (result.numComments && result.numComments > 0) {
 			if (result.isAuthorParticipating)
-				r.push(`${upvotes}. The authors are participating in a discussion with ${result.numComments} comments.`);
-			else r.push(`${upvotes}. There is a community discussion with ${result.numComments} comments.`);
+				r.push(
+					`${upvotes}. The authors are participating in a discussion with ${result.numComments.toString()} comments.`
+				);
+			else r.push(`${upvotes}. There is a community discussion with ${result.numComments.toString()} comments.`);
 		} else {
 			if ('' != upvotes) r.push(upvotes);
 		}
@@ -148,7 +150,7 @@ export function published(published: string | undefined): string {
 		const month = date.toLocaleString('en', { month: 'short' });
 		const year = date.getFullYear().toString();
 
-		return `Published on ${day} ${month}, ${year}`;
+		return `Published on ${day.toString()} ${month}, ${year.toString()}`;
 	} catch {
 		return 'Publication date not available';
 	}

@@ -19,7 +19,9 @@ export const DATASET_SEARCH_TOOL_CONFIG = {
 		tags: z
 			.array(z.string())
 			.optional()
-			.describe("Tags to filter datasets (e.g., ['language:en', 'size_categories:1M<n<10M', 'task_categories:text-classification'])"),
+			.describe(
+				"Tags to filter datasets (e.g., ['language:en', 'size_categories:1M<n<10M', 'task_categories:text-classification'])"
+			),
 		limit: z.number().min(1).max(100).optional().default(20).describe('Maximum number of results to return (1-100)'),
 		sort: z
 			.enum(['downloads', 'likes', 'lastModified'])
@@ -157,7 +159,7 @@ function formatSearchResults(datasets: ExtendedDatasetEntry[], params: Partial<D
 
 	const searchDesc = searchTerms.length > 0 ? ` matching ${searchTerms.join(', ')}` : '';
 
-	r.push(`Found ${datasets.length} datasets${searchDesc}:`);
+	r.push(`Found ${datasets.length.toString()} datasets${searchDesc}:`);
 	r.push('');
 
 	for (const dataset of datasets) {
@@ -173,7 +175,7 @@ function formatSearchResults(datasets: ExtendedDatasetEntry[], params: Partial<D
 		// Basic info line
 		const info = [];
 		if (dataset.downloads) info.push(`**Downloads:** ${formatNumber(dataset.downloads)}`);
-		if (dataset.likes) info.push(`**Likes:** ${dataset.likes}`);
+		if (dataset.likes) info.push(`**Likes:** ${dataset.likes.toString()}`);
 
 		if (info.length > 0) {
 			r.push(info.join(' | '));
@@ -184,7 +186,7 @@ function formatSearchResults(datasets: ExtendedDatasetEntry[], params: Partial<D
 		if (dataset.tags && dataset.tags.length > 0) {
 			r.push(`**Tags:** ${dataset.tags.slice(0, TAGS_TO_RETURN).join(', ')}`);
 			if (dataset.tags.length > TAGS_TO_RETURN) {
-				r.push(`*and ${dataset.tags.length - TAGS_TO_RETURN} more...*`);
+				r.push(`*and ${(dataset.tags.length - TAGS_TO_RETURN).toString()} more...*`);
 			}
 			r.push('');
 		}
@@ -202,7 +204,8 @@ function formatSearchResults(datasets: ExtendedDatasetEntry[], params: Partial<D
 		if (dataset.createdAt) {
 			r.push(`**Created:** ${formatDate(dataset.createdAt)}`);
 		}
-		if (dataset.updatedAt && dataset.updatedAt.toISOString() !== dataset.createdAt) {
+
+		if (dataset.updatedAt.toISOString() !== dataset.createdAt) {
 			r.push(`**Updated:** ${formatDate(dataset.updatedAt.toISOString())}`);
 		}
 

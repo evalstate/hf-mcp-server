@@ -81,13 +81,7 @@ export class DatasetDetailTool {
 	async getDetails(datasetId: string): Promise<string> {
 		try {
 			// Define additional fields we want to retrieve (only those available in the hub library)
-			const additionalFields = [
-				'author',
-				'downloadsAllTime',
-				'tags',
-				'description',
-				'cardData',
-			] as const;
+			const additionalFields = ['author', 'downloadsAllTime', 'tags', 'description', 'cardData'] as const;
 
 			const datasetData = await datasetInfo<(typeof additionalFields)[number]>({
 				name: datasetId,
@@ -180,7 +174,7 @@ function formatDatasetDetails(dataset: DatasetInformation): string {
 
 	// Author - from extended info or parsed from name
 	if (dataset.extended?.author || authorFromName) {
-		r.push(`- **Author:** ${dataset.extended?.author || authorFromName}`);
+		r.push(`- **Author:** ${dataset.extended?.author || authorFromName || ''}`);
 	}
 
 	// Statistics
@@ -189,7 +183,7 @@ function formatDatasetDetails(dataset: DatasetInformation): string {
 		stats.push(`**Downloads:** ${formatNumber(dataset.extended.downloadsAllTime)}`);
 	}
 	if (dataset.likes) {
-		stats.push(`**Likes:** ${dataset.likes}`);
+		stats.push(`**Likes:** ${dataset.likes.toString()}`);
 	}
 	if (stats.length > 0) {
 		r.push(`- ${stats.join(' | ')}`);
@@ -252,7 +246,6 @@ function formatDatasetDetails(dataset: DatasetInformation): string {
 			r.push('');
 		}
 	}
-
 
 	// Link is reliable - based on dataset name which is required
 	r.push(`**Link:** [https://hf.co/datasets/${dataset.name}](https://hf.co/datasets/${dataset.name})`);

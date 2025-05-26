@@ -20,7 +20,7 @@ export function formatDate(dateString: string): string {
 		const month = date.toLocaleString('en', { month: 'short' });
 		const year = date.getFullYear();
 
-		return `${day} ${month}, ${year}`;
+		return `${day.toString()} ${month}, ${year.toString()}`;
 	} catch {
 		return 'Unknown';
 	}
@@ -43,5 +43,5 @@ export function formatBytes(bytes: number): string {
 	} else if (bytes >= 1000) {
 		return `${(bytes / 1000).toFixed(1)} KB`;
 	}
-	return `${bytes} bytes`;
+	return `${bytes.toString()} bytes`;
 }

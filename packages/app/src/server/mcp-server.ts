@@ -4,7 +4,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
+import type { z } from 'zod';
 
 // Import the search services
 import {
@@ -35,8 +35,10 @@ import { settingsService, type ToolSettings } from '../shared/settings.js';
 import { type TransportType, DEFAULT_WEB_APP_PORT } from '../shared/constants.js';
 
 // Import the transport factory
-import { TransportFactory } from './transport/transport-factory.js';
-import { BaseTransport, type TransportOptions } from './transport/base-transport.js';
+import { createTransport } from './transport/transport-factory.js';
+import type { BaseTransport } from './transport/base-transport.js';
+import { type TransportOptions } from './transport/base-transport.js';
+import type { Server } from 'net';
 
 // Define type for registered tools
 interface RegisteredTool {
@@ -62,7 +64,7 @@ const getHfToken = (): string | undefined => {
 
 // Create an Express app to serve the React frontend and provide transport info
 const app = express();
-let webServer: any = null;
+let webServer: Server | null = null;
 // Determine if we're in development mode
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -226,13 +228,13 @@ export const createServer = async (
 		const hfToken = getHfToken();
 
 		// Define the type for transport info with all possible properties
-		type TransportInfoResponse = {
+		interface TransportInfoResponse {
 			transport: TransportType;
 			hfTokenSet: boolean;
 			hfTokenMasked?: string;
 			port?: number;
 			jsonResponseEnabled?: boolean;
-		};
+		}
 
 		const transportInfo: TransportInfoResponse = {
 			transport: activeTransport,
@@ -290,7 +292,7 @@ export const createServer = async (
 	let transport: BaseTransport | undefined;
 	if (transportType !== 'unknown') {
 		try {
-			transport = TransportFactory.createTransport(transportType, server, app);
+			transport = createTransport(transportType, server, app);
 			await transport.initialize({
 				port: webAppPort,
 				...transportOptions,
