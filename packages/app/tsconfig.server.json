@@ -22,7 +22,7 @@
       "dom",
       "dom.iterable"
     ],
-    "rootDir": "src",
+    "rootDir": "src"
   },
   "include": [
     "src/server/**/*.ts",
