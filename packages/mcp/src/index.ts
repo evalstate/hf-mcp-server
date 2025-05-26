@@ -4,3 +4,5 @@ export * from "./model-search.js";
 export * from "./model-detail.js";
 export * from "./model-utils.js";
 export * from "./paper-search.js";
+export * from "./dataset-search.js";
+export * from "./dataset-detail.js";

@@ -22,7 +22,7 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 	 * @param options - Fetch options
 	 * @returns The parsed JSON response
 	 */
-	protected async fetchFromApi<T = TResponse>(url: URL | string, options?: RequestInit): Promise<T> {
+	protected async fetchFromApi<T = TResponse>(url: URL | string, options?: globalThis.RequestInit): Promise<T> {
 		try {
 			const headers = {
 				'Content-Type': 'application/json',
@@ -81,6 +81,7 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 	 */
 	protected async callApi<T = TResponse>(params: TParams, options?: RequestInit): Promise<T> {
 		const url = this.buildUrl(params);
+		console.error(url);
 		return this.fetchFromApi<T>(url, options);
 	}
 }

@@ -4,18 +4,28 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 
 // Import the search services
 import {
 	SpaceSearchTool,
 	formatSearchResults,
 	SEMANTIC_SEARCH_TOOL_CONFIG,
+	type SearchParams,
 	ModelSearchTool,
 	MODEL_SEARCH_TOOL_CONFIG,
+	type ModelSearchParams,
 	ModelDetailTool,
 	MODEL_DETAIL_TOOL_CONFIG,
+	type ModelDetailParams,
 	PaperSearchTool,
 	PAPER_SEARCH_TOOL_CONFIG,
+	DatasetSearchTool,
+	DATASET_SEARCH_TOOL_CONFIG,
+	type DatasetSearchParams,
+	DatasetDetailTool,
+	DATASET_DETAIL_TOOL_CONFIG,
+	type DatasetDetailParams,
 } from '@hf-mcp/mcp';
 
 // Import the settings service
@@ -64,9 +74,13 @@ export const createServer = async (
 	const server = new McpServer(
 		{
 			name: 'hf-mcp-server',
-			version: '0.1.0',
+			version: '0.1.1',
 		},
 		{
+			instructions:
+				"This server provides tools for searching the Hugging Face Hub. arXiv paper id's are often " +
+				'used as references between datasets, models and papers. There are over 100 tags in use, ' +
+				"common tags include 'Text Generation', 'Transformers', 'Image Classification' and so on.",
 			capabilities: {
 				tools: { listChanged: true },
 			},
@@ -87,12 +101,12 @@ export const createServer = async (
 		SEMANTIC_SEARCH_TOOL_CONFIG.description,
 		SEMANTIC_SEARCH_TOOL_CONFIG.schema.shape,
 		SEMANTIC_SEARCH_TOOL_CONFIG.annotations,
-		async ({ query, limit }: { query: string, limit?: number }) => {
+		async (params: SearchParams) => {
 			const hfToken = getHfToken();
 			const semanticSearch = new SpaceSearchTool(hfToken);
-			const results = await semanticSearch.search(query, limit);
+			const results = await semanticSearch.search(params.query, params.limit, params.mcp);
 			return {
-				content: [{ type: 'text', text: formatSearchResults(query, results) }],
+				content: [{ type: 'text', text: formatSearchResults(params.query, results) }],
 			};
 		}
 	);
@@ -102,7 +116,7 @@ export const createServer = async (
 		MODEL_SEARCH_TOOL_CONFIG.description,
 		MODEL_SEARCH_TOOL_CONFIG.schema.shape,
 		MODEL_SEARCH_TOOL_CONFIG.annotations,
-		async (params: { query?: string, model_type?: string, sort?: "downloads" | "likes" | "lastModified", direction?: string, limit?: number }) => {
+		async (params: ModelSearchParams) => {
 			const hfToken = getHfToken();
 			const modelSearch = new ModelSearchTool(hfToken, undefined);
 			const results = await modelSearch.searchWithParams(params);
@@ -118,7 +132,7 @@ export const createServer = async (
 		MODEL_DETAIL_TOOL_CONFIG.description,
 		MODEL_DETAIL_TOOL_CONFIG.schema.shape,
 		MODEL_DETAIL_TOOL_CONFIG.annotations,
-		async (params: { model_id: string }) => {
+		async (params: ModelDetailParams) => {
 			const hfToken = getHfToken();
 			const modelDetail = new ModelDetailTool(hfToken, undefined);
 			const results = await modelDetail.getDetails(params.model_id);
@@ -135,9 +149,41 @@ export const createServer = async (
 		PAPER_SEARCH_TOOL_CONFIG.description,
 		PAPER_SEARCH_TOOL_CONFIG.schema.shape,
 		PAPER_SEARCH_TOOL_CONFIG.annotations,
-		async ({ query, limit }: { query: string, limit?: number }) => {
+		async (params: z.infer<typeof PAPER_SEARCH_TOOL_CONFIG.schema>) => {
 			const hfToken = getHfToken();
-			const results = await new PaperSearchTool(hfToken).search(query, limit);
+			const results = await new PaperSearchTool(hfToken).search(params.query, params.limit);
+			return {
+				content: [{ type: 'text', text: results }],
+			};
+		}
+	);
+
+	const datasetSearchTool = server.tool(
+		DATASET_SEARCH_TOOL_CONFIG.name,
+		DATASET_SEARCH_TOOL_CONFIG.description,
+		DATASET_SEARCH_TOOL_CONFIG.schema.shape,
+		DATASET_SEARCH_TOOL_CONFIG.annotations,
+		async (params: DatasetSearchParams) => {
+			const hfToken = getHfToken();
+			const datasetSearch = new DatasetSearchTool(hfToken, undefined);
+			const results = await datasetSearch.searchWithParams(params);
+
+			return {
+				content: [{ type: 'text', text: results }],
+			};
+		}
+	);
+
+	const datasetDetailTool = server.tool(
+		DATASET_DETAIL_TOOL_CONFIG.name,
+		DATASET_DETAIL_TOOL_CONFIG.description,
+		DATASET_DETAIL_TOOL_CONFIG.schema.shape,
+		DATASET_DETAIL_TOOL_CONFIG.annotations,
+		async (params: DatasetDetailParams) => {
+			const hfToken = getHfToken();
+			const datasetDetail = new DatasetDetailTool(hfToken, undefined);
+			const results = await datasetDetail.getDetails(params.dataset_id);
+
 			return {
 				content: [{ type: 'text', text: results }],
 			};
@@ -149,6 +195,8 @@ export const createServer = async (
 		[MODEL_SEARCH_TOOL_CONFIG.name]: modelSearchTool,
 		[MODEL_DETAIL_TOOL_CONFIG.name]: modelDetailTool,
 		[PAPER_SEARCH_TOOL_CONFIG.name]: paperSearchTool,
+		[DATASET_SEARCH_TOOL_CONFIG.name]: datasetSearchTool,
+		[DATASET_DETAIL_TOOL_CONFIG.name]: datasetDetailTool,
 	};
 
 	// Initialize tool state based on settings

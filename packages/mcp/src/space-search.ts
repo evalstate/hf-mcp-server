@@ -22,6 +22,7 @@ interface SearchResult {
 interface SpaceSearchParams {
 	q: string;
 	sdk: string;
+	filter?: string;
 }
 
 // Default number of results to return
@@ -36,8 +37,9 @@ export const SEMANTIC_SEARCH_TOOL_CONFIG = {
 		'Results are returned in a markdown table. ' +
 		'Include links to the space when presenting the results.',
 	schema: z.object({
-		query: z.string().min(1, 'Search query is required').max(50, 'Query too long'),
-		limit: z.number().optional().default(RESULTS_TO_RETURN),
+		query: z.string().describe('Semantic Search Query').min(1, 'Search query is required').max(50, 'Query too long'),
+		limit: z.number().optional().default(RESULTS_TO_RETURN).describe('Number of results to return'),
+		mcp: z.boolean().optional().default(false).describe('Only include MCP Server enabled Spaces'),
 	}),
 	annotations: {
 		title: 'Hugging Face Space Search',
@@ -66,7 +68,7 @@ export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SearchResult[]
 	 * @param limit Maximum number of results to return
 	 * @returns An array of search results
 	 */
-	async search(query: string, limit: number = RESULTS_TO_RETURN): Promise<SearchResult[]> {
+	async search(query: string, limit: number = RESULTS_TO_RETURN, mcp: boolean = false): Promise<SearchResult[]> {
 		try {
 			// Validate input before making API call
 			if (!query) {
@@ -77,7 +79,14 @@ export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SearchResult[]
 				throw new Error('Search query must be a string');
 			}
 
-			const results = await this.callApi<SearchResult[]>({ q: query, sdk: 'gradio' });
+			// Prepare API parameters, adding the filter if mcp is true
+			const params: SpaceSearchParams = { q: query, sdk: 'gradio' };
+
+			if (mcp) {
+				params.filter = 'mcp-server';
+			}
+
+			const results = await this.callApi<SearchResult[]>(params);
 
 			return results.filter((result) => result.sdk === 'gradio').slice(0, limit);
 		} catch (error) {

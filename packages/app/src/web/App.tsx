@@ -33,6 +33,8 @@ function App() {
       model_search: { enabled: false },
       model_detail: { enabled: false },
       paper_search: { enabled: false },
+      dataset_search: { enabled: false },
+      dataset_detail: { enabled: false },
     }
   });
 
@@ -126,6 +128,18 @@ function App() {
       label: "Model Details",
       description: "Get detailed information about a specific model.",
       settings: settings.tools.model_detail || { enabled: false }
+    },
+    dataset_search: {
+      id: "dataset_search",
+      label: "Dataset Search",
+      description: "Search for datasets with filters for author, tags, etc.",
+      settings: settings.tools.dataset_search || { enabled: false }
+    },
+    dataset_detail: {
+      id: "dataset_detail",
+      label: "Dataset Details",
+      description: "Get detailed information about a specific dataset.",
+      settings: settings.tools.dataset_detail || { enabled: false }
     },
   };
 
