@@ -28,41 +28,35 @@ import {
 	type DatasetDetailParams,
 } from '@hf-mcp/mcp';
 
-// Import the settings service
 import { settingsService, type ToolSettings } from '../shared/settings.js';
 
-// Import shared constants
 import { type TransportType, DEFAULT_WEB_APP_PORT } from '../shared/constants.js';
 
-// Import the transport factory
 import { createTransport } from './transport/transport-factory.js';
 import type { BaseTransport } from './transport/base-transport.js';
 import { type TransportOptions } from './transport/base-transport.js';
 import type { Server } from 'net';
+import { InitializeRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { request } from 'http';
 
-// Define type for registered tools
 interface RegisteredTool {
 	enable: () => void;
 	disable: () => void;
 	remove: () => void;
 }
 
-// Track the active transport type and port
 let activeTransport: TransportType = 'unknown';
 let activePort: number | undefined = undefined;
 
-// Function to mask token (show first 4 and last 5 chars)
 const maskToken = (token: string): string => {
 	if (!token || token.length <= 9) return token;
 	return `${token.substring(0, 4)}...${token.substring(token.length - 5)}`;
 };
 
-// Get HF token from environment
 const getHfToken = (): string | undefined => {
 	return process.env.HF_TOKEN || process.env.HUGGING_FACE_TOKEN;
 };
 
-// Create an Express app to serve the React frontend and provide transport info
 const app = express();
 let webServer: Server | null = null;
 // Determine if we're in development mode
@@ -89,10 +83,14 @@ export const createServer = async (
 		}
 	);
 
-	// Set active transport and port
+	server.server.oninitialized = () => {
+		console.error(
+			`${new Date().toISOString()} : Initialized ${server.server.getClientVersion()?.name || '<unknown>'} ${server.server.getClientVersion()?.version || '<unknown>'}`
+		);
+	};
+
 	activeTransport = transportType;
 
-	// Since we're consolidating servers, we'll use the web app port for all transports
 	if (transportType === 'sse' || transportType === 'streamableHttp' || transportType === 'streamableHttpJson') {
 		activePort = webAppPort;
 	}

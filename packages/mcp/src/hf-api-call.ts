@@ -81,7 +81,6 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 	 */
 	protected async callApi<T = TResponse>(params: TParams, options?: globalThis.RequestInit): Promise<T> {
 		const url = this.buildUrl(params);
-		console.error(url);
 		return this.fetchFromApi<T>(url, options);
 	}
 }
