@@ -5,10 +5,22 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./semantic": "./dist/semantic-search.js",
-    "./model": "./dist/model-search.js",
-    "./paper": "./dist/paper-search.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./semantic": {
+      "types": "./dist/semantic-search.d.ts",
+      "default": "./dist/semantic-search.js"
+    },
+    "./model": {
+      "types": "./dist/model-search.d.ts",
+      "default": "./dist/model-search.js"
+    },
+    "./paper": {
+      "types": "./dist/paper-search.d.ts",
+      "default": "./dist/paper-search.js"
+    }
   },
   "scripts": {
     "build": "tsc --declaration",
