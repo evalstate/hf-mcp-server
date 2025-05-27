@@ -11,7 +11,8 @@
 		"start": "pnpm run build && cd packages/app && pnpm start",
 		"test": "pnpm run --recursive test",
 		"lint": "pnpm run --recursive lint",
-		"clean": "pnpm run --recursive clean"
+		"clean": "pnpm run --recursive clean",
+		"rebuild": "pnpm run clean && pnpm run build"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.27.0",
@@ -21,6 +22,7 @@
 		"cross-env": "^7.0.3",
 		"eslint-plugin-prettier": "^5.4.0",
 		"globals": "^16.1.0",
+		"rimraf": "^5.0.10",
 		"typescript": "~5.8.3"
 	}
 }

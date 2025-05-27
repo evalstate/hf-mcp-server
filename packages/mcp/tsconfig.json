@@ -15,7 +15,6 @@
     "outDir": "dist",
     "declaration": true,
     "declarationDir": "dist",
-    "composite": true,
     "declarationMap": true,
     "sourceMap": true,
     "rootDir": "src",

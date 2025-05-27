@@ -27,7 +27,8 @@
     "test": "vitest run",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "clean": "rimraf dist"
   },
   "dependencies": {
     "@huggingface/hub": "^2.1.0",
@@ -38,6 +39,7 @@
     "@types/node": "^22.15.18",
     "eslint": "^9.25.0",
     "globals": "^16.0.0",
+    "rimraf": "^5.0.10",
     "typescript-eslint": "^8.32.1",
     "vitest": "^3.1.3"
   }

@@ -16,6 +16,10 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 
+# Clean any existing build artifacts to prevent export issues
+RUN rm -rf ./packages/mcp/dist ./packages/app/dist && \
+    echo "=== Cleaned build artifacts ==="
+
 # Build the application with debugging
 RUN echo "=== Starting build process ===" && \
     pnpm run build && \
