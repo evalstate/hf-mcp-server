@@ -17,7 +17,7 @@ export class StreamableHttpTransport extends BaseTransport {
 		this.enableJsonResponse = enableJsonResponse;
 	}
 
-	async initialize(options: TransportOptions): Promise<void> {
+	async initialize(_options: TransportOptions): Promise<void> {
 		const enableJsonResponse = this.enableJsonResponse;
 
 		// Handle POST requests for JSON-RPC

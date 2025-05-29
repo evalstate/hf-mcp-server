@@ -7,7 +7,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 export class StdioTransport extends BaseTransport {
 	private transport: StdioServerTransport | null = null;
 
-	async initialize(options: TransportOptions): Promise<void> {
+	async initialize(_options: TransportOptions): Promise<void> {
 		this.transport = new StdioServerTransport();
 
 		try {

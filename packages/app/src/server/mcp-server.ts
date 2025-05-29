@@ -336,7 +336,7 @@ export const createServer = async (
 	const startWebServer = () => {
 		if (!webServer) {
 			webServer = app.listen(webAppPort, () => {
-				console.error(`Server running at http://localhost:${webAppPort}`);
+				console.error(`Server running at http://localhost:${webAppPort.toString()}`);
 				console.error(`Transport type: ${transportType}`);
 				console.error(`Mode: ${isDev ? 'development with HMR' : 'production'}`);
 				if (isDev) {
