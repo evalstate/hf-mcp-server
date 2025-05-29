@@ -2,26 +2,28 @@ import { z } from 'zod';
 import { HfApiCall } from './hf-api-call.js';
 
 // Define the SearchResult interface
-interface SearchResult {
+export interface SpaceSearchResult {
 	id: string;
-	sdk: string;
-	likes?: number;
-	downloads?: number;
-	title?: string;
-	description?: string;
-	shortDescription?: string;
-	author: string;
-	authorData?: {
-		fullname?: string;
-	};
-	semanticRelevancyScore?: number; // Score from semantic search API
 	emoji?: string; // Emoji for the space
+	likes?: number;
+	title?: string;
+	author: string;
+	runtime: {
+		stage?: string; // always seems to be "RUNNING"
+	};
+	ai_category?: string;
+	ai_short_description?: string;
+	shortDescription?: string;
+	semanticRelevancyScore?: number; // Score from semantic search API
+	trendingScore?: number;
+	lastModified?: Date;
 }
 
 // Define input types for space search
 interface SpaceSearchParams {
 	q: string;
 	sdk: string;
+	filter?: string;
 }
 
 // Default number of results to return
@@ -31,13 +33,11 @@ export const SemanticSearchDescription = 'Search Hugging Face Spaces with semant
 
 export const SEMANTIC_SEARCH_TOOL_CONFIG = {
 	name: 'space_search',
-	description:
-		'Find Hugging Face Spaces with semantic search. ' +
-		'Results are returned in a markdown table. ' +
-		'Include links to the space when presenting the results.',
+	description: 'Search for Hugging Face Spaces. ' + 'Include links to the Space when presenting the results.',
 	schema: z.object({
-		query: z.string().min(1, 'Search query is required').max(50, 'Query too long'),
-		limit: z.number().optional().default(RESULTS_TO_RETURN),
+		query: z.string().min(1, 'Search query is required').max(50, 'Query too long').describe('Semantic Search Query'),
+		limit: z.number().optional().default(RESULTS_TO_RETURN).describe('Number of results to return'),
+		mcp: z.boolean().optional().default(false).describe('Only include MCP Server enabled Spaces'),
 	}),
 	annotations: {
 		title: 'Hugging Face Space Search',
@@ -50,7 +50,7 @@ export const SEMANTIC_SEARCH_TOOL_CONFIG = {
 /**
  * Service for searching Hugging Face Spaces semantically
  */
-export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SearchResult[]> {
+export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SpaceSearchResult[]> {
 	/**
 	 * Creates a new semantic search service
 	 * @param apiUrl The URL of the Hugging Face semantic search API
@@ -66,20 +66,23 @@ export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SearchResult[]
 	 * @param limit Maximum number of results to return
 	 * @returns An array of search results
 	 */
-	async search(query: string, limit: number = RESULTS_TO_RETURN): Promise<SearchResult[]> {
+	async search(query: string, limit: number = RESULTS_TO_RETURN, mcp: boolean = false): Promise<SpaceSearchResult[]> {
 		try {
 			// Validate input before making API call
 			if (!query) {
 				return [];
 			}
 
-			if (typeof query !== 'string') {
-				throw new Error('Search query must be a string');
+			// Prepare API parameters, adding the filter if mcp is true
+			const params: SpaceSearchParams = { q: query, sdk: 'gradio' };
+
+			if (mcp) {
+				params.filter = 'mcp-server';
 			}
 
-			const results = await this.callApi<SearchResult[]>({ q: query, sdk: 'gradio' });
+			const results = await this.callApi<SpaceSearchResult[]>(params);
 
-			return results.filter((result) => result.sdk === 'gradio').slice(0, limit);
+			return results.slice(0, limit);
 		} catch (error) {
 			if (error instanceof Error) {
 				throw new Error(`Failed to search for spaces: ${error.message}`);
@@ -99,19 +102,19 @@ export type SearchParams = z.infer<typeof SEMANTIC_SEARCH_TOOL_CONFIG.schema>;
  * @param results The search results to format
  * @returns A markdown formatted string with the search results
  */
-export const formatSearchResults = (query: string, results: SearchResult[]): string => {
+export const formatSearchResults = (query: string, results: SpaceSearchResult[]): string => {
 	if (results.length === 0) {
 		return `No matching Hugging Face Spaces found for the query '${query}'. Try a different query.`;
 	}
 
 	let markdown = `# Space Search Results for the query '${query}'\n\n`;
-	markdown += '| Space | Description | Author | ID | Likes | Downloads | Relevance |\n';
-	markdown += '|-------|-------------|--------|----|-------|-----------|-----------|\n';
+	markdown += '| Space | Description | Author | ID | Category |  Likes | Trending Score | Relevance |\n';
+	markdown += '|-------|-------------|--------|----|----------|--------|----------------|-----------|\n';
 
 	for (const result of results) {
 		const title = result.title || 'Untitled';
-		const description = result.shortDescription || result.description || 'No description';
-		const author = result.authorData?.fullname || result.author || 'Unknown';
+		const description = result.shortDescription || result.ai_short_description || 'No description';
+		const author = result.author || 'Unknown';
 		const id = result.id || '';
 		const emoji = result.emoji ? escapeMarkdown(result.emoji) + ' ' : '';
 		const relevance = result.semanticRelevancyScore ? (result.semanticRelevancyScore * 100).toFixed(1) + '%' : 'N/A';
@@ -121,8 +124,9 @@ export const formatSearchResults = (query: string, results: SearchResult[]): str
 			`| ${escapeMarkdown(description)} ` +
 			`| ${escapeMarkdown(author)} ` +
 			`| \`${escapeMarkdown(id)}\` ` +
-			`| \`${escapeMarkdown(result.likes?.toString() ?? '-')}\` ` +
-			`| \`${escapeMarkdown(result.downloads?.toString() ?? '-')}\` ` +
+			`| \`${escapeMarkdown(result.ai_category ?? '-')}\` ` +
+			`| ${escapeMarkdown(result.likes?.toString() ?? '-')} ` +
+			`| ${escapeMarkdown(result.trendingScore?.toString() ?? '-')} ` +
 			`| ${relevance} |\n`;
 	}
 

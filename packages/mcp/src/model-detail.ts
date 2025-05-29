@@ -205,7 +205,7 @@ export class ModelDetailTool {
 							title: name, // Default to name if title not available
 						};
 					});
-					// eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
+					// eslint-disable-next-line @typescript-eslint/no-unused-vars
 				} catch (ignoreUnformattedSpaces) {
 					console.error(`Error  processing spaces for model ${modelId}:`);
 				}
@@ -234,7 +234,7 @@ function formatModelDetails(model: ModelInformation): string {
 
 	// Author - from extended info or parsed from name
 	if (model.extended?.author || authorFromName) {
-		r.push(`- **Author:** ${model.extended?.author || authorFromName}`);
+		r.push(`- **Author:** ${model.extended?.author || authorFromName || ''}`);
 	}
 
 	// Task type
@@ -253,7 +253,7 @@ function formatModelDetails(model: ModelInformation): string {
 		stats.push(`**Downloads:** ${formatNumber(model.extended.downloadsAllTime)}`);
 	}
 	if (model.likes) {
-		stats.push(`**Likes:** ${model.likes}`);
+		stats.push(`**Likes:** ${model.likes.toString()}`);
 	}
 	if (stats.length > 0) {
 		r.push(`- ${stats.join(' | ')}`);
@@ -346,7 +346,7 @@ function formatModelDetails(model: ModelInformation): string {
 		}
 
 		if (model.spaces.length > 5) {
-			r.push(`- *... and ${model.spaces.length - 5} more spaces*`);
+			r.push(`- *... and ${(model.spaces.length - 5).toString()} more spaces*`);
 		}
 		r.push('');
 	}

@@ -175,7 +175,7 @@ function formatSearchResults(models: ExtendedModelEntry[], params: Partial<Model
 
 	const searchDesc = searchTerms.length > 0 ? ` matching ${searchTerms.join(', ')}` : '';
 
-	r.push(`Found ${models.length} models${searchDesc}:`);
+	r.push(`Found ${models.length.toString()} models${searchDesc}:`);
 	r.push('');
 
 	for (const model of models) {
@@ -187,7 +187,7 @@ function formatSearchResults(models: ExtendedModelEntry[], params: Partial<Model
 		if (model.pipeline_tag) info.push(`**Task:** ${model.pipeline_tag}`);
 		if (model.library_name) info.push(`**Library:** ${model.library_name}`);
 		if (model.downloads) info.push(`**Downloads:** ${formatNumber(model.downloads)}`);
-		if (model.likes) info.push(`**Likes:** ${model.likes}`);
+		if (model.likes) info.push(`**Likes:** ${model.likes.toString()}`);
 
 		if (info.length > 0) {
 			r.push(info.join(' | '));
@@ -198,7 +198,7 @@ function formatSearchResults(models: ExtendedModelEntry[], params: Partial<Model
 		if (model.tags && model.tags.length > 0) {
 			r.push(`**Tags:** ${model.tags.slice(0, TAGS_TO_RETURN).join(', ')}`);
 			if (model.tags.length > TAGS_TO_RETURN) {
-				r.push(`*and ${model.tags.length - TAGS_TO_RETURN} more...*`);
+				r.push(`*and ${(model.tags.length - TAGS_TO_RETURN).toString()} more...*`);
 			}
 			r.push('');
 		}
@@ -216,7 +216,7 @@ function formatSearchResults(models: ExtendedModelEntry[], params: Partial<Model
 		if (model.createdAt) {
 			r.push(`**Created:** ${formatDate(model.createdAt)}`);
 		}
-		if (model.updatedAt && model.updatedAt.toISOString() !== model.createdAt) {
+		if (model.updatedAt.toISOString() !== model.createdAt) {
 			r.push(`**Updated:** ${formatDate(model.updatedAt.toISOString())}`);
 		}
 

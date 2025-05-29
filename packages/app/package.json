@@ -3,7 +3,7 @@
 	"version": "1.0.0",
 	"type": "module",
 	"bin": {
-		"hf-mcp-server": "./dist/streamableHttp.js"
+		"hf-mcp-server": "./dist/server/streamableHttp.js"
 	},
 	"scripts": {
 		"build": "pnpm run build:server && pnpm run build:web",
@@ -18,7 +18,7 @@
 		"start:json": "cross-env NODE_ENV=production node dist/server/streamableHttp.js --json",
 		"start:stdio": "cross-env NODE_ENV=production node dist/server/stdio.js",
 		"start:sse": "cross-env NODE_ENV=production node dist/server/sse.js",
-		"test": "vitest run",
+		"test": "echo 'no tests for package yet'",
 		"lint": "eslint .",
 		"clean": "rimraf dist",
 		"preview": "vite preview"
@@ -56,6 +56,7 @@
 		"rimraf": "^5.0.10",
 		"tsx": "^4.19.4",
 		"typescript": "*",
+		"typescript-eslint": "^8.32.1",
 		"vite": "^6.3.5",
 		"vitest": "^3.1.3"
 	}

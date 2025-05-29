@@ -14,7 +14,6 @@ export class StreamableHttpTransport extends BaseTransport {
 
 		// Handle POST requests for JSON-RPC
 		this.app.post('/mcp', async (req: any, res: any) => {
-			console.log('Received MCP POST request');
 			try {
 				// Check for existing session ID
 				const sessionId = req.headers['mcp-session-id'] as string | undefined;
@@ -23,6 +22,8 @@ export class StreamableHttpTransport extends BaseTransport {
 				if (sessionId && this.transports[sessionId]) {
 					// Reuse existing transport
 					transport = this.transports[sessionId];
+
+					console.log(`Handling POST request for session ID ${sessionId}`);
 				} else if (!sessionId) {
 					// New initialization request
 					const eventStore = new InMemoryEventStore();
@@ -103,7 +104,7 @@ export class StreamableHttpTransport extends BaseTransport {
 				});
 				return;
 			}
-
+			console.log(`Handling GET request for session ID ${sessionId}`);
 			const transport = this.transports[sessionId];
 			await transport.handleRequest(req, res);
 		});

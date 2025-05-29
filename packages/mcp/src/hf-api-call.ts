@@ -22,11 +22,11 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 	 * @param options - Fetch options
 	 * @returns The parsed JSON response
 	 */
-	protected async fetchFromApi<T = TResponse>(url: URL | string, options?: RequestInit): Promise<T> {
+	protected async fetchFromApi<T = TResponse>(url: URL | string, options?: globalThis.RequestInit): Promise<T> {
 		try {
 			const headers = {
 				'Content-Type': 'application/json',
-				...(options?.headers || {}),
+				...Object.fromEntries(Object.entries(options?.headers || {})),
 			} as Record<string, string>;
 
 			if (this.hfToken) {
@@ -39,7 +39,7 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 			});
 
 			if (!response.ok) {
-				throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+				throw new Error(`API request failed: ${response.status.toString()} ${response.statusText}`);
 			}
 
 			return (await response.json()) as T;
@@ -79,7 +79,7 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 	 * @param options - Additional fetch options
 	 * @returns The parsed JSON response
 	 */
-	protected async callApi<T = TResponse>(params: TParams, options?: RequestInit): Promise<T> {
+	protected async callApi<T = TResponse>(params: TParams, options?: globalThis.RequestInit): Promise<T> {
 		const url = this.buildUrl(params);
 		return this.fetchFromApi<T>(url, options);
 	}

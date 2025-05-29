@@ -4,55 +4,61 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { z } from 'zod';
 
 // Import the search services
 import {
 	SpaceSearchTool,
 	formatSearchResults,
 	SEMANTIC_SEARCH_TOOL_CONFIG,
+	type SearchParams,
 	ModelSearchTool,
 	MODEL_SEARCH_TOOL_CONFIG,
+	type ModelSearchParams,
 	ModelDetailTool,
 	MODEL_DETAIL_TOOL_CONFIG,
+	type ModelDetailParams,
 	PaperSearchTool,
 	PAPER_SEARCH_TOOL_CONFIG,
+	DatasetSearchTool,
+	DATASET_SEARCH_TOOL_CONFIG,
+	type DatasetSearchParams,
+	DatasetDetailTool,
+	DATASET_DETAIL_TOOL_CONFIG,
+	type DatasetDetailParams,
 } from '@hf-mcp/mcp';
 
-// Import the settings service
 import { settingsService, type ToolSettings } from '../shared/settings.js';
 
-// Import shared constants
 import { type TransportType, DEFAULT_WEB_APP_PORT } from '../shared/constants.js';
 
-// Import the transport factory
-import { TransportFactory } from './transport/transport-factory.js';
-import { BaseTransport, type TransportOptions } from './transport/base-transport.js';
+import { createTransport } from './transport/transport-factory.js';
+import type { BaseTransport } from './transport/base-transport.js';
+import { type TransportOptions } from './transport/base-transport.js';
+import type { Server } from 'net';
+import { InitializeRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { request } from 'http';
 
-// Define type for registered tools
 interface RegisteredTool {
 	enable: () => void;
 	disable: () => void;
 	remove: () => void;
 }
 
-// Track the active transport type and port
 let activeTransport: TransportType = 'unknown';
 let activePort: number | undefined = undefined;
 
-// Function to mask token (show first 4 and last 5 chars)
 const maskToken = (token: string): string => {
 	if (!token || token.length <= 9) return token;
 	return `${token.substring(0, 4)}...${token.substring(token.length - 5)}`;
 };
 
-// Get HF token from environment
 const getHfToken = (): string | undefined => {
 	return process.env.HF_TOKEN || process.env.HUGGING_FACE_TOKEN;
 };
 
-// Create an Express app to serve the React frontend and provide transport info
 const app = express();
-let webServer: any = null;
+let webServer: Server | null = null;
 // Determine if we're in development mode
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -64,19 +70,27 @@ export const createServer = async (
 	const server = new McpServer(
 		{
 			name: 'hf-mcp-server',
-			version: '0.1.0',
+			version: '0.1.1',
 		},
 		{
+			instructions:
+				"This server provides tools for searching the Hugging Face Hub. arXiv paper id's are often " +
+				'used as references between datasets, models and papers. There are over 100 tags in use, ' +
+				"common tags include 'Text Generation', 'Transformers', 'Image Classification' and so on.",
 			capabilities: {
 				tools: { listChanged: true },
 			},
 		}
 	);
 
-	// Set active transport and port
+	server.server.oninitialized = () => {
+		console.error(
+			`${new Date().toISOString()} : Initialized ${server.server.getClientVersion()?.name || '<unknown>'} ${server.server.getClientVersion()?.version || '<unknown>'}`
+		);
+	};
+
 	activeTransport = transportType;
 
-	// Since we're consolidating servers, we'll use the web app port for all transports
 	if (transportType === 'sse' || transportType === 'streamableHttp' || transportType === 'streamableHttpJson') {
 		activePort = webAppPort;
 	}
@@ -87,12 +101,12 @@ export const createServer = async (
 		SEMANTIC_SEARCH_TOOL_CONFIG.description,
 		SEMANTIC_SEARCH_TOOL_CONFIG.schema.shape,
 		SEMANTIC_SEARCH_TOOL_CONFIG.annotations,
-		async ({ query, limit }: { query: string, limit?: number }) => {
+		async (params: SearchParams) => {
 			const hfToken = getHfToken();
 			const semanticSearch = new SpaceSearchTool(hfToken);
-			const results = await semanticSearch.search(query, limit);
+			const results = await semanticSearch.search(params.query, params.limit, params.mcp);
 			return {
-				content: [{ type: 'text', text: formatSearchResults(query, results) }],
+				content: [{ type: 'text', text: formatSearchResults(params.query, results) }],
 			};
 		}
 	);
@@ -102,7 +116,7 @@ export const createServer = async (
 		MODEL_SEARCH_TOOL_CONFIG.description,
 		MODEL_SEARCH_TOOL_CONFIG.schema.shape,
 		MODEL_SEARCH_TOOL_CONFIG.annotations,
-		async (params: { query?: string, model_type?: string, sort?: "downloads" | "likes" | "lastModified", direction?: string, limit?: number }) => {
+		async (params: ModelSearchParams) => {
 			const hfToken = getHfToken();
 			const modelSearch = new ModelSearchTool(hfToken, undefined);
 			const results = await modelSearch.searchWithParams(params);
@@ -118,7 +132,7 @@ export const createServer = async (
 		MODEL_DETAIL_TOOL_CONFIG.description,
 		MODEL_DETAIL_TOOL_CONFIG.schema.shape,
 		MODEL_DETAIL_TOOL_CONFIG.annotations,
-		async (params: { model_id: string }) => {
+		async (params: ModelDetailParams) => {
 			const hfToken = getHfToken();
 			const modelDetail = new ModelDetailTool(hfToken, undefined);
 			const results = await modelDetail.getDetails(params.model_id);
@@ -135,9 +149,41 @@ export const createServer = async (
 		PAPER_SEARCH_TOOL_CONFIG.description,
 		PAPER_SEARCH_TOOL_CONFIG.schema.shape,
 		PAPER_SEARCH_TOOL_CONFIG.annotations,
-		async ({ query, limit }: { query: string, limit?: number }) => {
+		async (params: z.infer<typeof PAPER_SEARCH_TOOL_CONFIG.schema>) => {
 			const hfToken = getHfToken();
-			const results = await new PaperSearchTool(hfToken).search(query, limit);
+			const results = await new PaperSearchTool(hfToken).search(params.query, params.limit);
+			return {
+				content: [{ type: 'text', text: results }],
+			};
+		}
+	);
+
+	const datasetSearchTool = server.tool(
+		DATASET_SEARCH_TOOL_CONFIG.name,
+		DATASET_SEARCH_TOOL_CONFIG.description,
+		DATASET_SEARCH_TOOL_CONFIG.schema.shape,
+		DATASET_SEARCH_TOOL_CONFIG.annotations,
+		async (params: DatasetSearchParams) => {
+			const hfToken = getHfToken();
+			const datasetSearch = new DatasetSearchTool(hfToken, undefined);
+			const results = await datasetSearch.searchWithParams(params);
+
+			return {
+				content: [{ type: 'text', text: results }],
+			};
+		}
+	);
+
+	const datasetDetailTool = server.tool(
+		DATASET_DETAIL_TOOL_CONFIG.name,
+		DATASET_DETAIL_TOOL_CONFIG.description,
+		DATASET_DETAIL_TOOL_CONFIG.schema.shape,
+		DATASET_DETAIL_TOOL_CONFIG.annotations,
+		async (params: DatasetDetailParams) => {
+			const hfToken = getHfToken();
+			const datasetDetail = new DatasetDetailTool(hfToken, undefined);
+			const results = await datasetDetail.getDetails(params.dataset_id);
+
 			return {
 				content: [{ type: 'text', text: results }],
 			};
@@ -149,6 +195,8 @@ export const createServer = async (
 		[MODEL_SEARCH_TOOL_CONFIG.name]: modelSearchTool,
 		[MODEL_DETAIL_TOOL_CONFIG.name]: modelDetailTool,
 		[PAPER_SEARCH_TOOL_CONFIG.name]: paperSearchTool,
+		[DATASET_SEARCH_TOOL_CONFIG.name]: datasetSearchTool,
+		[DATASET_DETAIL_TOOL_CONFIG.name]: datasetDetailTool,
 	};
 
 	// Initialize tool state based on settings
@@ -178,13 +226,13 @@ export const createServer = async (
 		const hfToken = getHfToken();
 
 		// Define the type for transport info with all possible properties
-		type TransportInfoResponse = {
+		interface TransportInfoResponse {
 			transport: TransportType;
 			hfTokenSet: boolean;
 			hfTokenMasked?: string;
 			port?: number;
 			jsonResponseEnabled?: boolean;
-		};
+		}
 
 		const transportInfo: TransportInfoResponse = {
 			transport: activeTransport,
@@ -242,7 +290,7 @@ export const createServer = async (
 	let transport: BaseTransport | undefined;
 	if (transportType !== 'unknown') {
 		try {
-			transport = TransportFactory.createTransport(transportType, server, app);
+			transport = createTransport(transportType, server, app);
 			await transport.initialize({
 				port: webAppPort,
 				...transportOptions,

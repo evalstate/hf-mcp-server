@@ -6,9 +6,8 @@
     { "path": "./packages/app/tsconfig.server.json" }
   ],
   "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+    "composite": true,
+    "skipLibCheck": true,
+    "strict": true
   }
 }
