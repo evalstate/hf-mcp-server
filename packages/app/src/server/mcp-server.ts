@@ -218,7 +218,10 @@ export const createServer = async (
 	const __dirname = path.dirname(__filename);
 
 	// Define the root directory (important for Vite to find the right files)
-	const rootDir = isDev ? path.resolve(__dirname, '..') : path.resolve(__dirname, '..', 'web');
+	// In dev mode, we need to point to the source directory, not the dist directory
+	const rootDir = isDev
+		? path.resolve(__dirname, '..', '..', '..', 'app', 'src', 'web') // Go up from dist/server to app/src/web
+		: path.resolve(__dirname, '..', 'web'); // In prod, static files are in dist/web
 
 	// In production, the static files are in the same directory as the server code
 	// Configure API endpoints first (these need to be available in both dev and prod)
@@ -308,7 +311,7 @@ export const createServer = async (
 
 			// Create Vite server with proper HMR configuration - load config from default location
 			const vite = await createViteServer({
-				// Let Vite find the config file automatically
+				configFile: path.resolve(__dirname, '..', '..', '..', 'app', 'vite.config.ts'),
 				server: {
 					middlewareMode: true,
 					hmr: true, // Explicitly enable HMR
