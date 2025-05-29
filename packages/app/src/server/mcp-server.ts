@@ -34,10 +34,7 @@ import { type TransportType, DEFAULT_WEB_APP_PORT } from '../shared/constants.js
 
 import { createTransport } from './transport/transport-factory.js';
 import type { BaseTransport } from './transport/base-transport.js';
-import { type TransportOptions } from './transport/base-transport.js';
 import type { Server } from 'net';
-import { InitializeRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { request } from 'http';
 
 interface RegisteredTool {
 	enable: () => void;
@@ -64,8 +61,7 @@ const isDev = process.env.NODE_ENV === 'development';
 
 export const createServer = async (
 	transportType: TransportType = 'unknown',
-	webAppPort: number = DEFAULT_WEB_APP_PORT,
-	transportOptions: TransportOptions = {}
+	webAppPort: number = DEFAULT_WEB_APP_PORT
 ): Promise<{ server: McpServer; cleanup: () => Promise<void>; app: express.Application }> => {
 	const server = new McpServer(
 		{
@@ -254,11 +250,8 @@ export const createServer = async (
 			transportInfo.port = activePort;
 		}
 
-		// Add JSON response mode info for both JSON transport type and streamableHttp with JSON enabled
-		if (
-			activeTransport === 'streamableHttpJson' ||
-			(activeTransport === 'streamableHttp' && transportOptions.enableJsonResponse === true)
-		) {
+		// Add JSON response mode info for streamableHttpJson transport type
+		if (activeTransport === 'streamableHttpJson') {
 			transportInfo.jsonResponseEnabled = true;
 		}
 
@@ -296,7 +289,6 @@ export const createServer = async (
 			transport = createTransport(transportType, server, app);
 			await transport.initialize({
 				port: webAppPort,
-				...transportOptions,
 			});
 		} catch (error) {
 			console.error(`Error initializing ${transportType} transport:`, error);

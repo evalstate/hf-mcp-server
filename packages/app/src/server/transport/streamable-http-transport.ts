@@ -2,15 +2,23 @@ import { BaseTransport, type TransportOptions } from './base-transport.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { InMemoryEventStore } from '@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js';
 import { randomUUID } from 'node:crypto';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { Express } from 'express';
 
 /**
  * Implementation of StreamableHTTP transport
  */
 export class StreamableHttpTransport extends BaseTransport {
 	private transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+	private enableJsonResponse: boolean;
+
+	constructor(server: McpServer, app: Express, enableJsonResponse: boolean = false) {
+		super(server, app);
+		this.enableJsonResponse = enableJsonResponse;
+	}
 
 	async initialize(options: TransportOptions): Promise<void> {
-		const { enableJsonResponse = false } = options;
+		const enableJsonResponse = this.enableJsonResponse;
 
 		// Handle POST requests for JSON-RPC
 		this.app.post('/mcp', async (req: any, res: any) => {

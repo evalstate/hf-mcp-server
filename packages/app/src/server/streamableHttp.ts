@@ -27,11 +27,10 @@ const port = parseInt((values.port as string) || process.env.WEB_APP_PORT || DEF
 async function start() {
 	const useJsonMode = values.json || false;
 
-	// Choose the appropriate transport type and options
+	// Choose the appropriate transport type based on JSON mode
 	const transportType = useJsonMode ? 'streamableHttpJson' : 'streamableHttp';
-	const transportOptions = { enableJsonResponse: useJsonMode };
 
-	const { server, cleanup } = await createServer(transportType, port, transportOptions);
+	const { server, cleanup } = await createServer(transportType, port);
 
 	// Handle server shutdown
 	process.on('SIGINT', async () => {

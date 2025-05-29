@@ -3,7 +3,6 @@ import type { Express } from 'express';
 
 export interface TransportOptions {
 	port?: number;
-	enableJsonResponse?: boolean;
 }
 
 /**

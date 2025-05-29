@@ -53,7 +53,7 @@ WORKDIR /app
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV TRANSPORT=streamableHttp
+ENV TRANSPORT=streamableHttpJson
 ENV PORT=3000
 
 # Expose port
