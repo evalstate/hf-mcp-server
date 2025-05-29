@@ -1,13 +1,15 @@
-# HF Services MCP Server
+# hf-mcp-server packages
 
 ## Quick Guide
 
 This repo contains:
 
- - MCP Tool Implementations for connecting to the HuggingFace API for integration to an MCP Server
- - A Web Application and set of Transports for deploying the MCP Server.
+ - (`/mcp`) MCP Implementations of Hub API and Search endpoints for integration with MCP Servers. 
+ - (`/app`) An MCP Server and Web Application for deploying endpoints.
 
-The following modes are supported:
+### MCP Server
+
+The following transports are supported:
 
 - STDIO 
 - SSE (To be deprecated, but still commonly deployed).
@@ -21,26 +23,20 @@ SSE and StreamableHTTP services are available at `/sse` and `/mcp` respectively.
 > [!TIP]
 > The Web Application allows you to switch tools on and off. For STDIO, SSE and StreamableHTTP this will send a ToolListChangedNotification to the MCP Client. In StreamableHTTPJSON mode the tool will not be listed when the client next requests the tool lists.
 
-## Docker Usage
+## Build and Run
 
-### Using NPM Scripts
+This project uses `pnpm` for build and development. 
 
-We provide several npm scripts to simplify Docker operations:
+`pnpm run clean` -> clean build artifacts
 
-```bash
-# Build the Docker image
-npm run docker:build
+`pnpm run build` -> build packages
 
-# Run with default settings (SSE transport)
-npm run docker:run
+`pnpm run start` -> start the mcp server application
 
-# Run with specific transport types
-npm run docker:run:sse
-npm run docker:run:stdio
-npm run docker:run:streamableHttp
-```
+`pnpm run buildrun` -> clean, build and start
 
-These scripts automatically pass your HF_TOKEN environment variable to the container.
+`pnpm run dev` -> concurrently watch `mcp` and start dev server
+
 
 ### Manual Docker Commands
 
