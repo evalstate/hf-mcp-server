@@ -3,64 +3,71 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 
 export class SseTransport extends BaseTransport {
 	// Store multiple SSE transport instances
-	private sseTransports: Record<string, SSEServerTransport> = {};
+	private sseTransports: Map<string, SSEServerTransport> = new Map();
 
-	async initialize(options: TransportOptions): Promise<void> {
+	async initialize(_options: TransportOptions): Promise<void> {
 		// SSE endpoint for client connections
-		this.app.get('/sse', async (req, res) => {
-			console.log('Received SSE connection');
+		this.app.get('/sse', (req, res) => {
+			void (async () => {
+				console.log('Received SSE connection');
 
-			// Create dedicated transport for this connection
-			const transport = new SSEServerTransport('/message', res);
-			const sessionId = transport.sessionId;
+				// Create dedicated transport for this connection
+				const transport = new SSEServerTransport('/message', res);
+				const sessionId = transport.sessionId;
 
-			// Store in our collection
-			this.sseTransports[sessionId] = transport;
+				// Store in our collection
+				this.sseTransports.set(sessionId, transport);
 
-			// Clean up on connection close
-			res.on('close', () => {
-				console.log(`SSE connection closed: ${sessionId}`);
-				delete this.sseTransports[sessionId];
-			});
+				// Clean up on connection close
+				res.on('close', () => {
+					console.log(`SSE connection closed: ${sessionId}`);
+					this.sseTransports.delete(sessionId);
+				});
 
-			// Connect to server
-			await this.server.connect(transport);
+				// Connect to server
+				await this.server.connect(transport);
 
-			// Note: No need to set server.onclose here
+				// Note: No need to set server.onclose here
+			})();
 		});
 
 		// Handle messages for all SSE sessions
-		this.app.post('/message', async (req, res) => {
-			console.log('Received SSE message');
+		this.app.post('/message', (req, res) => {
+			void (async () => {
+				console.log('Received SSE message');
 
-			// Extract sessionId from query parameters
-			const sessionId = req.query.sessionId as string;
+				// Extract sessionId from query parameters
+				const sessionId = req.query.sessionId as string;
 
-			if (sessionId && this.sseTransports[sessionId]) {
-				// Handle message with the appropriate transport
-				await this.sseTransports[sessionId].handlePostMessage(req, res);
-			} else {
-				res.status(404).json({
-					error: 'Session not found',
-				});
-			}
+				const transport = sessionId ? this.sseTransports.get(sessionId) : undefined;
+				if (transport) {
+					// Handle message with the appropriate transport
+					await transport.handlePostMessage(req, res);
+				} else {
+					res.status(404).json({
+						error: 'Session not found',
+					});
+				}
+			})();
 		});
 
 		console.log('SSE transport routes initialized');
+		// No await needed at top level, but method must be async to match base class
+		return Promise.resolve();
 	}
 
 	async cleanup(): Promise<void> {
 		console.log('Cleaning up SSE transport');
 
 		// Close all active SSE connections
-		const transportIds = Object.keys(this.sseTransports);
+		const transportIds = Array.from(this.sseTransports.keys());
 
 		for (const id of transportIds) {
 			try {
-				const transport = this.sseTransports[id];
+				const transport = this.sseTransports.get(id);
 				if (transport) {
 					await transport.close();
-					delete this.sseTransports[id];
+					this.sseTransports.delete(id);
 				} else {
 					console.error('Transport not found for ID:', id);
 				}

@@ -16,10 +16,9 @@ export const createTransport = (type: TransportType, server: McpServer, app: Exp
 		case 'sse':
 			return new SseTransport(server, app);
 		case 'streamableHttp':
+			return new StreamableHttpTransport(server, app, false);
 		case 'streamableHttpJson':
-			// For both streamableHttp and streamableHttpJson, use same class
-			// enableJsonResponse parameter will be passed separately
-			return new StreamableHttpTransport(server, app);
+			return new StreamableHttpTransport(server, app, true);
 		default:
 			throw new Error(`Unsupported transport type: ${type}`);
 	}

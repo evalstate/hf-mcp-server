@@ -34,10 +34,7 @@ import { type TransportType, DEFAULT_WEB_APP_PORT } from '../shared/constants.js
 
 import { createTransport } from './transport/transport-factory.js';
 import type { BaseTransport } from './transport/base-transport.js';
-import { type TransportOptions } from './transport/base-transport.js';
 import type { Server } from 'net';
-import { InitializeRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { request } from 'http';
 
 interface RegisteredTool {
 	enable: () => void;
@@ -58,14 +55,14 @@ const getHfToken = (): string | undefined => {
 };
 
 const app = express();
+app.use(express.json());
 let webServer: Server | null = null;
 // Determine if we're in development mode
 const isDev = process.env.NODE_ENV === 'development';
 
 export const createServer = async (
 	transportType: TransportType = 'unknown',
-	webAppPort: number = DEFAULT_WEB_APP_PORT,
-	transportOptions: TransportOptions = {}
+	webAppPort: number = DEFAULT_WEB_APP_PORT
 ): Promise<{ server: McpServer; cleanup: () => Promise<void>; app: express.Application }> => {
 	const server = new McpServer(
 		{
@@ -205,10 +202,10 @@ export const createServer = async (
 		if (registeredTools[toolId]) {
 			if (toolSettings.enabled) {
 				registeredTools[toolId].enable();
-				console.log(`Tool ${toolId} initialized as enabled`);
+				console.error(`Tool ${toolId} initialized as enabled`);
 			} else {
 				registeredTools[toolId].disable();
-				console.log(`Tool ${toolId} initialized as disabled`);
+				console.error(`Tool ${toolId} initialized as disabled`);
 			}
 		}
 	}
@@ -218,7 +215,10 @@ export const createServer = async (
 	const __dirname = path.dirname(__filename);
 
 	// Define the root directory (important for Vite to find the right files)
-	const rootDir = isDev ? path.resolve(__dirname, '..') : path.resolve(__dirname, '..', 'web');
+	// In dev mode, we need to point to the source directory, not the dist directory
+	const rootDir = isDev
+		? path.resolve(__dirname, '..', '..', '..', 'app', 'src', 'web') // Go up from dist/server to app/src/web
+		: path.resolve(__dirname, '..', 'web'); // In prod, static files are in dist/web
 
 	// In production, the static files are in the same directory as the server code
 	// Configure API endpoints first (these need to be available in both dev and prod)
@@ -251,11 +251,8 @@ export const createServer = async (
 			transportInfo.port = activePort;
 		}
 
-		// Add JSON response mode info for both JSON transport type and streamableHttp with JSON enabled
-		if (
-			activeTransport === 'streamableHttpJson' ||
-			(activeTransport === 'streamableHttp' && transportOptions.enableJsonResponse === true)
-		) {
+		// Add JSON response mode info for streamableHttpJson transport type
+		if (activeTransport === 'streamableHttpJson') {
 			transportInfo.jsonResponseEnabled = true;
 		}
 
@@ -270,16 +267,17 @@ export const createServer = async (
 	// API endpoint to update tool settings
 	app.post('/api/settings/tools/:toolId', express.json(), (req, res) => {
 		const { toolId } = req.params;
-		const updatedSettings = settingsService.updateToolSettings(toolId, req.body as Partial<ToolSettings>);
+		const settings = req.body as Partial<ToolSettings>;
+		const updatedSettings = settingsService.updateToolSettings(toolId, settings);
 
 		// Enable or disable the actual MCP tool if it exists
 		if (registeredTools[toolId]) {
-			if (req.body.enabled) {
+			if (settings.enabled) {
 				registeredTools[toolId].enable();
-				console.log(`Tool ${toolId} has been enabled via API`);
+				console.error(`Tool ${toolId} has been enabled via API`);
 			} else {
 				registeredTools[toolId].disable();
-				console.log(`Tool ${toolId} has been disabled via API`);
+				console.error(`Tool ${toolId} has been disabled via API`);
 			}
 		}
 
@@ -293,7 +291,6 @@ export const createServer = async (
 			transport = createTransport(transportType, server, app);
 			await transport.initialize({
 				port: webAppPort,
-				...transportOptions,
 			});
 		} catch (error) {
 			console.error(`Error initializing ${transportType} transport:`, error);
@@ -308,7 +305,7 @@ export const createServer = async (
 
 			// Create Vite server with proper HMR configuration - load config from default location
 			const vite = await createViteServer({
-				// Let Vite find the config file automatically
+				configFile: path.resolve(__dirname, '..', '..', '..', 'app', 'vite.config.ts'),
 				server: {
 					middlewareMode: true,
 					hmr: true, // Explicitly enable HMR
@@ -320,8 +317,8 @@ export const createServer = async (
 			// Use Vite's middleware for dev server with HMR
 			app.use(vite.middlewares);
 
-			console.log('Using Vite middleware in development mode with HMR enabled');
-			console.log(`Vite root directory: ${rootDir}`);
+			console.error('Using Vite middleware in development mode with HMR enabled');
+			console.error(`Vite root directory: ${rootDir}`);
 		} catch (err) {
 			console.error('Error setting up Vite middleware:', err);
 			console.error(err);
@@ -341,12 +338,12 @@ export const createServer = async (
 	const startWebServer = () => {
 		if (!webServer) {
 			webServer = app.listen(webAppPort, () => {
-				console.log(`Server running at http://localhost:${webAppPort}`);
-				console.log(`Transport type: ${transportType}`);
-				console.log(`Mode: ${isDev ? 'development with HMR' : 'production'}`);
+				console.error(`Server running at http://localhost:${webAppPort.toString()}`);
+				console.error(`Transport type: ${transportType}`);
+				console.error(`Mode: ${isDev ? 'development with HMR' : 'production'}`);
 				if (isDev) {
-					console.log(`HMR is active - frontend changes will be automatically reflected in the browser`);
-					console.log(`For server changes, use 'npm run dev:watch' to automatically rebuild and apply changes`);
+					console.error(`HMR is active - frontend changes will be automatically reflected in the browser`);
+					console.error(`For server changes, use 'npm run dev:watch' to automatically rebuild and apply changes`);
 				}
 			});
 		}
@@ -354,7 +351,7 @@ export const createServer = async (
 
 	const cleanup = async () => {
 		if (webServer) {
-			console.log('Shutting down web server...');
+			console.error('Shutting down web server...');
 			// improve mcp server & express shutdown handling
 		}
 

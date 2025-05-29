@@ -27,24 +27,26 @@ const port = parseInt((values.port as string) || process.env.WEB_APP_PORT || DEF
 async function start() {
 	const useJsonMode = values.json || false;
 
-	// Choose the appropriate transport type and options
+	// Choose the appropriate transport type based on JSON mode
 	const transportType = useJsonMode ? 'streamableHttpJson' : 'streamableHttp';
-	const transportOptions = { enableJsonResponse: useJsonMode };
 
-	const { server, cleanup } = await createServer(transportType, port, transportOptions);
+	const { server, cleanup } = await createServer(transportType, port);
 
 	// Handle server shutdown
-	process.on('SIGINT', async () => {
+	process.on('SIGINT', () => {
 		console.log('Shutting down server...');
-		await cleanup();
-		await server.close();
-		console.log('Server shutdown complete');
-		process.exit(0);
+		// Use void to explicitly ignore the promise
+		void (async () => {
+			await cleanup();
+			await server.close();
+			console.log('Server shutdown complete');
+			process.exit(0);
+		})();
 	});
 }
 
 // Run the async start function
-start().catch((error) => {
+start().catch((error: unknown) => {
 	console.error('Server startup error:', error);
 	process.exit(1);
 });

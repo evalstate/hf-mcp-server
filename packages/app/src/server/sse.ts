@@ -22,17 +22,19 @@ async function start() {
 	const { server, cleanup } = await createServer('sse', port);
 
 	// Handle server shutdown
-	process.on('SIGINT', async () => {
+	process.on('SIGINT', () => {
 		console.log('Shutting down server...');
-		await cleanup();
-		await server.close();
-		console.log('Server shutdown complete');
-		process.exit(0);
+		void (async () => {
+			await cleanup();
+			await server.close();
+			console.log('Server shutdown complete');
+			process.exit(0);
+		})();
 	});
 }
 
 // Run the async start function
-start().catch((error) => {
+start().catch((error: unknown) => {
 	console.error('Server startup error:', error);
 	process.exit(1);
 });

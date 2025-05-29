@@ -1,9 +1,8 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Express } from 'express';
 
 export interface TransportOptions {
 	port?: number;
-	enableJsonResponse?: boolean;
 }
 
 /**
