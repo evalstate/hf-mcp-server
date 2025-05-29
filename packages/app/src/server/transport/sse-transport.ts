@@ -3,7 +3,7 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 
 export class SseTransport extends BaseTransport {
 	// Store multiple SSE transport instances
-	private sseTransports: Record<string, SSEServerTransport> = {};
+	private sseTransports: Map<string, SSEServerTransport> = new Map();
 
 	async initialize(_options: TransportOptions): Promise<void> {
 		// SSE endpoint for client connections
@@ -16,12 +16,12 @@ export class SseTransport extends BaseTransport {
 				const sessionId = transport.sessionId;
 
 				// Store in our collection
-				this.sseTransports[sessionId] = transport;
+				this.sseTransports.set(sessionId, transport);
 
 				// Clean up on connection close
 				res.on('close', () => {
 					console.log(`SSE connection closed: ${sessionId}`);
-					delete this.sseTransports[sessionId];
+					this.sseTransports.delete(sessionId);
 				});
 
 				// Connect to server
@@ -39,9 +39,10 @@ export class SseTransport extends BaseTransport {
 				// Extract sessionId from query parameters
 				const sessionId = req.query.sessionId as string;
 
-				if (sessionId && this.sseTransports[sessionId]) {
+				const transport = sessionId ? this.sseTransports.get(sessionId) : undefined;
+				if (transport) {
 					// Handle message with the appropriate transport
-					await this.sseTransports[sessionId].handlePostMessage(req, res);
+					await transport.handlePostMessage(req, res);
 				} else {
 					res.status(404).json({
 						error: 'Session not found',
@@ -51,20 +52,22 @@ export class SseTransport extends BaseTransport {
 		});
 
 		console.log('SSE transport routes initialized');
+		// No await needed at top level, but method must be async to match base class
+		return Promise.resolve();
 	}
 
 	async cleanup(): Promise<void> {
 		console.log('Cleaning up SSE transport');
 
 		// Close all active SSE connections
-		const transportIds = Object.keys(this.sseTransports);
+		const transportIds = Array.from(this.sseTransports.keys());
 
 		for (const id of transportIds) {
 			try {
-				const transport = this.sseTransports[id];
+				const transport = this.sseTransports.get(id);
 				if (transport) {
 					await transport.close();
-					delete this.sseTransports[id];
+					this.sseTransports.delete(id);
 				} else {
 					console.error('Transport not found for ID:', id);
 				}

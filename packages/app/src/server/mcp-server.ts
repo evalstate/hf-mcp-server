@@ -55,6 +55,7 @@ const getHfToken = (): string | undefined => {
 };
 
 const app = express();
+app.use(express.json());
 let webServer: Server | null = null;
 // Determine if we're in development mode
 const isDev = process.env.NODE_ENV === 'development';
@@ -266,11 +267,12 @@ export const createServer = async (
 	// API endpoint to update tool settings
 	app.post('/api/settings/tools/:toolId', express.json(), (req, res) => {
 		const { toolId } = req.params;
-		const updatedSettings = settingsService.updateToolSettings(toolId, req.body as Partial<ToolSettings>);
+		const settings = req.body as Partial<ToolSettings>;
+		const updatedSettings = settingsService.updateToolSettings(toolId, settings);
 
 		// Enable or disable the actual MCP tool if it exists
 		if (registeredTools[toolId]) {
-			if (req.body.enabled) {
+			if (settings.enabled) {
 				registeredTools[toolId].enable();
 				console.error(`Tool ${toolId} has been enabled via API`);
 			} else {

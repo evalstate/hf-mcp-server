@@ -1,15 +1,16 @@
 import { BaseTransport, type TransportOptions } from './base-transport.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { StreamableHTTPServerTransport, type StreamableHTTPServerTransportOptions } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { InMemoryEventStore } from '@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js';
 import { randomUUID } from 'node:crypto';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { Express } from 'express';
+import type { Express, Request, Response } from 'express';
 
 /**
  * Implementation of StreamableHTTP transport
  */
 export class StreamableHttpTransport extends BaseTransport {
-	private transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+	private transports: Map<string, StreamableHTTPServerTransport> = new Map();
 	private enableJsonResponse: boolean;
 
 	constructor(server: McpServer, app: Express, enableJsonResponse: boolean = false) {
@@ -21,15 +22,21 @@ export class StreamableHttpTransport extends BaseTransport {
 		const enableJsonResponse = this.enableJsonResponse;
 
 		// Handle POST requests for JSON-RPC
-		this.app.post('/mcp', async (req: any, res: any) => {
-			try {
+		this.app.post('/mcp', (req: Request, res: Response) => {
+			void (async () => {
+				try {
 				// Check for existing session ID
 				const sessionId = req.headers['mcp-session-id'] as string | undefined;
 				let transport: StreamableHTTPServerTransport;
 
-				if (sessionId && this.transports[sessionId]) {
+				if (sessionId && this.transports.has(sessionId)) {
 					// Reuse existing transport
-					transport = this.transports[sessionId];
+					const existingTransport = this.transports.get(sessionId);
+					if (!existingTransport) {
+						// This shouldn't happen if has() returned true
+						throw new Error('Transport disappeared between has() and get()');
+					}
+					transport = existingTransport;
 
 					console.log(`Handling POST request for session ID ${sessionId}`);
 				} else if (!sessionId) {
@@ -37,35 +44,32 @@ export class StreamableHttpTransport extends BaseTransport {
 					const eventStore = new InMemoryEventStore();
 
 					// Create appropriate config based on JSON mode
-					const transportConfig: any = {
+					const transportConfig: StreamableHTTPServerTransportOptions = {
 						enableJsonResponse,
 						eventStore, // Enable resumability
 						onsessioninitialized: (sessionId: string) => {
 							console.log(`Session initialized with ID: ${sessionId}`);
-							this.transports[sessionId] = transport;
+							this.transports.set(sessionId, transport);
 						},
+						// sessionIdGenerator is required, use undefined for JSON mode
+						sessionIdGenerator: enableJsonResponse ? undefined : () => randomUUID(),
 					};
-
-					// Only add sessionIdGenerator for non-JSON mode
-					if (!enableJsonResponse) {
-						transportConfig.sessionIdGenerator = () => randomUUID();
-					}
 
 					transport = new StreamableHTTPServerTransport(transportConfig);
 
 					// Set up onclose handler to clean up transport when closed
 					transport.onclose = () => {
 						const sid = transport.sessionId;
-						if (sid && this.transports[sid]) {
+						if (sid && this.transports.has(sid)) {
 							console.log(`Transport closed for session ${sid}, removing from transports map`);
-							delete this.transports[sid];
+							this.transports.delete(sid);
 						}
 					};
 
 					// Connect the transport to the MCP server
 					await this.server.connect(transport);
 
-					await transport.handleRequest(req, res);
+					await transport.handleRequest(req as IncomingMessage, res as ServerResponse, req.body);
 					return;
 				} else {
 					// Invalid request - no session ID or not initialization request
@@ -75,13 +79,13 @@ export class StreamableHttpTransport extends BaseTransport {
 							code: -32000,
 							message: 'Bad Request: No valid session ID provided',
 						},
-						id: req?.body?.id,
+						id: null,
 					});
 					return;
 				}
 
 				// Handle the request with existing transport
-				await transport.handleRequest(req, res);
+				await transport.handleRequest(req as IncomingMessage, res as ServerResponse, req.body);
 			} catch (error) {
 				console.error('Error handling MCP request:', error);
 				if (!res.headersSent) {
@@ -91,43 +95,59 @@ export class StreamableHttpTransport extends BaseTransport {
 							code: -32603,
 							message: 'Internal server error',
 						},
-						id: req?.body?.id,
+						id: null,
 					});
 				}
 			}
+			})();
 		});
 
 		// Handle GET requests for SSE streams
-		this.app.get('/mcp', async (req: any, res: any) => {
-			console.log('Received MCP GET request');
+		this.app.get('/mcp', (req: Request, res: Response) => {
+			void (async () => {
+				console.log('Received MCP GET request');
 			const sessionId = req.headers['mcp-session-id'] as string | undefined;
-			if (!sessionId || !this.transports[sessionId]) {
+			if (!sessionId || !this.transports.has(sessionId)) {
 				res.status(400).json({
 					jsonrpc: '2.0',
 					error: {
 						code: -32000,
 						message: 'Bad Request: No valid session ID provided',
 					},
-					id: req?.body?.id,
+					id: null,
 				});
 				return;
 			}
 			console.log(`Handling GET request for session ID ${sessionId}`);
-			const transport = this.transports[sessionId];
-			await transport.handleRequest(req, res);
+			const transport = this.transports.get(sessionId);
+			if (!transport) {
+				// This was already checked above, but TypeScript doesn't know that
+				res.status(400).json({
+					jsonrpc: '2.0',
+					error: {
+						code: -32000,
+						message: 'Session not found',
+					},
+					id: null,
+				});
+				return;
+			}
+			await transport.handleRequest(req as IncomingMessage, res as ServerResponse, req.body);
+			})();
 		});
 
 		// Handle DELETE requests for session termination
-		this.app.delete('/mcp', async (req: any, res: any) => {
-			const sessionId = req.headers['mcp-session-id'] as string | undefined;
-			if (!sessionId || !this.transports[sessionId]) {
+		this.app.delete('/mcp', (req: Request, res: Response) => {
+			void (async () => {
+				const sessionId = req.headers['mcp-session-id'] as string | undefined;
+			if (!sessionId || !this.transports.has(sessionId)) {
 				res.status(400).json({
 					jsonrpc: '2.0',
 					error: {
 						code: -32000,
 						message: 'Bad Request: No valid session ID provided',
 					},
-					id: req?.body?.id,
+					id: null,
 				});
 				return;
 			}
@@ -135,8 +155,11 @@ export class StreamableHttpTransport extends BaseTransport {
 			console.log(`Received session termination request for session ${sessionId}`);
 
 			try {
-				const transport = this.transports[sessionId];
-				await transport.handleRequest(req, res);
+				const transport = this.transports.get(sessionId);
+				if (!transport) {
+					throw new Error('Transport not found for session ' + sessionId);
+				}
+				await transport.handleRequest(req as IncomingMessage, res as ServerResponse, req.body);
 			} catch (error) {
 				console.error('Error handling session termination:', error);
 				if (!res.headersSent) {
@@ -146,10 +169,11 @@ export class StreamableHttpTransport extends BaseTransport {
 							code: -32603,
 							message: 'Error handling session termination',
 						},
-						id: req?.body?.id,
+						id: null,
 					});
 				}
 			}
+			})();
 		});
 
 		console.log('StreamableHTTP transport routes initialized');
@@ -159,23 +183,26 @@ export class StreamableHttpTransport extends BaseTransport {
 		} else {
 			console.log('SessionIdGenerator: randomUUID (used for SSE streaming)');
 		}
+		// No await needed at top level, but method must be async to match base class
+		return Promise.resolve();
 	}
 
 	async cleanup(): Promise<void> {
 		console.log('Cleaning up StreamableHTTP transport');
 
 		// Close all active transports
-		for (const sessionId in this.transports) {
-			const transport = this.transports[sessionId];
+		for (const [sessionId, transport] of this.transports.entries()) {
 			try {
 				// The transport may have an onclose handler we need to respect
-				if (transport?.onclose) {
+				if (transport.onclose) {
 					transport.onclose();
 				}
-				delete this.transports[sessionId];
+				this.transports.delete(sessionId);
 			} catch (error) {
 				console.error(`Error closing transport for session ${sessionId}:`, error);
 			}
 		}
+		// No await needed, but method must be async to match base class
+		return Promise.resolve();
 	}
 }

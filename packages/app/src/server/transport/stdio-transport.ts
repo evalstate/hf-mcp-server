@@ -22,5 +22,6 @@ export class StdioTransport extends BaseTransport {
 	async cleanup(): Promise<void> {
 		// STDIO doesn't require special cleanup
 		console.error('Cleaning up STDIO transport');
+		return Promise.resolve();
 	}
 }
