@@ -205,10 +205,10 @@ export const createServer = async (
 		if (registeredTools[toolId]) {
 			if (toolSettings.enabled) {
 				registeredTools[toolId].enable();
-				console.log(`Tool ${toolId} initialized as enabled`);
+				console.error(`Tool ${toolId} initialized as enabled`);
 			} else {
 				registeredTools[toolId].disable();
-				console.log(`Tool ${toolId} initialized as disabled`);
+				console.error(`Tool ${toolId} initialized as disabled`);
 			}
 		}
 	}
@@ -279,10 +279,10 @@ export const createServer = async (
 		if (registeredTools[toolId]) {
 			if (req.body.enabled) {
 				registeredTools[toolId].enable();
-				console.log(`Tool ${toolId} has been enabled via API`);
+				console.error(`Tool ${toolId} has been enabled via API`);
 			} else {
 				registeredTools[toolId].disable();
-				console.log(`Tool ${toolId} has been disabled via API`);
+				console.error(`Tool ${toolId} has been disabled via API`);
 			}
 		}
 
@@ -323,8 +323,8 @@ export const createServer = async (
 			// Use Vite's middleware for dev server with HMR
 			app.use(vite.middlewares);
 
-			console.log('Using Vite middleware in development mode with HMR enabled');
-			console.log(`Vite root directory: ${rootDir}`);
+			console.error('Using Vite middleware in development mode with HMR enabled');
+			console.error(`Vite root directory: ${rootDir}`);
 		} catch (err) {
 			console.error('Error setting up Vite middleware:', err);
 			console.error(err);
@@ -344,12 +344,12 @@ export const createServer = async (
 	const startWebServer = () => {
 		if (!webServer) {
 			webServer = app.listen(webAppPort, () => {
-				console.log(`Server running at http://localhost:${webAppPort}`);
-				console.log(`Transport type: ${transportType}`);
-				console.log(`Mode: ${isDev ? 'development with HMR' : 'production'}`);
+				console.error(`Server running at http://localhost:${webAppPort}`);
+				console.error(`Transport type: ${transportType}`);
+				console.error(`Mode: ${isDev ? 'development with HMR' : 'production'}`);
 				if (isDev) {
-					console.log(`HMR is active - frontend changes will be automatically reflected in the browser`);
-					console.log(`For server changes, use 'npm run dev:watch' to automatically rebuild and apply changes`);
+					console.error(`HMR is active - frontend changes will be automatically reflected in the browser`);
+					console.error(`For server changes, use 'npm run dev:watch' to automatically rebuild and apply changes`);
 				}
 			});
 		}
@@ -357,7 +357,7 @@ export const createServer = async (
 
 	const cleanup = async () => {
 		if (webServer) {
-			console.log('Shutting down web server...');
+			console.error('Shutting down web server...');
 			// improve mcp server & express shutdown handling
 		}
 

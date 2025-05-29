@@ -45,7 +45,7 @@ RUN echo "=== Full package structure ===" && \
 
 
 # Build the application
-# RUN pnpm run build
+# RUN pnpm run build 
 # RUN chmod +x start.sh
 
 # Set working directory to where the built app is
@@ -53,11 +53,11 @@ WORKDIR /app
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV TRANSPORT_TYPE=streamableHttp
+ENV TRANSPORT=streamableHttp
 ENV PORT=3000
 
 # Expose port
 EXPOSE 3000
 
 # Run the startup script
-CMD ["./start.sh"]
+CMD ["/bin/sh", "./start.sh"]

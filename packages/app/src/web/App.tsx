@@ -96,7 +96,7 @@ function App() {
 				},
 			}));
 
-			console.log(`${toolId} is now ${checked ? 'enabled' : 'disabled'}`);
+			console.error(`${toolId} is now ${checked ? 'enabled' : 'disabled'}`);
 		} catch (err) {
 			console.error(`Error updating tool settings:`, err);
 			alert(`Error updating ${toolId}: ${err instanceof Error ? err.message : 'Unknown error'}`);

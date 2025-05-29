@@ -1,19 +1,22 @@
 #!/bin/sh
 
 # Default to stdio transport if not specified
-TRANSPORT_TYPE="${TRANSPORT_TYPE:-stdio}"
+TRANSPORT="${TRANSPORT:-stdio}"
 # Get port from environment or use default
 PORT="${PORT:-3000}"
 # Other options
 JSON_MODE="${JSON_MODE:-false}"
 
-echo "Starting MCP server with transport type: $TRANSPORT_TYPE on port $PORT"
+# Only echo if not using stdio transport
+if [ "$TRANSPORT" != "stdio" ]; then
+  echo "Starting MCP server with transport type: $TRANSPORT on port $PORT"
 
-# Check for HF_TOKEN
-if [ -n "$HF_TOKEN" ]; then
-  echo "HF_TOKEN found in environment"
-else
-  echo "Warning: HF_TOKEN not found in environment"
+  # Check for HF_TOKEN
+  if [ -n "$HF_TOKEN" ]; then
+    echo "HF_TOKEN found in environment"
+  else
+    echo "Warning: HF_TOKEN not found in environment"
+  fi
 fi
 
 cd packages/app
@@ -21,7 +24,7 @@ cd packages/app
 DIST_PATH="dist/server"
 
 # Start the appropriate server based on transport type
-case "$TRANSPORT_TYPE" in
+case "$TRANSPORT" in
   stdio)
     node $DIST_PATH/stdio.js --port "$PORT"
     ;;
@@ -42,7 +45,7 @@ case "$TRANSPORT_TYPE" in
     node $DIST_PATH/streamableHttp.js --port "$PORT" --json
     ;;
   *)
-    echo "Error: Invalid transport type '$TRANSPORT_TYPE'. Valid options are: stdio, sse, streamableHttp, streamableHttpJson"
+    echo "Error: Invalid transport type '$TRANSPORT'. Valid options are: stdio, sse, streamableHttp, streamableHttpJson"
     exit 1
     ;;
 esac

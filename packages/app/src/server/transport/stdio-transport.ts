@@ -12,7 +12,7 @@ export class StdioTransport extends BaseTransport {
 
 		try {
 			await this.server.connect(this.transport);
-			console.log('STDIO transport initialized');
+			console.error('STDIO transport initialized');
 		} catch (error) {
 			console.error('Error connecting STDIO transport:', error);
 			throw error;
@@ -21,6 +21,6 @@ export class StdioTransport extends BaseTransport {
 
 	async cleanup(): Promise<void> {
 		// STDIO doesn't require special cleanup
-		console.log('Cleaning up STDIO transport');
+		console.error('Cleaning up STDIO transport');
 	}
 }
