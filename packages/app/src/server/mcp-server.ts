@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod';
+import { logger } from './lib/logger.js';
 
 // Import the search services
 import {
@@ -81,8 +82,9 @@ export const createServer = async (
 	);
 
 	server.server.oninitialized = () => {
-		console.error(
-			`${new Date().toISOString()} : Initialized ${server.server.getClientVersion()?.name || '<unknown>'} ${server.server.getClientVersion()?.version || '<unknown>'}`
+		logger.info(
+			{ client: server.server.getClientVersion() },
+			`Initialized ${server.server.getClientVersion()?.name || '<unknown>'} ${server.server.getClientVersion()?.version || '<unknown>'}`
 		);
 	};
 
@@ -202,10 +204,10 @@ export const createServer = async (
 		if (registeredTools[toolId]) {
 			if (toolSettings.enabled) {
 				registeredTools[toolId].enable();
-				console.error(`Tool ${toolId} initialized as enabled`);
+				logger.info(`Tool ${toolId} initialized as enabled`);
 			} else {
 				registeredTools[toolId].disable();
-				console.error(`Tool ${toolId} initialized as disabled`);
+				logger.info(`Tool ${toolId} initialized as disabled`);
 			}
 		}
 	}
@@ -274,10 +276,10 @@ export const createServer = async (
 		if (registeredTools[toolId]) {
 			if (settings.enabled) {
 				registeredTools[toolId].enable();
-				console.error(`Tool ${toolId} has been enabled via API`);
+				logger.info(`Tool ${toolId} has been enabled via API`);
 			} else {
 				registeredTools[toolId].disable();
-				console.error(`Tool ${toolId} has been disabled via API`);
+				logger.info(`Tool ${toolId} has been disabled via API`);
 			}
 		}
 
@@ -293,7 +295,7 @@ export const createServer = async (
 				port: webAppPort,
 			});
 		} catch (error) {
-			console.error(`Error initializing ${transportType} transport:`, error);
+			logger.error({ error }, `Error initializing ${transportType} transport`);
 		}
 	}
 
@@ -317,11 +319,10 @@ export const createServer = async (
 			// Use Vite's middleware for dev server with HMR
 			app.use(vite.middlewares);
 
-			console.error('Using Vite middleware in development mode with HMR enabled');
-			console.error(`Vite root directory: ${rootDir}`);
+			logger.info('Using Vite middleware in development mode with HMR enabled');
+			logger.info({ rootDir }, 'Vite root directory');
 		} catch (err) {
-			console.error('Error setting up Vite middleware:', err);
-			console.error(err);
+			logger.error({ err }, 'Error setting up Vite middleware');
 			process.exit(1);
 		}
 	} else {
@@ -338,12 +339,11 @@ export const createServer = async (
 	const startWebServer = () => {
 		if (!webServer) {
 			webServer = app.listen(webAppPort, () => {
-				console.error(`Server running at http://localhost:${webAppPort.toString()}`);
-				console.error(`Transport type: ${transportType}`);
-				console.error(`Mode: ${isDev ? 'development with HMR' : 'production'}`);
+				logger.info(`Server running at http://localhost:${webAppPort.toString()}`);
+				logger.info({ transportType, mode: isDev ? 'development with HMR' : 'production' }, 'Server configuration');
 				if (isDev) {
-					console.error(`HMR is active - frontend changes will be automatically reflected in the browser`);
-					console.error(`For server changes, use 'npm run dev:watch' to automatically rebuild and apply changes`);
+					logger.info('HMR is active - frontend changes will be automatically reflected in the browser');
+					logger.info('For server changes, use \'npm run dev:watch\' to automatically rebuild and apply changes');
 				}
 			});
 		}
@@ -351,7 +351,7 @@ export const createServer = async (
 
 	const cleanup = async () => {
 		if (webServer) {
-			console.error('Shutting down web server...');
+			logger.info('Shutting down web server...');
 			// improve mcp server & express shutdown handling
 		}
 

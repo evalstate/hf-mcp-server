@@ -3,6 +3,7 @@
 import { createServer } from './mcp-server.js';
 import { DEFAULT_WEB_APP_PORT } from '../shared/constants.js';
 import { parseArgs } from 'node:util';
+import { logger } from './lib/logger.js';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -12,7 +13,7 @@ const { values } = parseArgs({
 	args: process.argv.slice(2),
 });
 
-console.error('Starting SSE server...');
+logger.info('Starting SSE server...');
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
 
@@ -23,11 +24,11 @@ async function start() {
 
 	// Handle server shutdown
 	process.on('SIGINT', () => {
-		console.log('Shutting down server...');
+		logger.info('Shutting down server...');
 		void (async () => {
 			await cleanup();
 			await server.close();
-			console.log('Server shutdown complete');
+			logger.info('Server shutdown complete');
 			process.exit(0);
 		})();
 	});
@@ -35,6 +36,6 @@ async function start() {
 
 // Run the async start function
 start().catch((error: unknown) => {
-	console.error('Server startup error:', error);
+	logger.error({ error }, 'Server startup error');
 	process.exit(1);
 });

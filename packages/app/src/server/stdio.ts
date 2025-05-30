@@ -3,6 +3,7 @@
 import { createServer } from './mcp-server.js';
 import { DEFAULT_WEB_APP_PORT } from '../shared/constants.js';
 import { parseArgs } from 'node:util';
+import { logger } from './lib/logger.js';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -12,7 +13,7 @@ const { values } = parseArgs({
 	args: process.argv.slice(2),
 });
 
-console.error('Starting default (STDIO) server...');
+logger.info('Starting default (STDIO) server...');
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
 process.env.TRANSPORT = process.env.TRANSPORT || 'STDIO';
@@ -33,6 +34,6 @@ async function main() {
 }
 
 main().catch((error: unknown) => {
-	console.error('Server error:', error);
+	logger.error({ error }, 'Server error');
 	process.exit(1);
 });

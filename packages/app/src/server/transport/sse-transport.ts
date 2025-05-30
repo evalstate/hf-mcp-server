@@ -1,5 +1,6 @@
 import { BaseTransport, type TransportOptions } from './base-transport.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { logger } from '../lib/logger.js';
 
 export class SseTransport extends BaseTransport {
 	// Store multiple SSE transport instances
@@ -9,7 +10,7 @@ export class SseTransport extends BaseTransport {
 		// SSE endpoint for client connections
 		this.app.get('/sse', (req, res) => {
 			void (async () => {
-				console.log('Received SSE connection');
+				logger.debug('Received SSE connection');
 
 				// Create dedicated transport for this connection
 				const transport = new SSEServerTransport('/message', res);
@@ -20,7 +21,7 @@ export class SseTransport extends BaseTransport {
 
 				// Clean up on connection close
 				res.on('close', () => {
-					console.log(`SSE connection closed: ${sessionId}`);
+					logger.debug({ sessionId }, 'SSE connection closed');
 					this.sseTransports.delete(sessionId);
 				});
 
@@ -34,7 +35,7 @@ export class SseTransport extends BaseTransport {
 		// Handle messages for all SSE sessions
 		this.app.post('/message', (req, res) => {
 			void (async () => {
-				console.log('Received SSE message');
+				logger.debug('Received SSE message');
 
 				// Extract sessionId from query parameters
 				const sessionId = req.query.sessionId as string;
@@ -52,13 +53,13 @@ export class SseTransport extends BaseTransport {
 			})();
 		});
 
-		console.log('SSE transport routes initialized');
+		logger.info('SSE transport routes initialized');
 		// No await needed at top level, but method must be async to match base class
 		return Promise.resolve();
 	}
 
 	async cleanup(): Promise<void> {
-		console.log('Cleaning up SSE transport');
+		logger.info('Cleaning up SSE transport');
 
 		// Close all active SSE connections
 		const transportIds = Array.from(this.sseTransports.keys());
@@ -70,10 +71,10 @@ export class SseTransport extends BaseTransport {
 					await transport.close();
 					this.sseTransports.delete(id);
 				} else {
-					console.error('Transport not found for ID:', id);
+					logger.error({ id }, 'Transport not found for ID');
 				}
 			} catch (err) {
-				console.error(`Error closing SSE transport ${id}:`, err);
+				logger.error({ err, id }, 'Error closing SSE transport');
 			}
 		}
 	}

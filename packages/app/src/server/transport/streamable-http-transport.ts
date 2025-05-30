@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Express, Request, Response } from 'express';
+import { logger } from '../lib/logger.js';
 
 /**
  * Implementation of StreamableHTTP transport
@@ -38,7 +39,7 @@ export class StreamableHttpTransport extends BaseTransport {
 					}
 					transport = existingTransport;
 
-					console.log(`Handling POST request for session ID ${sessionId}`);
+					logger.debug({ sessionId }, 'Handling POST request for session');
 				} else if (!sessionId) {
 					// New initialization request
 					const eventStore = new InMemoryEventStore();
@@ -48,7 +49,7 @@ export class StreamableHttpTransport extends BaseTransport {
 						enableJsonResponse,
 						eventStore, // Enable resumability
 						onsessioninitialized: (sessionId: string) => {
-							console.log(`Session initialized with ID: ${sessionId}`);
+							logger.debug({ sessionId }, 'Session initialized');
 							this.transports.set(sessionId, transport);
 						},
 						// sessionIdGenerator is required, use undefined for JSON mode
@@ -61,7 +62,7 @@ export class StreamableHttpTransport extends BaseTransport {
 					transport.onclose = () => {
 						const sid = transport.sessionId;
 						if (sid && this.transports.has(sid)) {
-							console.log(`Transport closed for session ${sid}, removing from transports map`);
+							logger.debug({ sessionId: sid }, 'Transport closed, removing from transports map');
 							this.transports.delete(sid);
 						}
 					};
@@ -87,7 +88,7 @@ export class StreamableHttpTransport extends BaseTransport {
 				// Handle the request with existing transport
 				await transport.handleRequest(req as IncomingMessage, res as ServerResponse, req.body);
 			} catch (error) {
-				console.error('Error handling MCP request:', error);
+				logger.error({ error }, 'Error handling MCP request');
 				if (!res.headersSent) {
 					res.status(500).json({
 						jsonrpc: '2.0',
@@ -105,7 +106,7 @@ export class StreamableHttpTransport extends BaseTransport {
 		// Handle GET requests for SSE streams
 		this.app.get('/mcp', (req: Request, res: Response) => {
 			void (async () => {
-				console.log('Received MCP GET request');
+				logger.debug('Received MCP GET request');
 			const sessionId = req.headers['mcp-session-id'] as string | undefined;
 			if (!sessionId || !this.transports.has(sessionId)) {
 				res.status(400).json({
@@ -118,7 +119,7 @@ export class StreamableHttpTransport extends BaseTransport {
 				});
 				return;
 			}
-			console.log(`Handling GET request for session ID ${sessionId}`);
+			logger.debug({ sessionId }, 'Handling GET request for session');
 			const transport = this.transports.get(sessionId);
 			if (!transport) {
 				// This was already checked above, but TypeScript doesn't know that
@@ -152,7 +153,7 @@ export class StreamableHttpTransport extends BaseTransport {
 				return;
 			}
 
-			console.log(`Received session termination request for session ${sessionId}`);
+			logger.debug({ sessionId }, 'Received session termination request');
 
 			try {
 				const transport = this.transports.get(sessionId);
@@ -161,7 +162,7 @@ export class StreamableHttpTransport extends BaseTransport {
 				}
 				await transport.handleRequest(req as IncomingMessage, res as ServerResponse, req.body);
 			} catch (error) {
-				console.error('Error handling session termination:', error);
+				logger.error({ error }, 'Error handling session termination');
 				if (!res.headersSent) {
 					res.status(500).json({
 						jsonrpc: '2.0',
@@ -176,19 +177,19 @@ export class StreamableHttpTransport extends BaseTransport {
 			})();
 		});
 
-		console.log('StreamableHTTP transport routes initialized');
-		console.log(`JSON Response mode: ${enableJsonResponse ? 'enabled' : 'disabled'}`);
+		logger.info('StreamableHTTP transport routes initialized');
+		logger.info({ jsonResponseMode: enableJsonResponse ? 'enabled' : 'disabled' }, 'JSON Response mode');
 		if (enableJsonResponse) {
-			console.log('SessionIdGenerator: undefined (not needed in JSON mode)');
+			logger.debug('SessionIdGenerator: undefined (not needed in JSON mode)');
 		} else {
-			console.log('SessionIdGenerator: randomUUID (used for SSE streaming)');
+			logger.debug('SessionIdGenerator: randomUUID (used for SSE streaming)');
 		}
 		// No await needed at top level, but method must be async to match base class
 		return Promise.resolve();
 	}
 
 	async cleanup(): Promise<void> {
-		console.log('Cleaning up StreamableHTTP transport');
+		logger.info('Cleaning up StreamableHTTP transport');
 
 		// Close all active transports
 		for (const [sessionId, transport] of this.transports.entries()) {
@@ -199,7 +200,7 @@ export class StreamableHttpTransport extends BaseTransport {
 				}
 				this.transports.delete(sessionId);
 			} catch (error) {
-				console.error(`Error closing transport for session ${sessionId}:`, error);
+				logger.error({ error, sessionId }, 'Error closing transport for session');
 			}
 		}
 		// No await needed, but method must be async to match base class
