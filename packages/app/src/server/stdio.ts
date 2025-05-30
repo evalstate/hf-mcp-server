@@ -15,6 +15,7 @@ const { values } = parseArgs({
 console.error('Starting default (STDIO) server...');
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+process.env.TRANSPORT = process.env.TRANSPORT || 'STDIO';
 
 const port = parseInt((values.port as string) || process.env.WEB_APP_PORT || DEFAULT_WEB_APP_PORT.toString());
 
