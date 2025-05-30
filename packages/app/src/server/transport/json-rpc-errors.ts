@@ -90,6 +90,6 @@ export const JsonRpcErrors = {
 	sessionAlreadyExists: (sessionId: string, id: string | number | null = null) =>
 		createJsonRpcError(JSON_RPC_ERROR_CODES.SESSION_ALREADY_EXISTS, 'Session already exists', id, { sessionId }),
 
-	methodNotAllowed: (id: string | number | null = null) =>
-		createJsonRpcError(JSON_RPC_ERROR_CODES.SERVER_ERROR, 'Method not allowed', id),
+	methodNotAllowed: (id: string | number | null = null, message: string = 'Method not allowed') =>
+		createJsonRpcError(JSON_RPC_ERROR_CODES.SERVER_ERROR, message, id),
 } as const;
