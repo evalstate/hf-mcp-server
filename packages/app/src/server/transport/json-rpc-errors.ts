@@ -53,6 +53,25 @@ export function createJsonRpcError(
 }
 
 /**
+ * Safely extract JSON-RPC ID from request body
+ */
+export function extractJsonRpcId(body: unknown): string | number | null {
+	if (body && typeof body === 'object' && 'id' in body) {
+		const id = (body as { id: unknown }).id;
+		if (typeof id === 'string') {
+			return id;
+		}
+		if (typeof id === 'number') {
+			return id;
+		}
+		if (id === null) {
+			return null;
+		}
+	}
+	return null;
+}
+
+/**
  * Common error response factories
  */
 export const JsonRpcErrors = {
@@ -70,4 +89,7 @@ export const JsonRpcErrors = {
 
 	sessionAlreadyExists: (sessionId: string, id: string | number | null = null) =>
 		createJsonRpcError(JSON_RPC_ERROR_CODES.SESSION_ALREADY_EXISTS, 'Session already exists', id, { sessionId }),
+
+	methodNotAllowed: (id: string | number | null = null) =>
+		createJsonRpcError(JSON_RPC_ERROR_CODES.SERVER_ERROR, 'Method not allowed', id),
 } as const;

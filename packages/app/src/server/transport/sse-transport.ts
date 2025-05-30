@@ -3,7 +3,7 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { logger } from '../lib/logger.js';
 import type { Request, Response, Express } from 'express';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { JsonRpcErrors } from './json-rpc-errors.js';
+import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 
 interface SSEConnection {
 	transport: SSEServerTransport;
@@ -11,25 +11,6 @@ interface SSEConnection {
 	heartbeatInterval?: NodeJS.Timeout;
 	createdAt: Date;
 	lastActivity: Date;
-}
-
-/**
- * Safely extract JSON-RPC ID from request body
- */
-function extractJsonRpcId(body: unknown): string | number | null {
-	if (body && typeof body === 'object' && 'id' in body) {
-		const id = (body as { id: unknown }).id;
-		if (typeof id === 'string') {
-			return id;
-		}
-		if (typeof id === 'number') {
-			return id;
-		}
-		if (id === null) {
-			return null;
-		}
-	}
-	return null;
 }
 
 export class SseTransport extends BaseTransport {

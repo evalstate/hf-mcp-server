@@ -5,6 +5,7 @@ import type { BaseTransport } from './base-transport.js';
 import { StdioTransport } from './stdio-transport.js';
 import { SseTransport } from './sse-transport.js';
 import { StreamableHttpTransport } from './streamable-http-transport.js';
+import { StatelessHttpTransport } from './stateless-http-transport.js';
 
 /**
  * Utility for creating transport instances
@@ -18,7 +19,7 @@ export const createTransport = (type: TransportType, server: McpServer, app: Exp
 		case 'streamableHttp':
 			return new StreamableHttpTransport(server, app, false);
 		case 'streamableHttpJson':
-			return new StreamableHttpTransport(server, app, true);
+			return new StatelessHttpTransport(server, app);
 		default:
 			throw new Error(`Unsupported transport type: ${type}`);
 	}
