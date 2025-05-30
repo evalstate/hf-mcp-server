@@ -42,7 +42,8 @@ export class SseTransport extends BaseTransport {
 				const transport = sessionId ? this.sseTransports.get(sessionId) : undefined;
 				if (transport) {
 					// Handle message with the appropriate transport
-					await transport.handlePostMessage(req, res);
+					// Pass req.body as the third parameter since express.json() has already parsed it
+					await transport.handlePostMessage(req, res, req.body);
 				} else {
 					res.status(404).json({
 						error: 'Session not found',
