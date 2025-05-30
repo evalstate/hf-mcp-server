@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod';
 import { logger } from './lib/logger.js';
+import { createRequire } from 'module';
 
 // Import the search services
 import {
@@ -65,10 +66,13 @@ export const createServer = async (
 	transportType: TransportType = 'unknown',
 	webAppPort: number = DEFAULT_WEB_APP_PORT
 ): Promise<{ server: McpServer; cleanup: () => Promise<void>; app: express.Application }> => {
+	const require = createRequire(import.meta.url);
+	const { version } = require('../../package.json') as { version: string };
+
 	const server = new McpServer(
 		{
-			name: 'hf-mcp-server',
-			version: '0.1.1',
+			name: '@huggingface/mcp-services',
+			version: version,
 		},
 		{
 			instructions:
@@ -343,7 +347,7 @@ export const createServer = async (
 				logger.info({ transportType, mode: isDev ? 'development with HMR' : 'production' }, 'Server configuration');
 				if (isDev) {
 					logger.info('HMR is active - frontend changes will be automatically reflected in the browser');
-					logger.info('For server changes, use \'npm run dev:watch\' to automatically rebuild and apply changes');
+					logger.info("For server changes, use 'npm run dev:watch' to automatically rebuild and apply changes");
 				}
 			});
 		}

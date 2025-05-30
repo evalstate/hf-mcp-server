@@ -106,8 +106,8 @@ export class StreamableHttpTransport extends BaseTransport {
 		// Handle GET requests for SSE streams
 		this.app.get('/mcp', (req: Request, res: Response) => {
 			void (async () => {
-				logger.debug('Received MCP GET request');
 			const sessionId = req.headers['mcp-session-id'] as string | undefined;
+			logger.debug({ sessionId }, 'Received MCP GET request');
 			if (!sessionId || !this.transports.has(sessionId)) {
 				res.status(400).json({
 					jsonrpc: '2.0',
@@ -162,7 +162,7 @@ export class StreamableHttpTransport extends BaseTransport {
 				}
 				await transport.handleRequest(req as IncomingMessage, res as ServerResponse, req.body);
 			} catch (error) {
-				logger.error({ error }, 'Error handling session termination');
+				logger.error({ error, sessionId }, 'Error handling session termination');
 				if (!res.headersSent) {
 					res.status(500).json({
 						jsonrpc: '2.0',

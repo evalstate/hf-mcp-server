@@ -10,11 +10,11 @@ export class SseTransport extends BaseTransport {
 		// SSE endpoint for client connections
 		this.app.get('/sse', (req, res) => {
 			void (async () => {
-				logger.debug('Received SSE connection');
-
 				// Create dedicated transport for this connection
 				const transport = new SSEServerTransport('/message', res);
 				const sessionId = transport.sessionId;
+				
+				logger.debug({ sessionId }, 'Received SSE connection');
 
 				// Store in our collection
 				this.sseTransports.set(sessionId, transport);
@@ -35,10 +35,10 @@ export class SseTransport extends BaseTransport {
 		// Handle messages for all SSE sessions
 		this.app.post('/message', (req, res) => {
 			void (async () => {
-				logger.debug('Received SSE message');
-
 				// Extract sessionId from query parameters
 				const sessionId = req.query.sessionId as string;
+				
+				logger.debug({ sessionId }, 'Received SSE message');
 
 				const transport = sessionId ? this.sseTransports.get(sessionId) : undefined;
 				if (transport) {
