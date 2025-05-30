@@ -148,7 +148,7 @@ function App() {
 		<>
 			<div className="flex h-screen w-screen items-center justify-center flex-col gap-6 pb-12">
 				<ToolsCard
-					title="Hugging Face Search Tools (MCP)"
+					title="🤗 Hugging Face Search Tools (MCP)"
 					description="Find and use Hugging Face and Community content."
 					tools={searchTools}
 					onToolToggle={handleToolToggle}

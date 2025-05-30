@@ -46,6 +46,7 @@ interface RegisteredTool {
 
 let activeTransport: TransportType = 'unknown';
 let activePort: number | undefined = undefined;
+let activeClientInfo: { name: string; version: string } | null = null;
 
 const maskToken = (token: string): string => {
 	if (!token || token.length <= 9) return token;
@@ -86,17 +87,23 @@ export const createServer = async (
 	);
 
 	server.server.oninitialized = () => {
+		const clientInfo = server.server.getClientVersion();
 		logger.info(
-			{ client: server.server.getClientVersion() },
-			`Initialized ${server.server.getClientVersion()?.name || '<unknown>'} ${server.server.getClientVersion()?.version || '<unknown>'}`
+			{ client: clientInfo },
+			`Initialized ${clientInfo?.name || '<unknown>'} ${clientInfo?.version || '<unknown>'}`
 		);
+		
+		// Store client info for STDIO connections
+		if (transportType === 'stdio' && clientInfo) {
+			activeClientInfo = {
+				name: clientInfo.name || '<unknown>',
+				version: clientInfo.version || '<unknown>'
+			};
+		}
 	};
 
 	activeTransport = transportType;
-
-	if (transportType === 'sse' || transportType === 'streamableHttp' || transportType === 'streamableHttpJson') {
-		activePort = webAppPort;
-	}
+	activePort = webAppPort;
 
 	// "Hugging Face Spaces" are known by Qwen2.5/3, Sonnet/Haiku and OpenAI Models
 	const spaceSearchTool = server.tool(
@@ -238,6 +245,10 @@ export const createServer = async (
 			hfTokenMasked?: string;
 			port?: number;
 			jsonResponseEnabled?: boolean;
+			stdioClient?: {
+				name: string;
+				version: string;
+			} | null;
 		}
 
 		const transportInfo: TransportInfoResponse = {
@@ -249,17 +260,19 @@ export const createServer = async (
 			transportInfo.hfTokenMasked = maskToken(hfToken);
 		}
 
-		// Set port information for all HTTP transports
-		if (
-			activePort &&
-			(activeTransport === 'sse' || activeTransport === 'streamableHttp' || activeTransport === 'streamableHttpJson')
-		) {
+		// Set port information for all transports (web app always runs on this port)
+		if (activePort) {
 			transportInfo.port = activePort;
 		}
 
 		// Add JSON response mode info for streamableHttpJson transport type
 		if (activeTransport === 'streamableHttpJson') {
 			transportInfo.jsonResponseEnabled = true;
+		}
+
+		// Add STDIO client info
+		if (activeTransport === 'stdio') {
+			transportInfo.stdioClient = activeClientInfo;
 		}
 
 		res.json(transportInfo);
@@ -362,6 +375,11 @@ export const createServer = async (
 		// Clean up transport if initialized
 		if (transport) {
 			await transport.cleanup();
+		}
+		
+		// Clear client info on cleanup for STDIO
+		if (transportType === 'stdio') {
+			activeClientInfo = null;
 		}
 	};
 
