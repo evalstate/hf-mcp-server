@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createServer } from './mcp-server.js';
+import { WebServer } from './web-server.js';
 import { DEFAULT_WEB_APP_PORT } from '../shared/constants.js';
 import { parseArgs } from 'node:util';
 import { logger } from './lib/logger.js';
@@ -31,7 +32,10 @@ async function start() {
 	// Choose the appropriate transport type based on JSON mode
 	const transportType = useJsonMode ? 'streamableHttpJson' : 'streamableHttp';
 
-	const { server, cleanup } = await createServer(transportType, port);
+	// Create WebServer instance
+	const webServer = new WebServer();
+
+	const { server, cleanup } = await createServer(transportType, port, webServer);
 
 	// Handle server shutdown
 	process.on('SIGINT', () => {
