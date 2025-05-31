@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { createServer } from './mcp-server.js';
+import { Application } from './application.js';
 import { WebServer } from './web-server.js';
 import { DEFAULT_WEB_APP_PORT } from '../shared/constants.js';
 import { parseArgs } from 'node:util';
@@ -35,14 +35,21 @@ async function start() {
 	// Create WebServer instance
 	const webServer = new WebServer();
 
-	const { server, cleanup } = await createServer(transportType, port, webServer);
+	// Create Application instance
+	const app = new Application({
+		transportType,
+		webAppPort: port,
+		webServerInstance: webServer,
+	});
+
+	// Start the application
+	await app.start();
 
 	// Handle server shutdown
 	const shutdown = async () => {
 		logger.info('Shutting down server...');
 		try {
-			await cleanup();
-			await server.close();
+			await app.stop();
 			logger.info('Server shutdown complete');
 			process.exit(0);
 		} catch (error) {

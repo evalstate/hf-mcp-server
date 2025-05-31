@@ -1,6 +1,12 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Express } from 'express';
 
+/**
+ * Factory function to create server instances
+ * This should be provided during transport construction to enable per-connection server instances
+ */
+export type ServerFactory = (headers: Record<string, string> | null) => McpServer;
+
 export interface TransportOptions {
 	port?: number;
 }
@@ -39,11 +45,11 @@ export interface SessionInfo {
  * Base class for all transport implementations
  */
 export abstract class BaseTransport {
-	protected server: McpServer;
+	protected serverFactory: ServerFactory;
 	protected app: Express;
 
-	constructor(server: McpServer, app: Express) {
-		this.server = server;
+	constructor(serverFactory: ServerFactory, app: Express) {
+		this.serverFactory = serverFactory;
 		this.app = app;
 	}
 

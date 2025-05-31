@@ -6,9 +6,11 @@ import { logger } from '../lib/logger.js';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { ZodObject, ZodLiteral } from 'zod';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 interface Session {
 	transport: StreamableHTTPServerTransport;
+	server: McpServer;
 	metadata: {
 		id: string;
 		connectedAt: Date;
@@ -118,7 +120,7 @@ export class StreamableHttpTransport extends BaseTransport {
 			transport = existingSession.transport;
 		} else if (!sessionId && isInitializeRequest(req.body)) {
 			// Create new session only for initialization requests
-			transport = await this.createSession();
+			transport = await this.createSession(req.headers as Record<string, string>);
 		} else if (!sessionId) {
 			// No session ID and not an initialization request
 			res
@@ -174,7 +176,10 @@ export class StreamableHttpTransport extends BaseTransport {
 		await this.removeSession(sessionId);
 	}
 
-	private async createSession(): Promise<StreamableHTTPServerTransport> {
+	private async createSession(requestHeaders?: Record<string, string>): Promise<StreamableHTTPServerTransport> {
+		// Create server instance using factory with request headers
+		const server = this.serverFactory(requestHeaders || null);
+		
 		const transport = new StreamableHTTPServerTransport({
 			sessionIdGenerator: () => randomUUID(),
 			onsessioninitialized: (sessionId: string) => {
@@ -183,6 +188,7 @@ export class StreamableHttpTransport extends BaseTransport {
 				// Create session object and store it immediately
 				const session: Session = {
 					transport,
+					server,
 					metadata: {
 						id: sessionId,
 						connectedAt: new Date(),
@@ -204,24 +210,22 @@ export class StreamableHttpTransport extends BaseTransport {
 			}
 		};
 
-		// Connect to shared server
-		// TODO: When implementing server instancing, create dedicated server here
-		await this.server.connect(transport);
+		// Connect to session-specific server
+		await server.connect(transport);
 
-		// Set up client info capture
-		// TODO: This will need adjustment when server instancing is implemented
-		this.setupClientInfoCapture(transport);
+		// Set up client info capture for this session's server
+		this.setupClientInfoCapture(transport, server);
 
 		return transport;
 	}
 
-	private setupClientInfoCapture(transport: StreamableHTTPServerTransport): void {
+	private setupClientInfoCapture(transport: StreamableHTTPServerTransport, server: McpServer): void {
 		// Intercept the server's initialization handler to capture client info
-		const originalSetHandler = this.server.server.setRequestHandler.bind(this.server.server);
+		const originalSetHandler = server.server.setRequestHandler.bind(server.server);
 		const sessions = this.sessions;
 
 		// Type-safe wrapper that preserves the original signature
-		this.server.server.setRequestHandler = function <T extends ZodObject<{ method: ZodLiteral<string> }>>(
+		server.server.setRequestHandler = function <T extends ZodObject<{ method: ZodLiteral<string> }>>(
 			schema: T,
 			handler: Parameters<typeof originalSetHandler<T>>[1]
 		): void {

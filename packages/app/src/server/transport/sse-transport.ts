@@ -4,9 +4,11 @@ import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import type { ZodObject, ZodLiteral } from 'zod';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 interface SSEConnection {
 	transport: SSEServerTransport;
+	server: McpServer;
 	cleanup: () => Promise<void>;
 	heartbeatInterval?: NodeJS.Timeout;
 	metadata: SessionMetadata;
@@ -71,6 +73,9 @@ export class SseTransport extends BaseTransport {
 				}
 			}
 
+			// Create server instance using factory with request headers
+			const server = this.serverFactory(req.headers as Record<string, string>);
+			
 			// Create new transport
 			const transport = new SSEServerTransport('/message', res);
 			const sessionId = transport.sessionId;
@@ -91,6 +96,7 @@ export class SseTransport extends BaseTransport {
 			// Store connection with metadata
 			const connection: SSEConnection = {
 				transport,
+				server,
 				cleanup,
 				heartbeatInterval,
 				metadata: {
@@ -115,7 +121,7 @@ export class SseTransport extends BaseTransport {
 			});
 
 			// Connect to server with proper cleanup handling
-			await this.connectWithCleanup(transport, sessionId, cleanup);
+			await this.connectWithCleanup(transport, server, sessionId, cleanup);
 
 			logger.debug({ sessionId }, 'SSE transport fully initialized');
 		} catch (error) {
@@ -195,14 +201,15 @@ export class SseTransport extends BaseTransport {
 
 	private async connectWithCleanup(
 		transport: SSEServerTransport,
+		server: McpServer,
 		sessionId: string,
 		cleanup: () => Promise<void>
 	): Promise<void> {
 		try {
-			await this.server.connect(transport);
+			await server.connect(transport);
 
 			// Set up client info capture
-			this.setupClientInfoCapture(transport, sessionId);
+			this.setupClientInfoCapture(transport, server, sessionId);
 		} catch (error) {
 			logger.error({ error, sessionId }, 'Failed to connect transport to server');
 			await cleanup();
@@ -329,13 +336,13 @@ export class SseTransport extends BaseTransport {
 		return !this.isShuttingDown;
 	}
 
-	private setupClientInfoCapture(transport: SSEServerTransport, sessionId: string): void {
+	private setupClientInfoCapture(transport: SSEServerTransport, server: McpServer, sessionId: string): void {
 		// Intercept the server's initialization handler to capture client info
-		const originalSetHandler = this.server.server.setRequestHandler.bind(this.server.server);
+		const originalSetHandler = server.server.setRequestHandler.bind(server.server);
 		const connections = this.sseConnections;
 
 		// Type-safe wrapper that preserves the original signature
-		this.server.server.setRequestHandler = function <T extends ZodObject<{ method: ZodLiteral<string> }>>(
+		server.server.setRequestHandler = function <T extends ZodObject<{ method: ZodLiteral<string> }>>(
 			schema: T,
 			handler: Parameters<typeof originalSetHandler<T>>[1]
 		): void {
