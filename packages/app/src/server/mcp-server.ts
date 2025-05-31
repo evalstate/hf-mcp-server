@@ -30,7 +30,6 @@ import {
 	type DatasetDetailParams,
 } from '@hf-mcp/mcp';
 
-
 import { type TransportType, DEFAULT_WEB_APP_PORT } from '../shared/constants.js';
 
 import { createTransport } from './transport/transport-factory.js';
@@ -83,14 +82,14 @@ export const createServer = async (
 			{ client: clientInfo },
 			`Initialized ${clientInfo?.name || '<unknown>'} ${clientInfo?.version || '<unknown>'}`
 		);
-		
+
 		// Store client info for STDIO connections
 		if (transportType === 'stdio' && clientInfo) {
 			const clientData = {
 				name: clientInfo.name || '<unknown>',
-				version: clientInfo.version || '<unknown>'
+				version: clientInfo.version || '<unknown>',
 			};
-			
+
 			webServerInstance.setClientInfo(clientData);
 		}
 	};
@@ -212,10 +211,6 @@ export const createServer = async (
 	// Configure API endpoints
 	webServerInstance.setupApiRoutes();
 
-	// WebServer handles static files
-	await webServerInstance.setupStaticFiles(isDev);
-
-	// Initialize transport AFTER static files setup but BEFORE server starts
 	let transport: BaseTransport | undefined;
 	if (transportType !== 'unknown') {
 		try {
@@ -227,6 +222,9 @@ export const createServer = async (
 			logger.error({ error }, `Error initializing ${transportType} transport`);
 		}
 	}
+
+	// WebServer handles static files - MUST be after transport routes in dev mode
+	await webServerInstance.setupStaticFiles(isDev);
 
 	const startWebServer = async () => {
 		// WebServer manages its own lifecycle
