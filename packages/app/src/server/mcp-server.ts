@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 
-import express, { type Express } from 'express';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { type Express } from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod';
 import { logger } from './lib/logger.js';
 import { createRequire } from 'module';
 import type { WebServer } from './web-server.js';
+import { McpApiClient } from './lib/mcp-api-client.js';
 
 // Import the search services
 import {
@@ -31,13 +30,11 @@ import {
 	type DatasetDetailParams,
 } from '@hf-mcp/mcp';
 
-import { settingsService, type ToolSettings } from '../shared/settings.js';
 
 import { type TransportType, DEFAULT_WEB_APP_PORT } from '../shared/constants.js';
 
 import { createTransport } from './transport/transport-factory.js';
 import type { BaseTransport } from './transport/base-transport.js';
-import type { Server } from 'net';
 
 interface RegisteredTool {
 	enable: () => void;
@@ -45,29 +42,18 @@ interface RegisteredTool {
 	remove: () => void;
 }
 
-let activeTransport: TransportType = 'unknown';
-let activePort: number | undefined = undefined;
-let activeClientInfo: { name: string; version: string } | null = null;
-
-const maskToken = (token: string): string => {
-	if (!token || token.length <= 9) return token;
-	return `${token.substring(0, 4)}...${token.substring(token.length - 5)}`;
-};
-
+// Utility functions
 const getHfToken = (): string | undefined => {
 	return process.env.HF_TOKEN || process.env.HUGGING_FACE_TOKEN;
 };
 
-const app = express() as Express;
-app.use(express.json());
-let webServer: Server | null = null;
 // Determine if we're in development mode
 const isDev = process.env.NODE_ENV === 'development';
 
 export const createServer = async (
 	transportType: TransportType = 'unknown',
 	webAppPort: number = DEFAULT_WEB_APP_PORT,
-	webServerInstance?: WebServer
+	webServerInstance: WebServer
 ): Promise<{ server: McpServer; cleanup: () => Promise<void>; app: Express }> => {
 	const require = createRequire(import.meta.url);
 	const { version } = require('../../package.json') as { version: string };
@@ -88,8 +74,8 @@ export const createServer = async (
 		}
 	);
 
-	// Use provided WebServer instance or create legacy Express app
-	const appInstance: Express = webServerInstance ? webServerInstance.getApp() : app;
+	// Use provided WebServer instance
+	const appInstance: Express = webServerInstance.getApp();
 
 	server.server.oninitialized = () => {
 		const clientInfo = server.server.getClientVersion();
@@ -105,21 +91,12 @@ export const createServer = async (
 				version: clientInfo.version || '<unknown>'
 			};
 			
-			if (webServerInstance) {
-				webServerInstance.setClientInfo(clientData);
-			} else {
-				activeClientInfo = clientData;
-			}
+			webServerInstance.setClientInfo(clientData);
 		}
 	};
 
 	// Set transport info
-	if (webServerInstance) {
-		webServerInstance.setTransportInfo(transportType, webAppPort);
-	} else {
-		activeTransport = transportType;
-		activePort = webAppPort;
-	}
+	webServerInstance.setTransportInfo(transportType, webAppPort);
 
 	// "Hugging Face Spaces" are known by Qwen2.5/3, Sonnet/Haiku and OpenAI Models
 	const spaceSearchTool = server.tool(
@@ -225,112 +202,20 @@ export const createServer = async (
 		[DATASET_DETAIL_TOOL_CONFIG.name]: datasetDetailTool,
 	};
 
-	// Pass registered tools to WebServer if using it
-	if (webServerInstance) {
-		webServerInstance.setRegisteredTools(registeredTools);
-	}
+	// Pass registered tools to WebServer
+	webServerInstance.setRegisteredTools(registeredTools);
 
-	// Initialize tool state based on settings
-	const initialSettings = settingsService.getSettings();
-	for (const [toolId, toolSettings] of Object.entries(initialSettings.tools)) {
-		if (registeredTools[toolId]) {
-			if (toolSettings.enabled) {
-				registeredTools[toolId].enable();
-				logger.info(`Tool ${toolId} initialized as enabled`);
-			} else {
-				registeredTools[toolId].disable();
-				logger.info(`Tool ${toolId} initialized as disabled`);
-			}
-		}
-	}
+	// Create API client (but don't start polling yet)
+	const apiUrl = `http://localhost:${String(webAppPort)}`;
+	const apiClient = new McpApiClient(apiUrl, 5000); // 5 second polling interval
 
-	// Get the file paths
-	const __filename = fileURLToPath(import.meta.url);
-	const __dirname = path.dirname(__filename);
+	// Configure API endpoints
+	webServerInstance.setupApiRoutes();
 
-	// Define the root directory (important for Vite to find the right files)
-	// In dev mode, we need to point to the source directory, not the dist directory
-	const rootDir = isDev
-		? path.resolve(__dirname, '..', '..', '..', 'app', 'src', 'web') // Go up from dist/server to app/src/web
-		: path.resolve(__dirname, '..', 'web'); // In prod, static files are in dist/web
+	// WebServer handles static files
+	await webServerInstance.setupStaticFiles(isDev);
 
-	// In production, the static files are in the same directory as the server code
-	// Configure API endpoints first (these need to be available in both dev and prod)
-	if (webServerInstance) {
-		// WebServer handles API routes
-		webServerInstance.setupApiRoutes();
-	} else {
-		// Legacy API route setup
-		app.get('/api/transport', (req, res) => {
-			const hfToken = getHfToken();
-
-			// Define the type for transport info with all possible properties
-			interface TransportInfoResponse {
-				transport: TransportType;
-				hfTokenSet: boolean;
-				hfTokenMasked?: string;
-				port?: number;
-				jsonResponseEnabled?: boolean;
-				stdioClient?: {
-					name: string;
-					version: string;
-				} | null;
-			}
-
-			const transportInfo: TransportInfoResponse = {
-				transport: activeTransport,
-				hfTokenSet: !!hfToken,
-			};
-
-			if (hfToken) {
-				transportInfo.hfTokenMasked = maskToken(hfToken);
-			}
-
-			// Set port information for all transports (web app always runs on this port)
-			if (activePort) {
-				transportInfo.port = activePort;
-			}
-
-			// Add JSON response mode info for streamableHttpJson transport type
-			if (activeTransport === 'streamableHttpJson') {
-				transportInfo.jsonResponseEnabled = true;
-			}
-
-			// Add STDIO client info
-			if (activeTransport === 'stdio') {
-				transportInfo.stdioClient = activeClientInfo;
-			}
-
-			res.json(transportInfo);
-		});
-
-		// API endpoint to get settings
-		app.get('/api/settings', (req, res) => {
-			res.json(settingsService.getSettings());
-		});
-
-		// API endpoint to update tool settings
-		app.post('/api/settings/tools/:toolId', express.json(), (req, res) => {
-			const { toolId } = req.params;
-			const settings = req.body as Partial<ToolSettings>;
-			const updatedSettings = settingsService.updateToolSettings(toolId, settings);
-
-			// Enable or disable the actual MCP tool if it exists
-			if (registeredTools[toolId]) {
-				if (settings.enabled) {
-					registeredTools[toolId].enable();
-					logger.info(`Tool ${toolId} has been enabled via API`);
-				} else {
-					registeredTools[toolId].disable();
-					logger.info(`Tool ${toolId} has been disabled via API`);
-				}
-			}
-
-			res.json(updatedSettings);
-		});
-	}
-
-	// Initialize transport based on the transport type
+	// Initialize transport AFTER static files setup but BEFORE server starts
 	let transport: BaseTransport | undefined;
 	if (transportType !== 'unknown') {
 		try {
@@ -343,92 +228,44 @@ export const createServer = async (
 		}
 	}
 
-	// Handle static file serving and SPA navigation based on mode
-	if (!webServerInstance) {
-		// Only setup static files if not using WebServer (legacy mode)
-		if (isDev) {
-			// In development mode, use Vite's dev server middleware
-			try {
-				const { createServer: createViteServer } = await import('vite');
-
-				// Create Vite server with proper HMR configuration - load config from default location
-				const vite = await createViteServer({
-					configFile: path.resolve(__dirname, '..', '..', '..', 'app', 'vite.config.ts'),
-					server: {
-						middlewareMode: true,
-					hmr: true, // Explicitly enable HMR
-				},
-				appType: 'spa',
-				root: rootDir,
-			});
-
-			// Use Vite's middleware for dev server with HMR
-			app.use(vite.middlewares);
-
-			logger.info('Using Vite middleware in development mode with HMR enabled');
-			logger.info({ rootDir }, 'Vite root directory');
-		} catch (err) {
-			logger.error({ err }, 'Error setting up Vite middleware');
-			process.exit(1);
-		}
-	} else {
-		// In production mode, serve static files from dist directory
-		const distPath = rootDir;
-		app.use(express.static(distPath));
-
-		// For any other route in production, serve the index.html file (for SPA navigation)
-		app.get('*', (req, res) => {
-			res.sendFile(path.join(distPath, 'index.html'));
-		});
-	}
-	} else {
-		// WebServer handles static files
-		await webServerInstance.setupStaticFiles(isDev);
-	}
-
 	const startWebServer = async () => {
-		if (webServerInstance) {
-			// WebServer manages its own lifecycle
-			await webServerInstance.start(webAppPort);
-			logger.info(`Server running at http://localhost:${webAppPort.toString()}`);
-			logger.info({ transportType, mode: isDev ? 'development with HMR' : 'production' }, 'Server configuration');
-			if (isDev) {
-				logger.info('HMR is active - frontend changes will be automatically reflected in the browser');
-				logger.info("For server changes, use 'npm run dev:watch' to automatically rebuild and apply changes");
-			}
-		} else if (!webServer) {
-			// Legacy mode
-			webServer = app.listen(webAppPort, () => {
-				logger.info(`Server running at http://localhost:${webAppPort.toString()}`);
-				logger.info({ transportType, mode: isDev ? 'development with HMR' : 'production' }, 'Server configuration');
-				if (isDev) {
-					logger.info('HMR is active - frontend changes will be automatically reflected in the browser');
-					logger.info("For server changes, use 'npm run dev:watch' to automatically rebuild and apply changes");
-				}
-			});
+		// WebServer manages its own lifecycle
+		await webServerInstance.start(webAppPort);
+		logger.info(`Server running at http://localhost:${String(webAppPort)}`);
+		logger.info({ transportType, mode: isDev ? 'development with HMR' : 'production' }, 'Server configuration');
+		if (isDev) {
+			logger.info('HMR is active - frontend changes will be automatically reflected in the browser');
+			logger.info("For server changes, use 'npm run dev:watch' to automatically rebuild and apply changes");
 		}
 	};
 
 	const cleanup = async () => {
-		if (webServerInstance) {
-			logger.info('Shutting down web server...');
-			await webServerInstance.stop();
-		} else if (webServer) {
-			logger.info('Shutting down web server...');
-			// improve mcp server & express shutdown handling
-		}
+		// Stop API polling
+		apiClient.destroy();
+
+		logger.info('Shutting down web server...');
+		await webServerInstance.stop();
 
 		// Clean up transport if initialized
 		if (transport) {
 			await transport.cleanup();
 		}
-		
-		// Clear client info on cleanup for STDIO
-		if (transportType === 'stdio' && !webServerInstance) {
-			activeClientInfo = null;
-		}
 	};
 
 	await startWebServer();
+
+	// Start polling for tool state changes after web server is running
+	await apiClient.startPolling((toolId, enabled) => {
+		if (registeredTools[toolId]) {
+			if (enabled) {
+				registeredTools[toolId].enable();
+				logger.info(`Tool ${toolId} enabled via API polling`);
+			} else {
+				registeredTools[toolId].disable();
+				logger.info(`Tool ${toolId} disabled via API polling`);
+			}
+		}
+	});
+
 	return { server, cleanup, app: appInstance };
 };

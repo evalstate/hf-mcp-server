@@ -27,14 +27,25 @@ async function start() {
 	const { server, cleanup } = await createServer('sse', port, webServer);
 
 	// Handle server shutdown
-	process.on('SIGINT', () => {
+	const shutdown = async () => {
 		logger.info('Shutting down server...');
-		void (async () => {
+		try {
 			await cleanup();
 			await server.close();
 			logger.info('Server shutdown complete');
 			process.exit(0);
-		})();
+		} catch (error) {
+			logger.error({ error }, 'Error during shutdown');
+			process.exit(1);
+		}
+	};
+
+	process.on('SIGINT', () => {
+		void shutdown();
+	});
+
+	process.on('SIGTERM', () => {
+		void shutdown();
 	});
 }
 
