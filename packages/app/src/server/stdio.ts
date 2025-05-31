@@ -41,11 +41,11 @@ async function main() {
 		}
 	};
 
-	process.on('SIGINT', () => {
+	process.once('SIGINT', () => {
 		void shutdown();
 	});
 
-	process.on('SIGTERM', () => {
+	process.once('SIGTERM', () => {
 		void shutdown();
 	});
 }

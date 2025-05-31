@@ -240,6 +240,12 @@ export const createServer = async (
 	const cleanup = async () => {
 		// Stop API polling
 		apiClient.destroy();
+		logger.info('Stopped API polling');
+
+		// Signal transport to stop accepting new connections
+		if (transport?.shutdown) {
+			transport.shutdown();
+		}
 
 		logger.info('Shutting down web server...');
 		await webServerInstance.stop();

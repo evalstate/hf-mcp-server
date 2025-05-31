@@ -91,6 +91,14 @@ export class StatelessHttpTransport extends BaseTransport {
 		}
 	}
 
+	/**
+	 * Mark transport as shutting down
+	 */
+	override shutdown(): void {
+		// Stateless transport doesn't need to reject new connections
+		logger.debug('Stateless HTTP transport shutdown signaled');
+	}
+
 	cleanup(): Promise<void> {
 		// No persistent resources to clean up in stateless mode
 		logger.info('HTTP JSON transport cleanup complete');

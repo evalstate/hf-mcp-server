@@ -1,27 +1,27 @@
-import { BaseTransport, type TransportOptions } from './base-transport.js';
+import { BaseTransport, type TransportOptions, type SessionMetadata, type SessionInfo } from './base-transport.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { logger } from '../lib/logger.js';
-import type { Request, Response, Express } from 'express';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { Request, Response } from 'express';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
+import type { ZodObject, ZodLiteral } from 'zod';
 
 interface SSEConnection {
 	transport: SSEServerTransport;
 	cleanup: () => Promise<void>;
 	heartbeatInterval?: NodeJS.Timeout;
-	createdAt: Date;
-	lastActivity: Date;
+	metadata: SessionMetadata;
 }
 
 export class SseTransport extends BaseTransport {
 	// Store SSE connections with comprehensive metadata
 	private sseConnections: Map<string, SSEConnection> = new Map();
 	private isShuttingDown = false;
+	private staleCheckInterval?: NodeJS.Timeout;
 
-	constructor(server: McpServer, app: Express) {
-		super(server, app);
-		this.setupGracefulShutdown();
-	}
+	// Configuration from environment variables
+	private readonly STALE_CHECK_INTERVAL = parseInt(process.env.MCP_CLIENT_CONNECTION_CHECK || '30000', 10);
+	private readonly STALE_TIMEOUT = parseInt(process.env.MCP_CLIENT_CONNECTION_TIMEOUT || '60000', 10);
+
 
 	async initialize(_options: TransportOptions): Promise<void> {
 		// SSE endpoint for client connections
@@ -34,7 +34,12 @@ export class SseTransport extends BaseTransport {
 			void this.handleSseMessage(req, res);
 		});
 
-		logger.info('SSE transport routes initialized');
+		this.startStaleConnectionCheck();
+
+		logger.info('SSE transport routes initialized', {
+			staleCheckInterval: this.STALE_CHECK_INTERVAL,
+			staleTimeout: this.STALE_TIMEOUT,
+		});
 		return Promise.resolve();
 	}
 
@@ -56,7 +61,7 @@ export class SseTransport extends BaseTransport {
 					logger.warn(
 						{
 							sessionId: existingSessionId,
-							age: Date.now() - existing.createdAt.getTime(),
+							age: Date.now() - existing.metadata.connectedAt.getTime(),
 						},
 						'Client attempting to reconnect with existing sessionId'
 					);
@@ -88,8 +93,12 @@ export class SseTransport extends BaseTransport {
 				transport,
 				cleanup,
 				heartbeatInterval,
-				createdAt: new Date(),
-				lastActivity: new Date(),
+				metadata: {
+					id: sessionId,
+					connectedAt: new Date(),
+					lastActivity: new Date(),
+					capabilities: {},
+				},
 			};
 
 			this.sseConnections.set(sessionId, connection);
@@ -124,9 +133,7 @@ export class SseTransport extends BaseTransport {
 
 			if (!sessionId) {
 				logger.warn('SSE message received without sessionId');
-				res
-					.status(400)
-					.json(JsonRpcErrors.invalidParams('sessionId is required', extractJsonRpcId(req.body)));
+				res.status(400).json(JsonRpcErrors.invalidParams('sessionId is required', extractJsonRpcId(req.body)));
 				return;
 			}
 
@@ -139,7 +146,7 @@ export class SseTransport extends BaseTransport {
 			}
 
 			// Update last activity
-			connection.lastActivity = new Date();
+			connection.metadata.lastActivity = new Date();
 
 			// Handle message with the transport
 			await connection.transport.handlePostMessage(req, res, req.body);
@@ -151,12 +158,7 @@ export class SseTransport extends BaseTransport {
 			if (!res.headersSent) {
 				res
 					.status(500)
-					.json(
-						JsonRpcErrors.internalError(
-							extractJsonRpcId(req.body),
-							'Internal server error handling SSE message'
-						)
-					);
+					.json(JsonRpcErrors.internalError(extractJsonRpcId(req.body), 'Internal server error handling SSE message'));
 			}
 		}
 	}
@@ -198,6 +200,9 @@ export class SseTransport extends BaseTransport {
 	): Promise<void> {
 		try {
 			await this.server.connect(transport);
+
+			// Set up client info capture
+			this.setupClientInfoCapture(transport, sessionId);
 		} catch (error) {
 			logger.error({ error, sessionId }, 'Failed to connect transport to server');
 			await cleanup();
@@ -205,52 +210,40 @@ export class SseTransport extends BaseTransport {
 		}
 	}
 
-	private setupGracefulShutdown(): void {
-		const gracefulShutdown = async (signal: string) => {
-			logger.info(
-				{ signal, activeConnections: this.sseConnections.size },
-				'Received shutdown signal, cleaning up SSE connections'
-			);
+	private startStaleConnectionCheck(): void {
+		this.staleCheckInterval = setInterval(() => {
+			if (this.isShuttingDown) return;
 
-			this.isShuttingDown = true;
+			const now = Date.now();
+			const staleSessionIds: string[] = [];
 
-			// Clean up all connections
-			await this.cleanup();
+			// Find stale sessions
+			for (const [sessionId, connection] of this.sseConnections) {
+				const timeSinceActivity = now - connection.metadata.lastActivity.getTime();
+				if (timeSinceActivity > this.STALE_TIMEOUT) {
+					staleSessionIds.push(sessionId);
+				}
+			}
 
-			logger.info('Graceful shutdown complete');
-		};
+			// Remove stale sessions
+			for (const sessionId of staleSessionIds) {
+				const connection = this.sseConnections.get(sessionId);
+				if (connection) {
+					logger.info(
+						{ sessionId, timeSinceActivity: now - connection.metadata.lastActivity.getTime() },
+						'Removing stale SSE connection'
+					);
+					void this.closeConnection(sessionId);
+				}
+			}
+		}, this.STALE_CHECK_INTERVAL);
+	}
 
-		// Handle various shutdown signals
-		(['SIGINT', 'SIGTERM', 'SIGQUIT'] as const).forEach((signal) => {
-			process.once(signal, () => {
-				gracefulShutdown(signal).catch((error: unknown) => {
-					logger.error({ error }, 'Error during graceful shutdown');
-				});
-			});
-		});
-
-		// Handle uncaught exceptions
-		process.once('uncaughtException', (error: unknown) => {
-			logger.error({ error }, 'Uncaught exception, cleaning up SSE connections');
-			gracefulShutdown('uncaughtException')
-				.then(() => {
-					process.exit(1);
-				})
-				.catch(() => {
-					process.exit(1);
-				});
-		});
-
-		process.once('unhandledRejection', (reason: unknown) => {
-			logger.error({ reason }, 'Unhandled rejection, cleaning up SSE connections');
-			gracefulShutdown('unhandledRejection')
-				.then(() => {
-					process.exit(1);
-				})
-				.catch(() => {
-					process.exit(1);
-				});
-		});
+	/**
+	 * Mark transport as shutting down (called by entry point)
+	 */
+	override shutdown(): void {
+		this.isShuttingDown = true;
 	}
 
 	async cleanup(): Promise<void> {
@@ -260,6 +253,12 @@ export class SseTransport extends BaseTransport {
 			},
 			'Starting SSE transport cleanup'
 		);
+
+		// Stop stale checker
+		if (this.staleCheckInterval) {
+			clearInterval(this.staleCheckInterval);
+			this.staleCheckInterval = undefined;
+		}
 
 		// Get all session IDs to avoid mutation during iteration
 		const sessionIds = Array.from(this.sseConnections.keys());
@@ -284,24 +283,23 @@ export class SseTransport extends BaseTransport {
 	/**
 	 * Get the number of active SSE connections
 	 */
-	getActiveConnectionCount(): number {
+	override getActiveConnectionCount(): number {
 		return this.sseConnections.size;
 	}
 
 	/**
-	 * Get all active session IDs with metadata
+	 * Get all active sessions with metadata
 	 */
-	getActiveConnections(): Array<{
-		sessionId: string;
-		createdAt: Date;
-		lastActivity: Date;
-		age: number;
-	}> {
-		return Array.from(this.sseConnections.entries()).map(([sessionId, conn]) => ({
-			sessionId,
-			createdAt: conn.createdAt,
-			lastActivity: conn.lastActivity,
-			age: Date.now() - conn.createdAt.getTime(),
+	override getActiveSessions(): SessionInfo[] {
+		const now = Date.now();
+
+		return Array.from(this.sseConnections.values()).map((conn) => ({
+			id: conn.metadata.id,
+			connectedAt: conn.metadata.connectedAt.toISOString(),
+			lastActivity: conn.metadata.lastActivity.toISOString(),
+			timeSinceActivity: now - conn.metadata.lastActivity.getTime(),
+			clientInfo: conn.metadata.clientInfo,
+			capabilities: conn.metadata.capabilities,
 		}));
 	}
 
@@ -325,29 +323,79 @@ export class SseTransport extends BaseTransport {
 	}
 
 	/**
-	 * Close stale connections (connections inactive for specified duration)
-	 */
-	async closeStaleConnections(maxInactivityMs: number = 3600000): Promise<number> {
-		const now = Date.now();
-		let closedCount = 0;
-
-		for (const [sessionId, conn] of Array.from(this.sseConnections.entries())) {
-			const inactivityDuration = now - conn.lastActivity.getTime();
-			if (inactivityDuration > maxInactivityMs) {
-				logger.info({ sessionId, inactivityDuration }, 'Closing stale connection');
-				if (await this.closeConnection(sessionId)) {
-					closedCount++;
-				}
-			}
-		}
-
-		return closedCount;
-	}
-
-	/**
 	 * Check if server is accepting new connections
 	 */
 	isAcceptingConnections(): boolean {
 		return !this.isShuttingDown;
+	}
+
+	private setupClientInfoCapture(transport: SSEServerTransport, sessionId: string): void {
+		// Intercept the server's initialization handler to capture client info
+		const originalSetHandler = this.server.server.setRequestHandler.bind(this.server.server);
+		const connections = this.sseConnections;
+
+		// Type-safe wrapper that preserves the original signature
+		this.server.server.setRequestHandler = function <T extends ZodObject<{ method: ZodLiteral<string> }>>(
+			schema: T,
+			handler: Parameters<typeof originalSetHandler<T>>[1]
+		): void {
+			// Check if this is the initialize request handler by examining the method
+			if (schema.shape.method.value === 'initialize') {
+				interface InitRequest {
+					params?: {
+						clientInfo?: { name: string; version: string };
+						capabilities?: {
+							sampling?: unknown;
+							tools?: unknown;
+							resources?: unknown;
+						};
+					};
+				}
+
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				const wrappedHandler = async (request: any, extra: any) => {
+					// Capture client info for this specific transport/session
+					if (connections.has(sessionId)) {
+						const connection = connections.get(sessionId);
+						// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+						if (!connection) return await handler(request, extra);
+
+						const typedRequest = request as InitRequest;
+						if (typedRequest.params?.clientInfo) {
+							connection.metadata.clientInfo = {
+								name: typedRequest.params.clientInfo.name,
+								version: typedRequest.params.clientInfo.version,
+							};
+						}
+
+						if (typedRequest.params?.capabilities) {
+							Object.assign(connection.metadata.capabilities, {
+								sampling: !!typedRequest.params.capabilities.sampling,
+								tools: !!typedRequest.params.capabilities.tools,
+								resources: !!typedRequest.params.capabilities.resources,
+							});
+						}
+
+						logger.info(
+							{
+								sessionId,
+								clientInfo: connection.metadata.clientInfo,
+								capabilities: connection.metadata.capabilities,
+							},
+							'Client info captured'
+						);
+					}
+
+					// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+					return await handler(request, extra);
+				};
+
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+				originalSetHandler(schema, wrappedHandler as any);
+				return;
+			}
+
+			originalSetHandler(schema, handler);
+		};
 	}
 }

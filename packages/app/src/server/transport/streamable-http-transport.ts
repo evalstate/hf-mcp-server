@@ -1,4 +1,4 @@
-import { BaseTransport, type TransportOptions } from './base-transport.js';
+import { BaseTransport, type TransportOptions, type SessionInfo } from './base-transport.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { InMemoryEventStore } from '@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js';
 import { randomUUID } from 'node:crypto';
@@ -31,16 +31,18 @@ export class StreamableHttpTransport extends BaseTransport {
 	private staleCheckInterval?: NodeJS.Timeout;
 	private isShuttingDown = false;
 
-	// Configuration
-	private readonly STALE_CHECK_INTERVAL = 30000; // 30 seconds
-	private readonly STALE_TIMEOUT = 60000; // 60 seconds
+	// Configuration from environment variables
+	private readonly STALE_CHECK_INTERVAL = parseInt(process.env.MCP_CLIENT_CONNECTION_CHECK || '30000', 10);
+	private readonly STALE_TIMEOUT = parseInt(process.env.MCP_CLIENT_CONNECTION_TIMEOUT || '60000', 10);
 
 	initialize(_options: TransportOptions): Promise<void> {
 		this.setupRoutes();
 		this.startStaleConnectionCheck();
-		this.setupGracefulShutdown();
 
-		logger.info('StreamableHTTP transport initialized');
+		logger.info('StreamableHTTP transport initialized', {
+			staleCheckInterval: this.STALE_CHECK_INTERVAL,
+			staleTimeout: this.STALE_TIMEOUT,
+		});
 		return Promise.resolve();
 	}
 
@@ -120,7 +122,11 @@ export class StreamableHttpTransport extends BaseTransport {
 			transport = await this.createSession();
 		} else if (!sessionId) {
 			// No session ID and not an initialization request
-			res.status(400).json(JsonRpcErrors.invalidRequest(extractJsonRpcId(req.body), 'Missing session ID for non-initialization request'));
+			res
+				.status(400)
+				.json(
+					JsonRpcErrors.invalidRequest(extractJsonRpcId(req.body), 'Missing session ID for non-initialization request')
+				);
 			return;
 		} else {
 			// Invalid session ID
@@ -237,7 +243,6 @@ export class StreamableHttpTransport extends BaseTransport {
 					};
 				}
 
-
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				const wrappedHandler = async (request: any, extra: any) => {
 					// Capture client info for this specific transport/session
@@ -326,26 +331,11 @@ export class StreamableHttpTransport extends BaseTransport {
 		}, this.STALE_CHECK_INTERVAL);
 	}
 
-	private setupGracefulShutdown(): void {
-		const shutdown = (signal: string) => {
-			logger.info({ signal, activeSessions: this.sessions.size }, 'Graceful shutdown initiated');
-			this.isShuttingDown = true;
-
-			// Give active requests a moment to complete
-			setTimeout(() => {
-				void this.cleanup().then(() => {
-					logger.info('Shutdown complete');
-					// Let the process manager handle the actual exit
-				});
-			}, 1000);
-		};
-
-		process.once('SIGINT', () => {
-			shutdown('SIGINT');
-		});
-		process.once('SIGTERM', () => {
-			shutdown('SIGTERM');
-		});
+	/**
+	 * Mark transport as shutting down (called by entry point)
+	 */
+	override shutdown(): void {
+		this.isShuttingDown = true;
 	}
 
 	async cleanup(): Promise<void> {
@@ -369,14 +359,7 @@ export class StreamableHttpTransport extends BaseTransport {
 	}
 
 	// Public API for monitoring
-	getActiveSessions(): Array<{
-		id: string;
-		connectedAt: string;
-		lastActivity: string;
-		timeSinceActivity: number;
-		clientInfo?: Session['metadata']['clientInfo'];
-		capabilities: Session['metadata']['capabilities'];
-	}> {
+	override getActiveSessions(): SessionInfo[] {
 		const now = Date.now();
 
 		return Array.from(this.sessions.values()).map((session) => ({
@@ -387,5 +370,19 @@ export class StreamableHttpTransport extends BaseTransport {
 			clientInfo: session.metadata.clientInfo,
 			capabilities: session.metadata.capabilities,
 		}));
+	}
+
+	/**
+	 * Get the number of active connections
+	 */
+	override getActiveConnectionCount(): number {
+		return this.sessions.size;
+	}
+
+	/**
+	 * Check if server is accepting new connections
+	 */
+	isAcceptingConnections(): boolean {
+		return !this.isShuttingDown;
 	}
 }

@@ -20,6 +20,14 @@ export class StdioTransport extends BaseTransport {
 		}
 	}
 
+	/**
+	 * Mark transport as shutting down
+	 */
+	override shutdown(): void {
+		// STDIO doesn't need to reject new connections
+		logger.debug('STDIO transport shutdown signaled');
+	}
+
 	async cleanup(): Promise<void> {
 		// STDIO doesn't require special cleanup
 		logger.info('Cleaning up STDIO transport');
