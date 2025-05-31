@@ -24,22 +24,24 @@ export interface SessionMetadata {
 	};
 	capabilities: {
 		sampling?: boolean;
-		tools?: boolean;
-		resources?: boolean;
+		roots?: boolean;
 	};
 }
 
 /**
- * Standardized session info for monitoring APIs
+ * Base session interface that all transport sessions should extend
+ * This provides common fields while allowing transport-specific extensions
  */
-export interface SessionInfo {
-	id: string;
-	connectedAt: string;
-	lastActivity: string;
-	timeSinceActivity: number;
-	clientInfo?: SessionMetadata['clientInfo'];
-	capabilities: SessionMetadata['capabilities'];
+export interface BaseSession<T = unknown> {
+	transport: T;
+	server: McpServer;
+	metadata: SessionMetadata;
 }
+
+/**
+ * Special constant for stateless transports to distinguish from zero active connections
+ */
+export const STATELESS_MODE = -1;
 
 /**
  * Base class for all transport implementations
@@ -70,14 +72,8 @@ export abstract class BaseTransport {
 	shutdown?(): void;
 
 	/**
-	 * Get active sessions with standardized metadata
-	 * Optional for transports that don't manage sessions
-	 */
-	getActiveSessions?(): SessionInfo[];
-
-	/**
 	 * Get the number of active connections
-	 * Optional for transports that don't manage sessions
+	 * Returns -1 (STATELESS_MODE) for stateless transports
 	 */
-	getActiveConnectionCount?(): number;
+	abstract getActiveConnectionCount(): number;
 }

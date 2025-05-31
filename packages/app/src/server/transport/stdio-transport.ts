@@ -1,23 +1,35 @@
-import { BaseTransport, type TransportOptions } from './base-transport.js';
+import { BaseTransport, type TransportOptions, type BaseSession } from './base-transport.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { logger } from '../lib/logger.js';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+
+type StdioSession = BaseSession<StdioServerTransport>;
 
 /**
  * Implementation of STDIO transport
  */
 export class StdioTransport extends BaseTransport {
-	private transport: StdioServerTransport | null = null;
-	private server: McpServer | null = null;
+	private session: StdioSession | null = null;
 
 	async initialize(_options: TransportOptions): Promise<void> {
-		this.transport = new StdioServerTransport();
+		const transport = new StdioServerTransport();
 		
 		// Create server instance using factory (null headers for STDIO)
-		this.server = this.serverFactory(null);
+		const server = this.serverFactory(null);
+
+		// Create session with metadata tracking
+		this.session = {
+			transport,
+			server,
+			metadata: {
+				id: 'stdio-session',
+				connectedAt: new Date(),
+				lastActivity: new Date(),
+				capabilities: {},
+			},
+		};
 
 		try {
-			await this.server.connect(this.transport);
+			await server.connect(transport);
 			logger.info('STDIO transport initialized');
 		} catch (error) {
 			logger.error({ error }, 'Error connecting STDIO transport');
@@ -34,8 +46,16 @@ export class StdioTransport extends BaseTransport {
 	}
 
 	async cleanup(): Promise<void> {
-		// STDIO doesn't require special cleanup
+		this.session = null;
 		logger.info('Cleaning up STDIO transport');
 		return Promise.resolve();
+	}
+
+
+	/**
+	 * Get the number of active connections
+	 */
+	override getActiveConnectionCount(): number {
+		return this.session ? 1 : 0;
 	}
 }

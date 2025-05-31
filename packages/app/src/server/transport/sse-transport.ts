@@ -1,4 +1,4 @@
-import { BaseTransport, type TransportOptions, type SessionMetadata, type SessionInfo } from './base-transport.js';
+import { BaseTransport, type TransportOptions, type BaseSession } from './base-transport.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
@@ -6,12 +6,9 @@ import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import type { ZodObject, ZodLiteral } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-interface SSEConnection {
-	transport: SSEServerTransport;
-	server: McpServer;
+interface SSEConnection extends BaseSession<SSEServerTransport> {
 	cleanup: () => Promise<void>;
 	heartbeatInterval?: NodeJS.Timeout;
-	metadata: SessionMetadata;
 }
 
 export class SseTransport extends BaseTransport {
@@ -23,7 +20,6 @@ export class SseTransport extends BaseTransport {
 	// Configuration from environment variables
 	private readonly STALE_CHECK_INTERVAL = parseInt(process.env.MCP_CLIENT_CONNECTION_CHECK || '30000', 10);
 	private readonly STALE_TIMEOUT = parseInt(process.env.MCP_CLIENT_CONNECTION_TIMEOUT || '60000', 10);
-
 
 	async initialize(_options: TransportOptions): Promise<void> {
 		// SSE endpoint for client connections
@@ -75,7 +71,7 @@ export class SseTransport extends BaseTransport {
 
 			// Create server instance using factory with request headers
 			const server = this.serverFactory(req.headers as Record<string, string>);
-			
+
 			// Create new transport
 			const transport = new SSEServerTransport('/message', res);
 			const sessionId = transport.sessionId;
@@ -295,22 +291,6 @@ export class SseTransport extends BaseTransport {
 	}
 
 	/**
-	 * Get all active sessions with metadata
-	 */
-	override getActiveSessions(): SessionInfo[] {
-		const now = Date.now();
-
-		return Array.from(this.sseConnections.values()).map((conn) => ({
-			id: conn.metadata.id,
-			connectedAt: conn.metadata.connectedAt.toISOString(),
-			lastActivity: conn.metadata.lastActivity.toISOString(),
-			timeSinceActivity: now - conn.metadata.lastActivity.getTime(),
-			clientInfo: conn.metadata.clientInfo,
-			capabilities: conn.metadata.capabilities,
-		}));
-	}
-
-	/**
 	 * Force close a specific connection
 	 */
 	async closeConnection(sessionId: string): Promise<boolean> {
@@ -353,8 +333,7 @@ export class SseTransport extends BaseTransport {
 						clientInfo?: { name: string; version: string };
 						capabilities?: {
 							sampling?: unknown;
-							tools?: unknown;
-							resources?: unknown;
+							roots?: unknown;
 						};
 					};
 				}
@@ -378,8 +357,7 @@ export class SseTransport extends BaseTransport {
 						if (typedRequest.params?.capabilities) {
 							Object.assign(connection.metadata.capabilities, {
 								sampling: !!typedRequest.params.capabilities.sampling,
-								tools: !!typedRequest.params.capabilities.tools,
-								resources: !!typedRequest.params.capabilities.resources,
+								roots: !!typedRequest.params.capabilities.roots,
 							});
 						}
 

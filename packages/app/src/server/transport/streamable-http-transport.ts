@@ -1,4 +1,4 @@
-import { BaseTransport, type TransportOptions, type SessionInfo } from './base-transport.js';
+import { BaseTransport, type TransportOptions, type BaseSession } from './base-transport.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { randomUUID } from 'node:crypto';
 import type { Request, Response } from 'express';
@@ -8,24 +8,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { ZodObject, ZodLiteral } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-interface Session {
-	transport: StreamableHTTPServerTransport;
-	server: McpServer;
-	metadata: {
-		id: string;
-		connectedAt: Date;
-		lastActivity: Date;
-		capabilities: {
-			sampling?: boolean;
-			tools?: boolean;
-			resources?: boolean;
-		};
-		clientInfo?: {
-			name: string;
-			version: string;
-		};
-	};
-}
+type Session = BaseSession<StreamableHTTPServerTransport>;
 
 export class StreamableHttpTransport extends BaseTransport {
 	private sessions = new Map<string, Session>();
@@ -236,8 +219,7 @@ export class StreamableHttpTransport extends BaseTransport {
 						clientInfo?: { name: string; version: string };
 						capabilities?: {
 							sampling?: unknown;
-							tools?: unknown;
-							resources?: unknown;
+							roots?: unknown;
 						};
 					};
 				}
@@ -262,8 +244,7 @@ export class StreamableHttpTransport extends BaseTransport {
 						if (typedRequest.params?.capabilities) {
 							Object.assign(session.metadata.capabilities, {
 								sampling: !!typedRequest.params.capabilities.sampling,
-								tools: !!typedRequest.params.capabilities.tools,
-								resources: !!typedRequest.params.capabilities.resources,
+								roots: !!typedRequest.params.capabilities.roots,
 							});
 						}
 
@@ -357,19 +338,6 @@ export class StreamableHttpTransport extends BaseTransport {
 		logger.info('StreamableHTTP transport cleanup complete');
 	}
 
-	// Public API for monitoring
-	override getActiveSessions(): SessionInfo[] {
-		const now = Date.now();
-
-		return Array.from(this.sessions.values()).map((session) => ({
-			id: session.metadata.id,
-			connectedAt: session.metadata.connectedAt.toISOString(),
-			lastActivity: session.metadata.lastActivity.toISOString(),
-			timeSinceActivity: now - session.metadata.lastActivity.getTime(),
-			clientInfo: session.metadata.clientInfo,
-			capabilities: session.metadata.capabilities,
-		}));
-	}
 
 	/**
 	 * Get the number of active connections

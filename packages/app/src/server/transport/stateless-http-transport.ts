@@ -1,4 +1,4 @@
-import { BaseTransport, type TransportOptions } from './base-transport.js';
+import { BaseTransport, type TransportOptions, STATELESS_MODE } from './base-transport.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
@@ -115,5 +115,12 @@ export class StatelessHttpTransport extends BaseTransport {
 		// No persistent resources to clean up in stateless mode
 		logger.info('HTTP JSON transport cleanup complete');
 		return Promise.resolve();
+	}
+
+	/**
+	 * Get the number of active connections - returns STATELESS_MODE for stateless transport
+	 */
+	getActiveConnectionCount(): number {
+		return STATELESS_MODE;
 	}
 }
