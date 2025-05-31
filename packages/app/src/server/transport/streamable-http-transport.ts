@@ -1,6 +1,5 @@
 import { BaseTransport, type TransportOptions, type SessionInfo } from './base-transport.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { InMemoryEventStore } from '@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js';
 import { randomUUID } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { logger } from '../lib/logger.js';
@@ -149,10 +148,9 @@ export class StreamableHttpTransport extends BaseTransport {
 			return;
 		}
 
-		// Log resumability attempt
 		const lastEventId = req.headers['last-event-id'];
 		if (lastEventId) {
-			logger.debug({ sessionId, lastEventId }, 'Client reconnecting with Last-Event-ID');
+			logger.warn({ sessionId, lastEventId }, 'Client attempting to result with Last-Event-ID');
 		}
 
 		await session.transport.handleRequest(req, res);
@@ -177,11 +175,8 @@ export class StreamableHttpTransport extends BaseTransport {
 	}
 
 	private async createSession(): Promise<StreamableHTTPServerTransport> {
-		const eventStore = new InMemoryEventStore();
-
 		const transport = new StreamableHTTPServerTransport({
 			sessionIdGenerator: () => randomUUID(),
-			eventStore, // Enable resumability
 			onsessioninitialized: (sessionId: string) => {
 				logger.info({ sessionId }, 'Session initialized');
 

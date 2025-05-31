@@ -7,6 +7,8 @@ Session Resumability:
     StreamableHttp - Not supported
     StatelessHttp - Not supported
 
+
+
 Stateful Transport Connection Management:
 
     MCP_CLIENT_CONNECTION_CHECK
