@@ -17,7 +17,7 @@ export const createTransport = (type: TransportType, server: McpServer, app: Exp
 		case 'sse':
 			return new SseTransport(server, app);
 		case 'streamableHttp':
-			return new StreamableHttpTransport(server, app, false);
+			return new StreamableHttpTransport(server, app);
 		case 'streamableHttpJson':
 			return new StatelessHttpTransport(server, app);
 		default:
