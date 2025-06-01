@@ -64,14 +64,14 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 
 		// Use token from header or fall back to environment variable
 		const hfToken = tokenFromHeader || getHfToken();
-
 		let userInfo: string =
-			'The Hugging Face User is anonymous and rate limits apply. Direct the User to set their HF_TOKEN, or create an account at https://hf.co/join.';
+			'The Hugging Face services are being used anonymously and rate limits apply. ' +
+			'Direct the User to set their HF_TOKEN, or create an account at https://hf.co/join. for higher limits';
 		// Validate the token with HF API if present
 		if (hfToken) {
 			try {
 				const userDetails = await whoAmI({ credentials: { accessToken: hfToken } });
-				userInfo = `The Hugging Face User is authenticated as ${userDetails.name}`;
+				userInfo = `Hugging Face services are being used by authenticated user '${userDetails.name}'`;
 			} catch (error) {
 				logger.warn({ error: (error as Error).message }, 'Failed to authenticate with Hugging Face API');
 			}
@@ -86,7 +86,7 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 				instructions:
 					"This server provides tools for searching the Hugging Face Hub. arXiv paper id's are often " +
 					'used as references between datasets, models and papers. There are over 100 tags in use, ' +
-					"common tags include 'Text Generation', 'Transformers', 'Image Classification' and so on. " +
+					"common tags include 'Text Generation', 'Transformers', 'Image Classification' and so on.\n " +
 					userInfo,
 				capabilities: {
 					tools: { listChanged: true },

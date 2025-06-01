@@ -8,25 +8,25 @@ import type { ApiClientConfig, GradioEndpoint } from '../src/server/lib/mcp-api-
 export const staticTestConfig: ApiClientConfig = {
 	type: 'static',
 	staticSettings: {
-		'huggingface_spaces_search': true,
-		'huggingface_model_search': true,
-		'huggingface_model_detail': false, // Disabled for testing
-		'huggingface_paper_search': true,
-		'huggingface_dataset_search': false, // Disabled for testing
-		'huggingface_dataset_detail': true,
+		huggingface_spaces_search: true,
+		huggingface_model_search: true,
+		huggingface_model_detail: false, // Disabled for testing
+		huggingface_paper_search: true,
+		huggingface_dataset_search: false, // Disabled for testing
+		huggingface_dataset_detail: true,
 	},
 	staticGradioEndpoints: [
 		{
 			name: 'Text Generation',
 			url: 'https://huggingface.co/spaces/huggingface/text-generation-inference',
-			description: 'High-performance text generation API'
+			description: 'High-performance text generation API',
 		},
 		{
 			name: 'Image Classification',
 			url: 'https://huggingface.co/spaces/huggingface/image-classification',
-			description: 'Classify images using various models'
-		}
-	]
+			description: 'Classify images using various models',
+		},
+	],
 };
 
 // 2. Local polling configuration (current default behavior)
@@ -40,7 +40,6 @@ export const localPollingConfig: ApiClientConfig = {
 export const externalApiConfig: ApiClientConfig = {
 	type: 'external',
 	externalUrl: 'https://api.huggingface.co/v1/mcp/settings',
-	hfToken: process.env.HF_TOKEN, // Will use Bearer token authentication
 	pollInterval: 30000, // 30 seconds for external API
 };
 
