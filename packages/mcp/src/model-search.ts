@@ -175,7 +175,10 @@ function formatSearchResults(models: ExtendedModelEntry[], params: Partial<Model
 
 	const searchDesc = searchTerms.length > 0 ? ` matching ${searchTerms.join(', ')}` : '';
 
-	r.push(`Found ${models.length.toString()} models${searchDesc}:`);
+	const resultText = models.length === params.limit 
+		? `Showing first ${models.length} models${searchDesc}:`
+		: `Found ${models.length} models${searchDesc}:`;
+	r.push(resultText);
 	r.push('');
 
 	for (const model of models) {

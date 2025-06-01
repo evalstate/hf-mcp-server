@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
-import { createServer } from './mcp-server.js';
+import { Application } from './application.js';
+import { WebServer } from './web-server.js';
 import { DEFAULT_WEB_APP_PORT } from '../shared/constants.js';
 import { parseArgs } from 'node:util';
+import { logger } from './lib/logger.js';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -13,9 +15,9 @@ const { values } = parseArgs({
 	args: process.argv.slice(2),
 });
 
-console.error('Starting Streamable HTTP server...');
+logger.info('Starting Streamable HTTP server...');
 if (values.json) {
-	console.error('JSON response mode enabled');
+	logger.info('JSON response mode enabled');
 }
 
 // Set development mode environment variable
@@ -30,23 +32,43 @@ async function start() {
 	// Choose the appropriate transport type based on JSON mode
 	const transportType = useJsonMode ? 'streamableHttpJson' : 'streamableHttp';
 
-	const { server, cleanup } = await createServer(transportType, port);
+	// Create WebServer instance
+	const webServer = new WebServer();
+
+	// Create Application instance
+	const app = new Application({
+		transportType,
+		webAppPort: port,
+		webServerInstance: webServer,
+	});
+
+	// Start the application
+	await app.start();
 
 	// Handle server shutdown
-	process.on('SIGINT', () => {
-		console.log('Shutting down server...');
-		// Use void to explicitly ignore the promise
-		void (async () => {
-			await cleanup();
-			await server.close();
-			console.log('Server shutdown complete');
+	const shutdown = async () => {
+		logger.info('Shutting down server...');
+		try {
+			await app.stop();
+			logger.info('Server shutdown complete');
 			process.exit(0);
-		})();
+		} catch (error) {
+			logger.error({ error }, 'Error during shutdown');
+			process.exit(1);
+		}
+	};
+
+	process.once('SIGINT', () => {
+		void shutdown();
+	});
+
+	process.once('SIGTERM', () => {
+		void shutdown();
 	});
 }
 
 // Run the async start function
 start().catch((error: unknown) => {
-	console.error('Server startup error:', error);
+	logger.error({ error }, 'Server startup error');
 	process.exit(1);
 });

@@ -66,11 +66,11 @@ export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SpaceSearchRes
 	 * @param limit Maximum number of results to return
 	 * @returns An array of search results
 	 */
-	async search(query: string, limit: number = RESULTS_TO_RETURN, mcp: boolean = false): Promise<SpaceSearchResult[]> {
+	async search(query: string, limit: number = RESULTS_TO_RETURN, mcp: boolean = false): Promise<{ results: SpaceSearchResult[], totalCount: number }> {
 		try {
 			// Validate input before making API call
 			if (!query) {
-				return [];
+				return { results: [], totalCount: 0 };
 			}
 
 			// Prepare API parameters, adding the filter if mcp is true
@@ -82,7 +82,7 @@ export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SpaceSearchRes
 
 			const results = await this.callApi<SpaceSearchResult[]>(params);
 
-			return results.slice(0, limit);
+			return { results: results.slice(0, limit), totalCount: results.length };
 		} catch (error) {
 			if (error instanceof Error) {
 				throw new Error(`Failed to search for spaces: ${error.message}`);
@@ -102,12 +102,15 @@ export type SearchParams = z.infer<typeof SEMANTIC_SEARCH_TOOL_CONFIG.schema>;
  * @param results The search results to format
  * @returns A markdown formatted string with the search results
  */
-export const formatSearchResults = (query: string, results: SpaceSearchResult[]): string => {
+export const formatSearchResults = (query: string, results: SpaceSearchResult[], totalCount: number): string => {
 	if (results.length === 0) {
 		return `No matching Hugging Face Spaces found for the query '${query}'. Try a different query.`;
 	}
 
-	let markdown = `# Space Search Results for the query '${query}'\n\n`;
+	const showingText = results.length < totalCount 
+		? `Showing ${results.length} of ${totalCount} results`
+		: `All ${results.length} results`;
+	let markdown = `# Space Search Results for the query '${query}' (${showingText})\n\n`;
 	markdown += '| Space | Description | Author | ID | Category |  Likes | Trending Score | Relevance |\n';
 	markdown += '|-------|-------------|--------|----|----------|--------|----------------|-----------|\n';
 

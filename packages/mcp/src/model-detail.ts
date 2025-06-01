@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { modelInfo } from '@huggingface/hub';
 import { formatDate, formatNumber } from './model-utils.js';
 
+const SPACES_TO_INCLUDE = 12;
 // Model Detail Tool Configuration
 export const MODEL_DETAIL_TOOL_CONFIG = {
 	name: 'model_detail',
@@ -340,13 +341,13 @@ function formatModelDetails(model: ModelInformation): string {
 	// Spaces - processed with validation
 	if (model.spaces && model.spaces.length > 0) {
 		r.push('## Demo Spaces');
-		for (const space of model.spaces.slice(0, 5)) {
+		for (const space of model.spaces.slice(0, SPACES_TO_INCLUDE)) {
 			const title = space.title || space.name;
 			r.push(`- [${title}](https://hf.co/spaces/${space.id})`);
 		}
 
-		if (model.spaces.length > 5) {
-			r.push(`- *... and ${(model.spaces.length - 5).toString()} more spaces*`);
+		if (model.spaces.length > SPACES_TO_INCLUDE) {
+			r.push(`- *... and ${(model.spaces.length - SPACES_TO_INCLUDE).toString()} more spaces*`);
 		}
 		r.push('');
 	}
