@@ -159,7 +159,10 @@ function formatSearchResults(datasets: ExtendedDatasetEntry[], params: Partial<D
 
 	const searchDesc = searchTerms.length > 0 ? ` matching ${searchTerms.join(', ')}` : '';
 
-	r.push(`Found ${datasets.length.toString()} datasets${searchDesc}:`);
+	const resultText = datasets.length === params.limit 
+		? `Showing first ${datasets.length} datasets${searchDesc}:`
+		: `Found ${datasets.length} datasets${searchDesc}:`;
+	r.push(resultText);
 	r.push('');
 
 	for (const dataset of datasets) {

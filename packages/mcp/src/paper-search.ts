@@ -10,6 +10,10 @@ import { HfApiCall } from './hf-api-call.js';
 // can we link to Collections, Datasets, Models, Spaces?
 // Create a schema validator for search parameters
 
+// 80 papers in full mode is ~ 35,000 tokens
+// 105 papers in summary mode is ~ 23094 tokens
+// 105 papers in full mode is ~ 45797 tokens
+
 export const PaperSearchDescription = 'Search Hugging Face for Machine Learning research papers.';
 
 export const DEFAULT_AUTHORS_TO_SHOW = 8;
@@ -23,7 +27,14 @@ export const PAPER_SEARCH_TOOL_CONFIG = {
 		'Consider whether tabulating results matches user intent.',
 	schema: z.object({
 		query: z.string().min(3, 'Supply at least one search term').max(200, 'Query too long').describe('Search query'),
-		limit: z.number().optional().default(10).describe('Number of results to return'),
+		results_limit: z.number().optional().default(12).describe('Number of results to return'),
+		concise_only: z
+			.boolean()
+			.optional()
+			.default(false)
+			.describe(
+				'Return a 2 sentence summary of the abstract. Use for very broad search terms and using a high results limit. Check with User if unsure.'
+			),
 	}),
 	annotations: {
 		title: 'Paper Search',
@@ -48,6 +59,7 @@ interface Paper {
 	summary?: string;
 	upvotes?: number;
 	ai_keywords?: string[];
+	ai_summary?: string;
 }
 
 export interface PaperSearchResult {
@@ -80,14 +92,14 @@ export class PaperSearchTool extends HfApiCall<PaperSearchParams, PaperSearchRes
 	 * @param limit Maximum number of results to return
 	 * @returns Formatted string with paper information
 	 */
-	async search(query: string, limit: number = RESULTS_TO_RETURN): Promise<string> {
+	async search(query: string, limit: number = RESULTS_TO_RETURN, conciseOnly: boolean = false): Promise<string> {
 		try {
 			if (!query) return 'No query';
 
 			const papers = await this.callApi<PaperSearchResult[]>({ q: query });
 
 			if (papers.length === 0) return `No papers found for query '${query}'`;
-			return formatSearchResults(query, papers.slice(0, limit));
+			return formatSearchResults(query, papers.slice(0, limit), papers.length, conciseOnly);
 		} catch (error) {
 			if (error instanceof Error) {
 				throw new Error(`Failed to search for papers: ${error.message}`);
@@ -97,11 +109,21 @@ export class PaperSearchTool extends HfApiCall<PaperSearchParams, PaperSearchRes
 	}
 }
 
-function formatSearchResults(query: string, papers: PaperSearchResult[]): string {
+function formatSearchResults(
+	query: string,
+	papers: PaperSearchResult[],
+	totalCount: number,
+	conciseOnly: boolean = false
+): string {
 	const r: string[] = [];
-	r.push(`The following papers matched the query ${query}`);
+	const showingText =
+		papers.length < totalCount
+			? `Showing ${papers.length} of ${totalCount} papers that matched the query '${query}'`
+			: `All ${papers.length} papers that matched the query '${query}'`;
+	r.push(showingText);
 
 	for (const result of papers) {
+		r.push('');
 		r.push('---');
 		const title = result.paper.title ?? `Paper ID ${result.paper.id}`;
 		r.push('');
@@ -110,9 +132,14 @@ function formatSearchResults(query: string, papers: PaperSearchResult[]): string
 		r.push(published(result.paper.publishedAt));
 		r.push(authors(result.paper.authors));
 		r.push('');
-		r.push('### Abstract');
+		// Handle concise_only option: use ai_summary when enabled, or fallback to ai_summary if summary is blank
+		const useAiSummary = conciseOnly || !result.paper.summary;
+		const summaryText = useAiSummary ? result.paper.ai_summary : result.paper.summary;
+		const summaryHeader = useAiSummary ? '### AI Generated Summary' : '### Abstract';
+
+		r.push(summaryHeader);
 		r.push('');
-		r.push(result.paper.summary ?? 'No abstract available');
+		r.push(summaryText ?? 'No summary available');
 		r.push('');
 		r.push(result.paper.ai_keywords ? `**AI Keywords**: ${result.paper.ai_keywords.join(', ')}` : '');
 
@@ -131,6 +158,7 @@ function formatSearchResults(query: string, papers: PaperSearchResult[]): string
 
 		r.push(`**Link to paper:** [https://hf.co/papers/${result.paper.id}](https://hf.co/papers/${result.paper.id})`);
 	}
+	r.push('');
 	r.push('---');
 	return r.join('\n');
 }

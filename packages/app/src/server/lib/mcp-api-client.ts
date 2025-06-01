@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events';
 import { logger } from './logger.js';
 import type { AppSettings } from '../../shared/settings.js';
 
@@ -24,7 +25,7 @@ export interface ApiClientConfig {
     hfToken?: string;
 }
 
-export class McpApiClient {
+export class McpApiClient extends EventEmitter {
     private config: ApiClientConfig;
     private pollTimer: NodeJS.Timeout | null = null;
     private cache: Map<string, boolean> = new Map();
@@ -32,6 +33,7 @@ export class McpApiClient {
     private isPolling = false;
 
     constructor(config: ApiClientConfig) {
+        super();
         this.config = config;
         
         // Initialize static data if provided
@@ -171,6 +173,8 @@ export class McpApiClient {
                     logger.info(`Tool ${toolId} state changed: ${String(cachedState)} -> ${String(enabled)}`);
                     this.cache.set(toolId, enabled);
                     onUpdate(toolId, enabled);
+                    // Emit event for any listening servers
+                    this.emit('toolStateChange', toolId, enabled);
                 }
             }
 
@@ -233,6 +237,24 @@ export class McpApiClient {
             logger.error({ error }, `Error updating tool ${toolId} state`);
             return false;
         }
+    }
+
+    /**
+     * Get cached tool state synchronously (for use during server creation)
+     */
+    getCachedToolState(toolId: string): boolean {
+        return this.cache.get(toolId) ?? true; // Default to enabled if not in cache
+    }
+
+    /**
+     * Get all cached tool states synchronously
+     */
+    getCachedToolStates(): Record<string, boolean> {
+        const states: Record<string, boolean> = {};
+        for (const [toolId, enabled] of this.cache.entries()) {
+            states[toolId] = enabled;
+        }
+        return states;
     }
 
     destroy(): void {

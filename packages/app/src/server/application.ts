@@ -6,6 +6,14 @@ import type { WebServer } from './web-server.js';
 import { logger } from './lib/logger.js';
 import { createServerFactory } from './mcp-server.js';
 import { McpApiClient, type ApiClientConfig } from './lib/mcp-api-client.js';
+import {
+	SEMANTIC_SEARCH_TOOL_CONFIG,
+	MODEL_SEARCH_TOOL_CONFIG,
+	MODEL_DETAIL_TOOL_CONFIG,
+	PAPER_SEARCH_TOOL_CONFIG,
+	DATASET_SEARCH_TOOL_CONFIG,
+	DATASET_DETAIL_TOOL_CONFIG,
+} from '@hf-mcp/mcp';
 
 export interface ApplicationOptions {
 	transportType: TransportType;
@@ -76,12 +84,12 @@ export class Application {
 		// In a full implementation, tool enable/disable would be managed differently
 		const registeredTools: { [toolId: string]: { enable: () => void; disable: () => void; remove: () => void } } = {};
 		const toolNames = [
-			'huggingface_spaces_search',
-			'huggingface_model_search', 
-			'huggingface_model_detail',
-			'huggingface_paper_search',
-			'huggingface_dataset_search',
-			'huggingface_dataset_detail',
+			SEMANTIC_SEARCH_TOOL_CONFIG.name,
+			MODEL_SEARCH_TOOL_CONFIG.name,
+			MODEL_DETAIL_TOOL_CONFIG.name,
+			PAPER_SEARCH_TOOL_CONFIG.name,
+			DATASET_SEARCH_TOOL_CONFIG.name,
+			DATASET_DETAIL_TOOL_CONFIG.name,
 		];
 		
 		// Create placeholder registered tools for web server compatibility

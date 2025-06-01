@@ -29,6 +29,11 @@ import type { McpApiClient } from './lib/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
 import { logger } from './lib/logger.js';
 
+interface Tool {
+	enable(): void;
+	disable(): void;
+}
+
 // Utility functions
 const getHfToken = (): string | undefined => {
 	return process.env.HF_TOKEN || process.env.HUGGING_FACE_TOKEN;
@@ -38,7 +43,7 @@ const getHfToken = (): string | undefined => {
  * Creates a ServerFactory function that produces McpServer instances with all tools registered
  * The shared ApiClient provides global tool state management across all server instances
  */
-export const createServerFactory = (webServerInstance: WebServer, _sharedApiClient: McpApiClient): ServerFactory => {
+export const createServerFactory = (webServerInstance: WebServer, sharedApiClient: McpApiClient): ServerFactory => {
 	const require = createRequire(import.meta.url);
 	const { version } = require('../../package.json') as { version: string };
 
@@ -79,30 +84,26 @@ export const createServerFactory = (webServerInstance: WebServer, _sharedApiClie
 			// Tool state management is now handled globally at the Application level
 		};
 
-		// For now, register all tools as enabled
-		// TODO: In a future version, implement dynamic tool enable/disable based on shared state
-		// This would require either:
-		// 1. Polling the shared state during tool execution, or
-		// 2. Implementing a tool registry that can be modified at runtime
-
-		// Register all tools on this server instance
+		// Always register all tools and store instances for dynamic control
+		const toolInstances: { [toolId: string]: Tool } = {};
+		logger.info('Registering all tools for server instance');
 		const hfToken = getHfToken();
 
-		server.tool(
+		toolInstances[SEMANTIC_SEARCH_TOOL_CONFIG.name] = server.tool(
 			SEMANTIC_SEARCH_TOOL_CONFIG.name,
 			SEMANTIC_SEARCH_TOOL_CONFIG.description,
 			SEMANTIC_SEARCH_TOOL_CONFIG.schema.shape,
 			SEMANTIC_SEARCH_TOOL_CONFIG.annotations,
 			async (params: SearchParams) => {
 				const semanticSearch = new SpaceSearchTool(hfToken);
-				const results = await semanticSearch.search(params.query, params.limit, params.mcp);
+				const searchResult = await semanticSearch.search(params.query, params.limit, params.mcp);
 				return {
-					content: [{ type: 'text', text: formatSearchResults(params.query, results) }],
+					content: [{ type: 'text', text: formatSearchResults(params.query, searchResult.results, searchResult.totalCount) }],
 				};
 			}
 		);
 
-		server.tool(
+		toolInstances[MODEL_SEARCH_TOOL_CONFIG.name] = server.tool(
 			MODEL_SEARCH_TOOL_CONFIG.name,
 			MODEL_SEARCH_TOOL_CONFIG.description,
 			MODEL_SEARCH_TOOL_CONFIG.schema.shape,
@@ -116,7 +117,7 @@ export const createServerFactory = (webServerInstance: WebServer, _sharedApiClie
 			}
 		);
 
-		server.tool(
+		toolInstances[MODEL_DETAIL_TOOL_CONFIG.name] = server.tool(
 			MODEL_DETAIL_TOOL_CONFIG.name,
 			MODEL_DETAIL_TOOL_CONFIG.description,
 			MODEL_DETAIL_TOOL_CONFIG.schema.shape,
@@ -130,20 +131,20 @@ export const createServerFactory = (webServerInstance: WebServer, _sharedApiClie
 			}
 		);
 
-		server.tool(
+		toolInstances[PAPER_SEARCH_TOOL_CONFIG.name] = server.tool(
 			PAPER_SEARCH_TOOL_CONFIG.name,
 			PAPER_SEARCH_TOOL_CONFIG.description,
 			PAPER_SEARCH_TOOL_CONFIG.schema.shape,
 			PAPER_SEARCH_TOOL_CONFIG.annotations,
 			async (params: z.infer<typeof PAPER_SEARCH_TOOL_CONFIG.schema>) => {
-				const results = await new PaperSearchTool(hfToken).search(params.query, params.limit);
+				const results = await new PaperSearchTool(hfToken).search(params.query, params.results_limit, params.concise_only);
 				return {
 					content: [{ type: 'text', text: results }],
 				};
 			}
 		);
 
-		server.tool(
+		toolInstances[DATASET_SEARCH_TOOL_CONFIG.name] = server.tool(
 			DATASET_SEARCH_TOOL_CONFIG.name,
 			DATASET_SEARCH_TOOL_CONFIG.description,
 			DATASET_SEARCH_TOOL_CONFIG.schema.shape,
@@ -157,7 +158,7 @@ export const createServerFactory = (webServerInstance: WebServer, _sharedApiClie
 			}
 		);
 
-		server.tool(
+		toolInstances[DATASET_DETAIL_TOOL_CONFIG.name] = server.tool(
 			DATASET_DETAIL_TOOL_CONFIG.name,
 			DATASET_DETAIL_TOOL_CONFIG.description,
 			DATASET_DETAIL_TOOL_CONFIG.schema.shape,
@@ -170,6 +171,31 @@ export const createServerFactory = (webServerInstance: WebServer, _sharedApiClie
 				};
 			}
 		);
+
+		// Apply initial tool states based on current settings
+		for (const [toolName, toolInstance] of Object.entries(toolInstances)) {
+			const isEnabled = sharedApiClient.getCachedToolState(toolName);
+			if (!isEnabled) {
+				toolInstance.disable();
+				logger.debug({ toolName }, 'Tool disabled based on initial settings');
+			}
+		}
+
+		// Set up event listener for dynamic tool state changes
+		sharedApiClient.on('toolStateChange', (toolId: string, enabled: boolean) => {
+			const toolInstance = toolInstances[toolId];
+			if (toolInstance) {
+				if (enabled) {
+					toolInstance.enable();
+					logger.info({ toolId }, 'Tool enabled via API event');
+				} else {
+					toolInstance.disable();
+					logger.info({ toolId }, 'Tool disabled via API event');
+				}
+			} else {
+				logger.warn({ toolId }, 'Received tool state change for unknown tool');
+			}
+		});
 
 		return server;
 	};
