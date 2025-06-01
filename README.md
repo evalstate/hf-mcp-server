@@ -47,12 +47,12 @@ docker build -t hf-mcp-server .
 
 Run with default settings (Streaming HTTP JSON Mode), Dashboard on Port 3000:
 ```bash
-docker run --rm -p 3000:3000 -e HF_TOKEN=hf_xxx hf-mcp-server
+docker run --rm -p 3000:3000 -e DEFAULT_HF_TOKEN=hf_xxx hf-mcp-server
 ```
 
 Run STDIO MCP Server:
 ```bash
-docker run -i --rm -e TRANSPORT=stdio -p 3000:3000 -e HF_TOKEN=hf_xxx hf-mcp-server
+docker run -i --rm -e TRANSPORT=stdio -p 3000:3000 -e DEFAULT_HF_TOKEN=hf_xxx hf-mcp-server
 ```
 
 `TRANSPORT` can be `stdio`, `sse`, `streamingHttp` or `streamingHttpJson` (default).
@@ -68,4 +68,5 @@ The different transport types use the following endpoints:
 
 The server respects the following environment variables:
 - `TRANSPORT`: The transport type to use (stdio, sse, streamableHttp, or streamableHttpJson)
-- `HF_TOKEN`: Your Hugging Face API token
+- `DEFAULT_HF_TOKEN`: ⚠️ Requests are serviced with the HF_TOKEN received in the Authorization: Bearer header. The DEFAULT_HF_TOKEN is used if no header was sent. Only set this in Development / Test environments or for local STDIO Deployments. ⚠️
+

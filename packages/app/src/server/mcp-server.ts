@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod';
 import { createRequire } from 'module';
+import { whoAmI } from '@huggingface/hub';
 
 // Import the search services
 import {
@@ -22,6 +23,10 @@ import {
 	DatasetDetailTool,
 	DATASET_DETAIL_TOOL_CONFIG,
 	type DatasetDetailParams,
+	DuplicateSpaceTool,
+	DUPLICATE_SPACE_TOOL_CONFIG,
+	formatDuplicateResult,
+	type DuplicateSpaceParams,
 } from '@hf-mcp/mcp';
 
 import type { ServerFactory } from './transport/base-transport.js';
@@ -36,7 +41,7 @@ interface Tool {
 
 // Utility functions
 const getHfToken = (): string | undefined => {
-	return process.env.HF_TOKEN || process.env.HUGGING_FACE_TOKEN;
+	return process.env.DEFAULT_HF_TOKEN;
 };
 
 /**
@@ -47,7 +52,31 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 	const require = createRequire(import.meta.url);
 	const { version } = require('../../package.json') as { version: string };
 
-	return (headers: Record<string, string> | null): McpServer => {
+	return async (headers: Record<string, string> | null): Promise<McpServer> => {
+		let tokenFromHeader: string | undefined;
+		if (headers && 'authorization' in headers) {
+			const authHeader = headers.authorization || '';
+			const match = authHeader.match(/^Bearer\s+(.+)$/i);
+			if (match) {
+				tokenFromHeader = match[1];
+			}
+		}
+
+		// Use token from header or fall back to environment variable
+		const hfToken = tokenFromHeader || getHfToken();
+
+		let userInfo: string =
+			'The Hugging Face User is anonymous and rate limits apply. Direct the User to set their HF_TOKEN, or create an account at https://hf.co/join.';
+		// Validate the token with HF API if present
+		if (hfToken) {
+			try {
+				const userDetails = await whoAmI({ credentials: { accessToken: hfToken } });
+				userInfo = `The Hugging Face User is authenticated as ${userDetails.name}`;
+			} catch (error) {
+				logger.warn({ error: (error as Error).message }, 'Failed to authenticate with Hugging Face API');
+			}
+		}
+
 		const server = new McpServer(
 			{
 				name: '@huggingface/mcp-services',
@@ -57,7 +86,8 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 				instructions:
 					"This server provides tools for searching the Hugging Face Hub. arXiv paper id's are often " +
 					'used as references between datasets, models and papers. There are over 100 tags in use, ' +
-					"common tags include 'Text Generation', 'Transformers', 'Image Classification' and so on.",
+					"common tags include 'Text Generation', 'Transformers', 'Image Classification' and so on. " +
+					userInfo,
 				capabilities: {
 					tools: { listChanged: true },
 				},
@@ -87,7 +117,6 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 		// Always register all tools and store instances for dynamic control
 		const toolInstances: { [toolId: string]: Tool } = {};
 		logger.info('Registering all tools for server instance');
-		const hfToken = getHfToken();
 
 		toolInstances[SEMANTIC_SEARCH_TOOL_CONFIG.name] = server.tool(
 			SEMANTIC_SEARCH_TOOL_CONFIG.name,
@@ -98,7 +127,9 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 				const semanticSearch = new SpaceSearchTool(hfToken);
 				const searchResult = await semanticSearch.search(params.query, params.limit, params.mcp);
 				return {
-					content: [{ type: 'text', text: formatSearchResults(params.query, searchResult.results, searchResult.totalCount) }],
+					content: [
+						{ type: 'text', text: formatSearchResults(params.query, searchResult.results, searchResult.totalCount) },
+					],
 				};
 			}
 		);
@@ -137,7 +168,11 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 			PAPER_SEARCH_TOOL_CONFIG.schema.shape,
 			PAPER_SEARCH_TOOL_CONFIG.annotations,
 			async (params: z.infer<typeof PAPER_SEARCH_TOOL_CONFIG.schema>) => {
-				const results = await new PaperSearchTool(hfToken).search(params.query, params.results_limit, params.concise_only);
+				const results = await new PaperSearchTool(hfToken).search(
+					params.query,
+					params.results_limit,
+					params.concise_only
+				);
 				return {
 					content: [{ type: 'text', text: results }],
 				};
@@ -168,6 +203,20 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 				const results = await datasetDetail.getDetails(params.dataset_id);
 				return {
 					content: [{ type: 'text', text: results }],
+				};
+			}
+		);
+
+		toolInstances[DUPLICATE_SPACE_TOOL_CONFIG.name] = server.tool(
+			DUPLICATE_SPACE_TOOL_CONFIG.name,
+			DUPLICATE_SPACE_TOOL_CONFIG.description,
+			DUPLICATE_SPACE_TOOL_CONFIG.schema.shape,
+			DUPLICATE_SPACE_TOOL_CONFIG.annotations,
+			async (params: DuplicateSpaceParams) => {
+				const duplicateSpace = new DuplicateSpaceTool(hfToken);
+				const result = await duplicateSpace.duplicate(params);
+				return {
+					content: [{ type: 'text', text: formatDuplicateResult(result) }],
 				};
 			}
 		);

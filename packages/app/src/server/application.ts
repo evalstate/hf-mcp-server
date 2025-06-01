@@ -1,5 +1,6 @@
 import { type Express } from 'express';
 import { type TransportType } from '../shared/constants.js';
+import type { TransportInfo } from '../shared/transport-info.js';
 import { createTransport } from './transport/transport-factory.js';
 import type { BaseTransport, ServerFactory } from './transport/base-transport.js';
 import type { WebServer } from './web-server.js';
@@ -13,6 +14,7 @@ import {
 	PAPER_SEARCH_TOOL_CONFIG,
 	DATASET_SEARCH_TOOL_CONFIG,
 	DATASET_DETAIL_TOOL_CONFIG,
+	DUPLICATE_SPACE_TOOL_CONFIG,
 } from '@hf-mcp/mcp';
 
 export interface ApplicationOptions {
@@ -40,7 +42,7 @@ export class Application {
 		this.webAppPort = options.webAppPort;
 		this.webServerInstance = options.webServerInstance;
 		this.isDev = process.env.NODE_ENV === 'development';
-		
+
 		// Configure API client
 		const apiClientConfig: ApiClientConfig = options.apiClientConfig || {
 			type: 'polling',
@@ -48,17 +50,26 @@ export class Application {
 			pollInterval: 5000,
 		};
 		this.apiClient = new McpApiClient(apiClientConfig);
-		
+
 		// Create the server factory
 		this.serverFactory = createServerFactory(this.webServerInstance, this.apiClient);
-		
+
 		// Get Express app instance
 		this.appInstance = this.webServerInstance.getApp();
 	}
 
 	async start(): Promise<void> {
 		// Set transport info
-		this.webServerInstance.setTransportInfo(this.transportType, this.webAppPort);
+		const defaultHfToken = process.env.DEFAULT_HF_TOKEN;
+		const transportInfo: TransportInfo = {
+			transport: this.transportType,
+			port: this.webAppPort,
+			defaultHfTokenSet: !!defaultHfToken,
+			hfTokenMasked: defaultHfToken ? this.maskToken(defaultHfToken) : undefined,
+			jsonResponseEnabled: this.transportType === 'streamableHttpJson',
+			stdioClient: this.transportType === 'stdio' ? null : undefined,
+		};
+		this.webServerInstance.setTransportInfo(transportInfo);
 
 		// Setup tool management for web server
 		this.setupToolManagement();
@@ -82,7 +93,7 @@ export class Application {
 	private setupToolManagement(): void {
 		// For web server tool management, create placeholder registered tools
 		// In a full implementation, tool enable/disable would be managed differently
-		const registeredTools: { [toolId: string]: { enable: () => void; disable: () => void; remove: () => void } } = {};
+		const registeredTools: { [toolId: string]: { enable: () => void; disable: () => void } } = {};
 		const toolNames = [
 			SEMANTIC_SEARCH_TOOL_CONFIG.name,
 			MODEL_SEARCH_TOOL_CONFIG.name,
@@ -90,14 +101,18 @@ export class Application {
 			PAPER_SEARCH_TOOL_CONFIG.name,
 			DATASET_SEARCH_TOOL_CONFIG.name,
 			DATASET_DETAIL_TOOL_CONFIG.name,
+			DUPLICATE_SPACE_TOOL_CONFIG.name,
 		];
-		
+
 		// Create placeholder registered tools for web server compatibility
-		toolNames.forEach(toolName => {
+		toolNames.forEach((toolName) => {
 			registeredTools[toolName] = {
-				enable: () => { /* Tools are enabled by default in each server instance */ },
-				disable: () => { /* Tools would need to be disabled per-server if needed */ },
-				remove: () => { /* Tools are per-server, so removal would be per-server */ },
+				enable: () => {
+					/* Tools are enabled by default in each server instance */
+				},
+				disable: () => {
+					/* Tools would need to be disabled per-server if needed */
+				},
 			};
 		});
 
@@ -123,7 +138,10 @@ export class Application {
 		// WebServer manages its own lifecycle
 		await this.webServerInstance.start(this.webAppPort);
 		logger.info(`Server running at http://localhost:${String(this.webAppPort)}`);
-		logger.info({ transportType: this.transportType, mode: this.isDev ? 'development with HMR' : 'production' }, 'Server configuration');
+		logger.info(
+			{ transportType: this.transportType, mode: this.isDev ? 'development with HMR' : 'production' },
+			'Server configuration'
+		);
 		if (this.isDev) {
 			logger.info('HMR is active - frontend changes will be automatically reflected in the browser');
 			logger.info("For server changes, use 'npm run dev:watch' to automatically rebuild and apply changes");
@@ -153,6 +171,11 @@ export class Application {
 		if (this.transport) {
 			await this.transport.cleanup();
 		}
+	}
+
+	private maskToken(token: string): string {
+		if (!token || token.length <= 9) return token;
+		return `${token.substring(0, 4)}...${token.substring(token.length - 5)}`;
 	}
 
 	getExpressApp(): Express {

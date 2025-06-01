@@ -176,8 +176,8 @@ function formatSearchResults(models: ExtendedModelEntry[], params: Partial<Model
 	const searchDesc = searchTerms.length > 0 ? ` matching ${searchTerms.join(', ')}` : '';
 
 	const resultText = models.length === params.limit 
-		? `Showing first ${models.length} models${searchDesc}:`
-		: `Found ${models.length} models${searchDesc}:`;
+		? `Showing first ${models.length.toString()} models${searchDesc}:`
+		: `Found ${models.length.toString()} models${searchDesc}:`;
 	r.push(resultText);
 	r.push('');
 

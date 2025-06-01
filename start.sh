@@ -11,11 +11,11 @@ JSON_MODE="${JSON_MODE:-false}"
 if [ "$TRANSPORT" != "stdio" ]; then
   echo "Starting MCP server with transport type: $TRANSPORT on port $PORT"
 
-  # Check for HF_TOKEN
-  if [ -n "$HF_TOKEN" ]; then
-    echo "HF_TOKEN found in environment"
+  # Check for DEFAULT_HF_TOKEN in the environment
+  if [ -n "$DEFAULT_HF_TOKEN" ]; then
+    echo "⚠️ DEFAULT_HF_TOKEN found in environment.  Make sure you understand the implications of this."
   else
-    echo "Warning: HF_TOKEN not found in environment"
+    echo "Using standard HF_TOKEN authentication."
   fi
 fi
 

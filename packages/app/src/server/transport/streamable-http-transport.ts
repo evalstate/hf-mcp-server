@@ -161,7 +161,7 @@ export class StreamableHttpTransport extends BaseTransport {
 
 	private async createSession(requestHeaders?: Record<string, string>): Promise<StreamableHTTPServerTransport> {
 		// Create server instance using factory with request headers
-		const server = this.serverFactory(requestHeaders || null);
+		const server = await this.serverFactory(requestHeaders || null);
 		
 		const transport = new StreamableHTTPServerTransport({
 			sessionIdGenerator: () => randomUUID(),

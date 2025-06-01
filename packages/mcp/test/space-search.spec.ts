@@ -2,8 +2,6 @@ import { describe, beforeEach, afterEach, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { SpaceSearchResult } from '../dist/space-search.js';
-import { assert } from 'console';
-import { experimental_patchConfig } from 'wrangler';
 
 describe('SpaceSearchService', () => {
 	let space: SpaceSearchResult[];
@@ -20,12 +18,12 @@ describe('SpaceSearchService', () => {
 	afterEach(() => {});
 
 	it('read the test file', () => {
-		expect('evalstate').toBe(space[0].author);
+		expect('evalstate').toBe(space[2].author);
 	});
 
 	it('picked up other results', () => {
-		expect('RUNNING').toBe(space[0].runtime.stage);
-		expect('Image Generation').toBe(space[0].ai_category);
-		expect('Genrate images').includes(space[0].ai_short_description);
+		expect('RUNNING').toBe(space[2].runtime.stage);
+		expect('Image Generation').toBe(space[2].ai_category);
+		expect('Generate images from text prompts').toBe(space[2].ai_short_description);
 	});
 });
