@@ -1,4 +1,69 @@
 /**
+ * Custom error class that includes HTTP status information
+ */
+export class HfApiError extends Error {
+	constructor(
+		message: string,
+		public readonly status: number,
+		public readonly statusText: string,
+		public readonly responseBody?: string
+	) {
+		super(message);
+		this.name = 'HfApiError';
+	}
+
+	/**
+	 * Format the error with a friendly explanation followed by the original error
+	 * @param friendlyExplanation - User-friendly explanation
+	 * @param context - Optional context about what was being attempted
+	 * @returns Formatted error message
+	 */
+	formatWithExplanation(friendlyExplanation: string, context?: string): string {
+		let formatted = '';
+		
+		// Add context if provided
+		if (context) {
+			formatted = `${context}. `;
+		}
+		
+		// Add friendly explanation
+		formatted += friendlyExplanation;
+		
+		// Add original error message on new line
+		formatted += `\n\n${this.message}`;
+		
+		// Add response body details if available and different from message
+		if (this.responseBody) {
+			try {
+				const parsed = JSON.parse(this.responseBody) as { error?: string; message?: string; detail?: string };
+				const errorDetail = parsed.error || parsed.message || parsed.detail;
+				if (errorDetail && !this.message.includes(errorDetail)) {
+					formatted += `\n${errorDetail}`;
+				}
+			} catch {
+				// If not JSON, add raw response if it's not too long and not already in message
+				if (this.responseBody.length < 200 && !this.message.includes(this.responseBody)) {
+					formatted += `\n${this.responseBody}`;
+				}
+			}
+		}
+		
+		return formatted;
+	}
+
+	/**
+	 * Create a new HfApiError with an improved message while preserving all other properties
+	 * @param friendlyExplanation - User-friendly explanation
+	 * @param context - Optional context about what was being attempted
+	 * @returns New HfApiError with improved message
+	 */
+	withImprovedMessage(friendlyExplanation: string, context?: string): HfApiError {
+		const improvedMessage = this.formatWithExplanation(friendlyExplanation, context);
+		return new HfApiError(improvedMessage, this.status, this.statusText, this.responseBody);
+	}
+}
+
+/**
  * Base API client for Hugging Face HTTP APIs
  *
  * @template TParams - Type for API parameters
@@ -28,7 +93,6 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 				'Content-Type': 'application/json',
 				...Object.fromEntries(Object.entries(options?.headers || {})),
 			} as Record<string, string>;
-
 			if (this.hfToken) {
 				headers['Authorization'] = `Bearer ${this.hfToken}`;
 			}
@@ -39,11 +103,29 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 			});
 
 			if (!response.ok) {
-				throw new Error(`API request failed: ${response.status.toString()} ${response.statusText}`);
+				// Try to get error details from response body
+				let responseBody: string | undefined;
+				try {
+					responseBody = await response.text();
+				} catch {
+					// Ignore if we can't read the body
+				}
+
+				throw new HfApiError(
+					`API request failed: ${response.status.toString()} ${response.statusText}`,
+					response.status,
+					response.statusText,
+					responseBody
+				);
 			}
 
 			return (await response.json()) as T;
 		} catch (error) {
+			// Re-throw HfApiError as-is to preserve status information
+			if (error instanceof HfApiError) {
+				throw error;
+			}
+			// Wrap other errors
 			if (error instanceof Error) {
 				throw new Error(`API request failed: ${error.message}`);
 			}

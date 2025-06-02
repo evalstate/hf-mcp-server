@@ -1,4 +1,4 @@
-import { BaseTransport, type TransportOptions, type BaseSession } from './base-transport.js';
+import { StatefulTransport, type TransportOptions, type BaseSession } from './base-transport.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { logger } from '../lib/logger.js';
 
@@ -7,8 +7,8 @@ type StdioSession = BaseSession<StdioServerTransport>;
 /**
  * Implementation of STDIO transport
  */
-export class StdioTransport extends BaseTransport {
-	private session: StdioSession | null = null;
+export class StdioTransport extends StatefulTransport<StdioSession> {
+	private readonly SESSION_ID = 'STDIO';
 
 	async initialize(_options: TransportOptions): Promise<void> {
 		const transport = new StdioServerTransport();
@@ -17,45 +17,66 @@ export class StdioTransport extends BaseTransport {
 		const server = await this.serverFactory(null);
 
 		// Create session with metadata tracking
-		this.session = {
+		const session: StdioSession = {
 			transport,
 			server,
 			metadata: {
-				id: 'stdio-session',
+				id: this.SESSION_ID,
 				connectedAt: new Date(),
 				lastActivity: new Date(),
 				capabilities: {},
 			},
 		};
 
+		// Store session in map
+		this.sessions.set(this.SESSION_ID, session);
+
 		try {
+			// Set up oninitialized callback to capture client info using base class helper
+			server.server.oninitialized = this.createClientInfoCapture(this.SESSION_ID);
+
 			await server.connect(transport);
 			logger.info('STDIO transport initialized');
 		} catch (error) {
 			logger.error({ error }, 'Error connecting STDIO transport');
+			// Clean up on error
+			this.sessions.delete(this.SESSION_ID);
 			throw error;
 		}
 	}
 
 	/**
-	 * Mark transport as shutting down
+	 * STDIO doesn't need stale session removal since there's only one persistent session
 	 */
-	override shutdown(): void {
-		// STDIO doesn't need to reject new connections
-		logger.debug('STDIO transport shutdown signaled');
-	}
-
-	async cleanup(): Promise<void> {
-		this.session = null;
-		logger.info('Cleaning up STDIO transport');
+	protected removeStaleSession(sessionId: string): Promise<void> {
+		// STDIO has only one session and it's not subject to staleness
+		logger.debug({ sessionId }, 'STDIO session staleness check (no-op)');
 		return Promise.resolve();
 	}
 
+	async cleanup(): Promise<void> {
+		const session = this.sessions.get(this.SESSION_ID);
+		if (session) {
+			try {
+				await session.transport.close();
+			} catch (error) {
+				logger.error({ error }, 'Error closing STDIO transport');
+			}
+			try {
+				await session.server.close();
+			} catch (error) {
+				logger.error({ error }, 'Error closing STDIO server');
+			}
+		}
+		this.sessions.clear();
+		logger.info('STDIO transport cleaned up');
+		return Promise.resolve();
+	}
 
 	/**
-	 * Get the number of active connections
+	 * Get the STDIO session if it exists
 	 */
-	override getActiveConnectionCount(): number {
-		return this.session ? 1 : 0;
+	getSession(): StdioSession | undefined {
+		return this.sessions.get(this.SESSION_ID);
 	}
 }

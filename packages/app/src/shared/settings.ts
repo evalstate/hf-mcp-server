@@ -37,6 +37,9 @@ const defaultSettings: AppSettings = {
     dataset_detail: {
       enabled: true,
     },
+    duplicate_space: {
+      enabled: true,
+    },
   },
 };
 

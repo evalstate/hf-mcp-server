@@ -49,7 +49,7 @@ export class Application {
 			transport: this.transportType,
 			port: this.webAppPort,
 			defaultHfTokenSet: !!defaultHfToken,
-			hfTokenMasked: defaultHfToken ? this.maskToken(defaultHfToken) : undefined,
+			hfTokenMasked: defaultHfToken ? maskToken(defaultHfToken) : undefined,
 			jsonResponseEnabled: this.transportType === 'streamableHttpJson',
 			stdioClient: this.transportType === 'stdio' ? null : undefined,
 		};
@@ -130,6 +130,10 @@ export class Application {
 
 		try {
 			this.transport = createTransport(this.transportType, this.serverFactory, this.appInstance);
+			
+			// Pass transport to web server for session management
+			this.webServerInstance.setTransport(this.transport);
+			
 			await this.transport.initialize({
 				port: this.webAppPort,
 			});
@@ -178,12 +182,12 @@ export class Application {
 		}
 	}
 
-	private maskToken(token: string): string {
-		if (!token || token.length <= 9) return token;
-		return `${token.substring(0, 4)}...${token.substring(token.length - 5)}`;
-	}
-
 	getExpressApp(): Express {
 		return this.appInstance;
 	}
+}
+
+export function maskToken(token: string): string {
+	if (!token || token.length <= 9) return token;
+	return `${token.substring(0, 4)}...${token.substring(token.length - 5)}`;
 }

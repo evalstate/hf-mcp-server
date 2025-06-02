@@ -1,9 +1,8 @@
-import { BaseTransport, type TransportOptions, type BaseSession } from './base-transport.js';
+import { StatefulTransport, type TransportOptions, type BaseSession } from './base-transport.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
-import type { ZodObject, ZodLiteral } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 interface SSEConnection extends BaseSession<SSEServerTransport> {
@@ -11,15 +10,7 @@ interface SSEConnection extends BaseSession<SSEServerTransport> {
 	heartbeatInterval?: NodeJS.Timeout;
 }
 
-export class SseTransport extends BaseTransport {
-	// Store SSE connections with comprehensive metadata
-	private sseConnections: Map<string, SSEConnection> = new Map();
-	private isShuttingDown = false;
-	private staleCheckInterval?: NodeJS.Timeout;
-
-	// Configuration from environment variables
-	private readonly STALE_CHECK_INTERVAL = parseInt(process.env.MCP_CLIENT_CONNECTION_CHECK || '30000', 10);
-	private readonly STALE_TIMEOUT = parseInt(process.env.MCP_CLIENT_CONNECTION_TIMEOUT || '60000', 10);
+export class SseTransport extends StatefulTransport<SSEConnection> {
 
 	async initialize(_options: TransportOptions): Promise<void> {
 		// SSE endpoint for client connections
@@ -51,10 +42,11 @@ export class SseTransport extends BaseTransport {
 			}
 
 			const existingSessionId = req.query.sessionId as string | undefined;
+			const bouquet = req.query.bouquet as string | undefined;
 
 			// Handle reconnection attempts
 			if (existingSessionId) {
-				const existing = this.sseConnections.get(existingSessionId);
+				const existing = this.sessions.get(existingSessionId);
 				if (existing) {
 					logger.warn(
 						{
@@ -69,8 +61,13 @@ export class SseTransport extends BaseTransport {
 				}
 			}
 
-			// Create server instance using factory with request headers
-			const server = await this.serverFactory(req.headers as Record<string, string>);
+			// Create server instance using factory with request headers and bouquet
+			const headers = req.headers as Record<string, string>;
+			if (bouquet) {
+				headers['x-mcp-bouquet'] = bouquet;
+				logger.info({ bouquet }, 'SSE: Passing bouquet parameter to server factory');
+			}
+			const server = await this.serverFactory(headers);
 
 			// Create new transport
 			const transport = new SSEServerTransport('/message', res);
@@ -103,7 +100,7 @@ export class SseTransport extends BaseTransport {
 				},
 			};
 
-			this.sseConnections.set(sessionId, connection);
+			this.sessions.set(sessionId, connection);
 
 			// Set up connection event handlers
 			res.on('close', () => {
@@ -139,7 +136,7 @@ export class SseTransport extends BaseTransport {
 				return;
 			}
 
-			const connection = this.sseConnections.get(sessionId);
+			const connection = this.sessions.get(sessionId);
 
 			if (!connection) {
 				logger.warn({ sessionId }, 'SSE message for unknown session');
@@ -147,8 +144,8 @@ export class SseTransport extends BaseTransport {
 				return;
 			}
 
-			// Update last activity
-			connection.metadata.lastActivity = new Date();
+			// Update last activity using base class helper
+			this.updateSessionActivity(sessionId);
 
 			// Handle message with the transport
 			await connection.transport.handlePostMessage(req, res, req.body);
@@ -168,7 +165,7 @@ export class SseTransport extends BaseTransport {
 	private createCleanupFunction(sessionId: string): () => Promise<void> {
 		return async () => {
 			try {
-				const connection = this.sseConnections.get(sessionId);
+				const connection = this.sessions.get(sessionId);
 				if (!connection) return;
 
 				logger.debug({ sessionId }, 'Cleaning up SSE connection');
@@ -186,7 +183,7 @@ export class SseTransport extends BaseTransport {
 				}
 
 				// Remove from map
-				this.sseConnections.delete(sessionId);
+				this.sessions.delete(sessionId);
 
 				logger.debug({ sessionId }, 'SSE connection cleaned up');
 			} catch (error) {
@@ -202,10 +199,10 @@ export class SseTransport extends BaseTransport {
 		cleanup: () => Promise<void>
 	): Promise<void> {
 		try {
-			await server.connect(transport);
+			// Set up oninitialized callback to capture client info using base class helper
+			server.server.oninitialized = this.createClientInfoCapture(sessionId);
 
-			// Set up client info capture
-			this.setupClientInfoCapture(transport, server, sessionId);
+			await server.connect(transport);
 		} catch (error) {
 			logger.error({ error, sessionId }, 'Failed to connect transport to server');
 			await cleanup();
@@ -213,58 +210,27 @@ export class SseTransport extends BaseTransport {
 		}
 	}
 
-	private startStaleConnectionCheck(): void {
-		this.staleCheckInterval = setInterval(() => {
-			if (this.isShuttingDown) return;
-
-			const now = Date.now();
-			const staleSessionIds: string[] = [];
-
-			// Find stale sessions
-			for (const [sessionId, connection] of this.sseConnections) {
-				const timeSinceActivity = now - connection.metadata.lastActivity.getTime();
-				if (timeSinceActivity > this.STALE_TIMEOUT) {
-					staleSessionIds.push(sessionId);
-				}
-			}
-
-			// Remove stale sessions
-			for (const sessionId of staleSessionIds) {
-				const connection = this.sseConnections.get(sessionId);
-				if (connection) {
-					logger.info(
-						{ sessionId, timeSinceActivity: now - connection.metadata.lastActivity.getTime() },
-						'Removing stale SSE connection'
-					);
-					void this.closeConnection(sessionId);
-				}
-			}
-		}, this.STALE_CHECK_INTERVAL);
-	}
-
 	/**
-	 * Mark transport as shutting down (called by entry point)
+	 * Remove a stale session - implementation for StatefulTransport
 	 */
-	override shutdown(): void {
-		this.isShuttingDown = true;
+	protected async removeStaleSession(sessionId: string): Promise<void> {
+		logger.info({ sessionId }, 'Removing stale SSE connection');
+		await this.closeConnection(sessionId);
 	}
 
 	async cleanup(): Promise<void> {
 		logger.info(
 			{
-				activeConnections: this.sseConnections.size,
+				activeConnections: this.sessions.size,
 			},
 			'Starting SSE transport cleanup'
 		);
 
-		// Stop stale checker
-		if (this.staleCheckInterval) {
-			clearInterval(this.staleCheckInterval);
-			this.staleCheckInterval = undefined;
-		}
+		// Stop stale checker using base class helper
+		this.stopStaleConnectionCheck();
 
 		// Get all session IDs to avoid mutation during iteration
-		const sessionIds = Array.from(this.sseConnections.keys());
+		const sessionIds = Array.from(this.sessions.keys());
 
 		// Close all connections in parallel
 		const cleanupPromises = sessionIds.map((sessionId) =>
@@ -276,25 +242,16 @@ export class SseTransport extends BaseTransport {
 		await Promise.allSettled(cleanupPromises);
 
 		// Ensure map is cleared
-		this.sseConnections.clear();
+		this.sessions.clear();
 
 		logger.info('SSE transport cleanup completed');
-	}
-
-	// Public management methods
-
-	/**
-	 * Get the number of active SSE connections
-	 */
-	override getActiveConnectionCount(): number {
-		return this.sseConnections.size;
 	}
 
 	/**
 	 * Force close a specific connection
 	 */
 	async closeConnection(sessionId: string): Promise<boolean> {
-		const connection = this.sseConnections.get(sessionId);
+		const connection = this.sessions.get(sessionId);
 		if (!connection) {
 			logger.debug({ sessionId }, 'Attempted to close non-existent connection');
 			return false;
@@ -309,78 +266,4 @@ export class SseTransport extends BaseTransport {
 		}
 	}
 
-	/**
-	 * Check if server is accepting new connections
-	 */
-	isAcceptingConnections(): boolean {
-		return !this.isShuttingDown;
-	}
-
-	private setupClientInfoCapture(_transport: SSEServerTransport, server: McpServer, sessionId: string): void {
-		// Intercept the server's initialization handler to capture client info
-		const originalSetHandler = server.server.setRequestHandler.bind(server.server);
-		const connections = this.sseConnections;
-
-		// Type-safe wrapper that preserves the original signature
-		server.server.setRequestHandler = function <T extends ZodObject<{ method: ZodLiteral<string> }>>(
-			schema: T,
-			handler: Parameters<typeof originalSetHandler<T>>[1]
-		): void {
-			// Check if this is the initialize request handler by examining the method
-			if (schema.shape.method.value === 'initialize') {
-				interface InitRequest {
-					params?: {
-						clientInfo?: { name: string; version: string };
-						capabilities?: {
-							sampling?: unknown;
-							roots?: unknown;
-						};
-					};
-				}
-
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				const wrappedHandler = async (request: any, extra: any) => {
-					// Capture client info for this specific transport/session
-					if (connections.has(sessionId)) {
-						const connection = connections.get(sessionId);
-						// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-						if (!connection) return await handler(request, extra);
-
-						const typedRequest = request as InitRequest;
-						if (typedRequest.params?.clientInfo) {
-							connection.metadata.clientInfo = {
-								name: typedRequest.params.clientInfo.name,
-								version: typedRequest.params.clientInfo.version,
-							};
-						}
-
-						if (typedRequest.params?.capabilities) {
-							Object.assign(connection.metadata.capabilities, {
-								sampling: !!typedRequest.params.capabilities.sampling,
-								roots: !!typedRequest.params.capabilities.roots,
-							});
-						}
-
-						logger.info(
-							{
-								sessionId,
-								clientInfo: connection.metadata.clientInfo,
-								capabilities: connection.metadata.capabilities,
-							},
-							'Client info captured'
-						);
-					}
-
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-					return await handler(request, extra);
-				};
-
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-				originalSetHandler(schema, wrappedHandler as any);
-				return;
-			}
-
-			originalSetHandler(schema, handler);
-		};
-	}
 }

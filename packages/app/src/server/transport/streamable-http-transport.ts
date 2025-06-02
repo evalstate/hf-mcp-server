@@ -1,23 +1,14 @@
-import { BaseTransport, type TransportOptions, type BaseSession } from './base-transport.js';
+import { StatefulTransport, type TransportOptions, type BaseSession } from './base-transport.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { randomUUID } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { logger } from '../lib/logger.js';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
-import type { ZodObject, ZodLiteral } from 'zod';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 type Session = BaseSession<StreamableHTTPServerTransport>;
 
-export class StreamableHttpTransport extends BaseTransport {
-	private sessions = new Map<string, Session>();
-	private staleCheckInterval?: NodeJS.Timeout;
-	private isShuttingDown = false;
-
-	// Configuration from environment variables
-	private readonly STALE_CHECK_INTERVAL = parseInt(process.env.MCP_CLIENT_CONNECTION_CHECK || '30000', 10);
-	private readonly STALE_TIMEOUT = parseInt(process.env.MCP_CLIENT_CONNECTION_TIMEOUT || '60000', 10);
+export class StreamableHttpTransport extends StatefulTransport<Session> {
 
 	initialize(_options: TransportOptions): Promise<void> {
 		this.setupRoutes();
@@ -59,10 +50,7 @@ export class StreamableHttpTransport extends BaseTransport {
 
 			// Update activity timestamp for existing sessions
 			if (sessionId && this.sessions.has(sessionId)) {
-				const session = this.sessions.get(sessionId);
-				if (session) {
-					session.metadata.lastActivity = new Date();
-				}
+				this.updateSessionActivity(sessionId);
 			}
 
 			switch (method) {
@@ -94,7 +82,6 @@ export class StreamableHttpTransport extends BaseTransport {
 		let transport: StreamableHTTPServerTransport;
 
 		if (sessionId && this.sessions.has(sessionId)) {
-			// Use existing session
 			const existingSession = this.sessions.get(sessionId);
 			if (!existingSession) {
 				res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(req.body)));
@@ -103,7 +90,12 @@ export class StreamableHttpTransport extends BaseTransport {
 			transport = existingSession.transport;
 		} else if (!sessionId && isInitializeRequest(req.body)) {
 			// Create new session only for initialization requests
-			transport = await this.createSession(req.headers as Record<string, string>);
+			const headers = req.headers as Record<string, string>;
+			const bouquet = req.query.bouquet as string | undefined;
+			if (bouquet) {
+				headers['x-mcp-bouquet'] = bouquet;
+			}
+			transport = await this.createSession(headers);
 		} else if (!sessionId) {
 			// No session ID and not an initialization request
 			res
@@ -162,7 +154,7 @@ export class StreamableHttpTransport extends BaseTransport {
 	private async createSession(requestHeaders?: Record<string, string>): Promise<StreamableHTTPServerTransport> {
 		// Create server instance using factory with request headers
 		const server = await this.serverFactory(requestHeaders || null);
-		
+
 		const transport = new StreamableHTTPServerTransport({
 			sessionIdGenerator: () => randomUUID(),
 			onsessioninitialized: (sessionId: string) => {
@@ -193,82 +185,17 @@ export class StreamableHttpTransport extends BaseTransport {
 			}
 		};
 
+		server.server.oninitialized = () => {
+			const sessionId = transport.sessionId;
+			if (sessionId) {
+				this.createClientInfoCapture(sessionId)();
+			}
+		};
+
 		// Connect to session-specific server
 		await server.connect(transport);
 
-		// Set up client info capture for this session's server
-		this.setupClientInfoCapture(transport, server);
-
 		return transport;
-	}
-
-	private setupClientInfoCapture(transport: StreamableHTTPServerTransport, server: McpServer): void {
-		// Intercept the server's initialization handler to capture client info
-		const originalSetHandler = server.server.setRequestHandler.bind(server.server);
-		const sessions = this.sessions;
-
-		// Type-safe wrapper that preserves the original signature
-		server.server.setRequestHandler = function <T extends ZodObject<{ method: ZodLiteral<string> }>>(
-			schema: T,
-			handler: Parameters<typeof originalSetHandler<T>>[1]
-		): void {
-			// Check if this is the initialize request handler by examining the method
-			if (schema.shape.method.value === 'initialize') {
-				interface InitRequest {
-					params?: {
-						clientInfo?: { name: string; version: string };
-						capabilities?: {
-							sampling?: unknown;
-							roots?: unknown;
-						};
-					};
-				}
-
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				const wrappedHandler = async (request: any, extra: any) => {
-					// Capture client info for this specific transport/session
-					const sessionId = transport.sessionId;
-					if (sessionId && sessions.has(sessionId)) {
-						const session = sessions.get(sessionId);
-						// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-						if (!session) return await handler(request, extra);
-
-						const typedRequest = request as InitRequest;
-						if (typedRequest.params?.clientInfo) {
-							session.metadata.clientInfo = {
-								name: typedRequest.params.clientInfo.name,
-								version: typedRequest.params.clientInfo.version,
-							};
-						}
-
-						if (typedRequest.params?.capabilities) {
-							Object.assign(session.metadata.capabilities, {
-								sampling: !!typedRequest.params.capabilities.sampling,
-								roots: !!typedRequest.params.capabilities.roots,
-							});
-						}
-
-						logger.info(
-							{
-								sessionId,
-								clientInfo: session.metadata.clientInfo,
-								capabilities: session.metadata.capabilities,
-							},
-							'Client info captured'
-						);
-					}
-
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-					return await handler(request, extra);
-				};
-
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-				originalSetHandler(schema, wrappedHandler as any);
-				return;
-			}
-
-			originalSetHandler(schema, handler);
-		};
 	}
 
 	private async removeSession(sessionId: string): Promise<void> {
@@ -285,45 +212,17 @@ export class StreamableHttpTransport extends BaseTransport {
 		logger.debug({ sessionId }, 'Session removed');
 	}
 
-	private startStaleConnectionCheck(): void {
-		// Uses JavaScript's event loop - no separate thread
-		this.staleCheckInterval = setInterval(() => {
-			if (this.isShuttingDown) return;
-
-			const now = Date.now();
-			const staleSessionIds: string[] = [];
-
-			// Find stale sessions
-			for (const [sessionId, session] of this.sessions) {
-				const timeSinceActivity = now - session.metadata.lastActivity.getTime();
-				if (timeSinceActivity > this.STALE_TIMEOUT) {
-					staleSessionIds.push(sessionId);
-				}
-			}
-
-			// Remove stale sessions
-			// TODO: Future enhancement - implement ping mechanism
-			// Could check if transport/server supports ping before removing
-			for (const sessionId of staleSessionIds) {
-				logger.info({ sessionId }, 'Removing stale session');
-				void this.removeSession(sessionId);
-			}
-		}, this.STALE_CHECK_INTERVAL);
-	}
-
 	/**
-	 * Mark transport as shutting down (called by entry point)
+	 * Remove a stale session - implementation for StatefulTransport
 	 */
-	override shutdown(): void {
-		this.isShuttingDown = true;
+	protected async removeStaleSession(sessionId: string): Promise<void> {
+		logger.info({ sessionId }, 'Removing stale session');
+		await this.removeSession(sessionId);
 	}
 
 	async cleanup(): Promise<void> {
-		// Stop stale checker
-		if (this.staleCheckInterval) {
-			clearInterval(this.staleCheckInterval);
-			this.staleCheckInterval = undefined;
-		}
+		// Stop stale checker using base class helper
+		this.stopStaleConnectionCheck();
 
 		// Close all sessions gracefully
 		const closePromises = Array.from(this.sessions.keys()).map((sessionId) =>
@@ -336,20 +235,5 @@ export class StreamableHttpTransport extends BaseTransport {
 
 		this.sessions.clear();
 		logger.info('StreamableHTTP transport cleanup complete');
-	}
-
-
-	/**
-	 * Get the number of active connections
-	 */
-	override getActiveConnectionCount(): number {
-		return this.sessions.size;
-	}
-
-	/**
-	 * Check if server is accepting new connections
-	 */
-	isAcceptingConnections(): boolean {
-		return !this.isShuttingDown;
 	}
 }

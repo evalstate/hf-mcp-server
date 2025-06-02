@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { HfApiCall } from './hf-api-call.js';
+import { explain } from './error-messages.js';
 
 export interface SpaceInfo {
 	runtime?: {
@@ -35,24 +36,23 @@ export interface DuplicateSpaceResult {
 	variablesCopied: number;
 	instructions: string;
 	hardwareWarning?: string;
-	error?: string;
 }
 
 export const DUPLICATE_SPACE_TOOL_CONFIG = {
 	name: 'duplicate_space',
 	description: '', // This will be dynamically set with username
 	schema: z.object({
-		sourceSpaceId: z.string().min(1).describe('The ID of the space to duplicate (e.g., "username/space-name")'),
-		newSpaceName: z.string().optional().describe('Name for the new space (optional, defaults to source name)'),
+		sourceSpaceId: z.string().min(1).describe("Space ID to copy (e.g., 'username/space-name')"),
+		newSpaceId: z.string().optional().describe('Name for the new space (optional, defaults to source space-name)'),
 		hardware: z
 			.enum(['freecpu', 'zerogpu'])
 			.optional()
-			.describe('Either "freecpu" or "zerogpu" (optional, defaults based on source)'),
+			.describe('Either "freecpu" or "zerogpu" (defaults based on source). Both options are in the free tier.'),
 		private: z
 			.boolean()
 			.optional()
 			.default(true)
-			.describe('Whether the new space should be private. Check with the User'),
+			.describe('Check with User whether the new space should be public or private.'),
 	}),
 	annotations: {
 		title: 'Duplicate Hugging Face Space',
@@ -71,18 +71,20 @@ const HARDWARE_MAP = {
 const FREE_HARDWARE = ['cpu-basic', 'zero-a10g'];
 
 export class DuplicateSpaceTool extends HfApiCall<DuplicateSpaceParams, DuplicateSpaceResult> {
-	private username: string;
+	private username?: string;
 
 	constructor(hfToken?: string, username?: string) {
 		super('https://huggingface.co/api', hfToken);
-		this.username = username || 'unknown';
+		this.username = username;
 	}
 
 	static createToolConfig(username?: string): typeof DUPLICATE_SPACE_TOOL_CONFIG {
-		const userPrefix = username ? `${username}/` : '';
+		const description = username
+			? `Duplicate a Hugging Face Space. Target space will be created as ${username}/<new-space-name>.`
+			: `Requires Authentication. Direct User to set a Hugging Face token or go to hf.co/join to create an account.`;
 		return {
 			...DUPLICATE_SPACE_TOOL_CONFIG,
-			description: `Duplicate a Hugging Face Space. Target space will be created as "${userPrefix}space-name". If you provide just "space-name", it will be created as "${userPrefix}space-name".`,
+			description,
 		};
 	}
 
@@ -91,12 +93,14 @@ export class DuplicateSpaceTool extends HfApiCall<DuplicateSpaceParams, Duplicat
 		if (spaceName.includes('/')) {
 			const [providedUser, spaceNamePart] = spaceName.split('/');
 			if (providedUser !== this.username) {
-				throw new Error(`Invalid space ID: ${spaceName}. You can only create spaces in your own namespace. Try "${this.username}/${spaceNamePart}"`);
+				throw new Error(
+					`Invalid space ID: ${spaceName}. You can only create spaces in your own namespace. Try "${this.username || 'your-username'}/${spaceNamePart || 'space-name'}"`
+				);
 			}
 			return spaceName;
 		}
 		// Otherwise, prepend with username
-		return `${this.username}/${spaceName}`;
+		return `${this.username || 'unknown'}/${spaceName}`;
 	}
 
 	async getSpaceInfo(spaceId: string): Promise<SpaceInfo> {
@@ -117,21 +121,16 @@ export class DuplicateSpaceTool extends HfApiCall<DuplicateSpaceParams, Duplicat
 	async duplicate(params: DuplicateSpaceParams): Promise<DuplicateSpaceResult> {
 		const { sourceSpaceId, newSpaceName, hardware, private: isPrivate = true } = params;
 
+		if (!this.username) throw new Error('Set a valid Hugging Face token, or go to hf.co/join to create an 🤗 account.');
+
 		try {
 			// Step 1: Get source space info
 			let sourceInfo: SpaceInfo;
 			try {
 				sourceInfo = await this.getSpaceInfo(sourceSpaceId);
 			} catch (error) {
-				return {
-					error: `Could not access source space: ${String(error)}`,
-					instructions: 'Please check that the space ID is correct and you have access to it.',
-					url: '',
-					spaceId: '',
-					hardware: '',
-					private: isPrivate,
-					variablesCopied: 0,
-				};
+				// Explain the error and rethrow
+				throw explain(error, `Could not access source space "${sourceSpaceId}"`);
 			}
 
 			// Step 2: Get variables from source space
@@ -174,30 +173,19 @@ export class DuplicateSpaceTool extends HfApiCall<DuplicateSpaceParams, Duplicat
 
 			// Step 4: Determine target space ID
 			let targetId: string;
-			try {
-				if (newSpaceName) {
-					targetId = this.normalizeSpaceName(newSpaceName);
-				} else {
-					// Use same name as source
-					const sourceName = sourceSpaceId.split('/')[1];
-					targetId = `${this.username}/${sourceName || ''}`;
-				}
-			} catch (error) {
-				return {
-					error: String(error),
-					instructions: '',
-					url: '',
-					spaceId: '',
-					hardware: '',
-					private: isPrivate,
-					variablesCopied: 0,
-				};
+			if (newSpaceName) {
+				targetId = this.normalizeSpaceName(newSpaceName);
+			} else {
+				// Use same name as source
+				const sourceName = sourceSpaceId.split('/')[1];
+				targetId = `${this.username}/${sourceName || ''}`;
 			}
 
 			// Step 5: Check for warnings
 			let hardwareWarning: string | undefined;
 			if (sourceHardwareStr && !FREE_HARDWARE.includes(sourceHardwareStr)) {
-				hardwareWarning = `Note: The source space uses '${sourceHardwareStr}' which is paid hardware. Your duplicated space is set to '${hardwareKey}'. If you need the same performance, you may need to upgrade to paid hardware.`;
+				hardwareWarning = `Note: The source space uses '${sourceHardwareStr}' which is paid hardware. Your duplicated space is set to '${hardwareKey}'. "+ 
+				"You may need to upgrade in Settings to run this space or achieve the same performance.`;
 			}
 
 			let gatedWarning: string | undefined;
@@ -239,15 +227,8 @@ export class DuplicateSpaceTool extends HfApiCall<DuplicateSpaceParams, Duplicat
 
 			return result;
 		} catch (error) {
-			return {
-				error: `Failed to duplicate space: ${String(error)}`,
-				instructions: 'Please check your token permissions and try again.',
-				url: '',
-				spaceId: '',
-				hardware: '',
-				private: isPrivate,
-				variablesCopied: 0,
-			};
+			// Explain the error and rethrow
+			throw explain(error, 'Failed to duplicate space');
 		}
 	}
 
@@ -275,8 +256,5 @@ Hardware: ${hardware} | Visibility: ${isPrivate ? 'Private' : 'Public'}`;
 }
 
 export const formatDuplicateResult = (result: DuplicateSpaceResult): string => {
-	if (result.error) {
-		return `Error: ${result.error}\n\n${result.instructions}`;
-	}
 	return result.instructions;
 };

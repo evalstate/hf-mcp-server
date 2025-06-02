@@ -1,4 +1,4 @@
-import { BaseTransport, type TransportOptions, STATELESS_MODE } from './base-transport.js';
+import { BaseTransport, type TransportOptions, STATELESS_MODE, type SessionMetadata } from './base-transport.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
@@ -39,14 +39,35 @@ export class StatelessHttpTransport extends BaseTransport {
 		const startTime = Date.now();
 		let server: McpServer | null = null;
 		let transport: StreamableHTTPServerTransport | null = null;
+		const requestBody = req.body as
+			| { method?: string; params?: { clientInfo?: unknown; capabilities?: unknown } }
+			| undefined;
 
 		try {
-			// Create new server instance using factory with request headers
-			server = await this.serverFactory(req.headers as Record<string, string>);
-			
+			// Create new server instance using factory with request headers and bouquet
+			const headers = req.headers as Record<string, string>;
+			const bouquet = req.query.bouquet as string | undefined;
+			if (bouquet) {
+				headers['x-mcp-bouquet'] = bouquet;
+				logger.info({ bouquet }, 'Stateless HTTP: Passing bouquet parameter to server factory');
+			}
+			server = await this.serverFactory(headers);
+
+			// After handling, check if it was an initialize request
+			if (requestBody?.method === 'initialize') {
+				logger.info(
+					{
+						clientInfo: requestBody.params?.clientInfo,
+						capabilities: requestBody.params?.capabilities,
+					},
+					'Initialize request processed'
+				);
+			}
+
 			// Create new transport instance for this request
 			transport = new StreamableHTTPServerTransport({
 				sessionIdGenerator: undefined,
+				enableJsonResponse: true,
 			});
 
 			// Setup cleanup handlers - only cleanup on client disconnect
@@ -71,13 +92,12 @@ export class StatelessHttpTransport extends BaseTransport {
 
 			// Connect and handle
 			await server.connect(transport);
-			await transport.handleRequest(req, res, req.body);
 
-			// Log success - don't cleanup here, let the response complete naturally
+			await transport.handleRequest(req, res, req.body);
 			logger.debug(
 				{
 					duration: Date.now() - startTime,
-					method: (req.body as { method?: string } | undefined)?.method,
+					method: requestBody?.method,
 				},
 				'Request completed'
 			);
@@ -122,5 +142,13 @@ export class StatelessHttpTransport extends BaseTransport {
 	 */
 	getActiveConnectionCount(): number {
 		return STATELESS_MODE;
+	}
+
+	/**
+	 * Get all active sessions - returns empty array for stateless transport
+	 */
+	override getSessions(): SessionMetadata[] {
+		// Stateless transport doesn't maintain sessions
+		return [];
 	}
 }

@@ -46,8 +46,8 @@ export class TestApiClient implements ApiClient {
     for (const callback of this.updateCallbacks) {
       try {
         callback(mcpSettings);
-      } catch (error) {
-        console.error('Error in settings update callback:', error);
+      } catch {
+        // Silently ignore callback errors to prevent logging interference
       }
     }
   }
