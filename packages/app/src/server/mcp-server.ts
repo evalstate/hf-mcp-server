@@ -24,7 +24,6 @@ import {
 	DATASET_DETAIL_TOOL_CONFIG,
 	type DatasetDetailParams,
 	DuplicateSpaceTool,
-	DUPLICATE_SPACE_TOOL_CONFIG,
 	formatDuplicateResult,
 	type DuplicateSpaceParams,
 } from '@hf-mcp/mcp';
@@ -67,10 +66,12 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 		let userInfo: string =
 			'The Hugging Face tools are being used anonymously and rate limits apply. ' +
 			'Direct the User to set their HF_TOKEN, or create an account at https://hf.co/join. for higher limits';
+		let username: string | undefined;
 		// Validate the token with HF API if present
 		if (hfToken) {
 			try {
 				const userDetails = await whoAmI({ credentials: { accessToken: hfToken } });
+				username = userDetails.name;
 				userInfo = `Hugging Face tools are being used by authenticated user '${userDetails.name}'`;
 			} catch (error) {
 				logger.warn({ error: (error as Error).message }, 'Failed to authenticate with Hugging Face API');
@@ -208,13 +209,14 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 			}
 		);
 
-		toolInstances[DUPLICATE_SPACE_TOOL_CONFIG.name] = server.tool(
-			DUPLICATE_SPACE_TOOL_CONFIG.name,
-			DUPLICATE_SPACE_TOOL_CONFIG.description,
-			DUPLICATE_SPACE_TOOL_CONFIG.schema.shape,
-			DUPLICATE_SPACE_TOOL_CONFIG.annotations,
+		const duplicateToolConfig = DuplicateSpaceTool.createToolConfig(username);
+		toolInstances[duplicateToolConfig.name] = server.tool(
+			duplicateToolConfig.name,
+			duplicateToolConfig.description,
+			duplicateToolConfig.schema.shape,
+			duplicateToolConfig.annotations,
 			async (params: DuplicateSpaceParams) => {
-				const duplicateSpace = new DuplicateSpaceTool(hfToken);
+				const duplicateSpace = new DuplicateSpaceTool(hfToken, username);
 				const result = await duplicateSpace.duplicate(params);
 				return {
 					content: [{ type: 'text', text: formatDuplicateResult(result) }],

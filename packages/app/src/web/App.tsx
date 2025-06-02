@@ -35,6 +35,7 @@ function App() {
 			paper_search: { enabled: false },
 			dataset_search: { enabled: false },
 			dataset_detail: { enabled: false },
+			duplicate_space: { enabled: false },
 		},
 	});
 
@@ -144,6 +145,15 @@ function App() {
 		},
 	};
 
+	const spaceTools = {
+		duplicate_space: {
+			id: 'duplicate_space',
+			label: 'Duplicate Space',
+			description: 'Create a copy of any Hugging Face Space to your account.',
+			settings: settings.tools.duplicate_space || { enabled: false },
+		},
+	};
+
 	return (
 		<>
 			<div className="flex h-screen w-screen items-center justify-center flex-col gap-6 pb-12">
@@ -151,6 +161,12 @@ function App() {
 					title="🤗 Hugging Face Search Tools (MCP)"
 					description="Find and use Hugging Face and Community content."
 					tools={searchTools}
+					onToolToggle={handleToolToggle}
+				/>
+				<ToolsCard
+					title="🤗 Hugging Face Space Tools (MCP)"
+					description="Manage and duplicate Hugging Face Spaces."
+					tools={spaceTools}
 					onToolToggle={handleToolToggle}
 				/>
 			</div>
