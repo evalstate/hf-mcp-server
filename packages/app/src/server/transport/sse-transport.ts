@@ -1,4 +1,4 @@
-import { BaseTransport, type TransportOptions, type BaseSession, type SessionMetadata } from './base-transport.js';
+import { StatefulTransport, type TransportOptions, type BaseSession } from './base-transport.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
@@ -10,15 +10,7 @@ interface SSEConnection extends BaseSession<SSEServerTransport> {
 	heartbeatInterval?: NodeJS.Timeout;
 }
 
-export class SseTransport extends BaseTransport {
-	// Store SSE connections with comprehensive metadata
-	private sseConnections: Map<string, SSEConnection> = new Map();
-	private isShuttingDown = false;
-	private staleCheckInterval?: NodeJS.Timeout;
-
-	// Configuration from environment variables
-	private readonly STALE_CHECK_INTERVAL = parseInt(process.env.MCP_CLIENT_CONNECTION_CHECK || '30000', 10);
-	private readonly STALE_TIMEOUT = parseInt(process.env.MCP_CLIENT_CONNECTION_TIMEOUT || '60000', 10);
+export class SseTransport extends StatefulTransport<SSEConnection> {
 
 	async initialize(_options: TransportOptions): Promise<void> {
 		// SSE endpoint for client connections
@@ -54,7 +46,7 @@ export class SseTransport extends BaseTransport {
 
 			// Handle reconnection attempts
 			if (existingSessionId) {
-				const existing = this.sseConnections.get(existingSessionId);
+				const existing = this.sessions.get(existingSessionId);
 				if (existing) {
 					logger.warn(
 						{
@@ -108,7 +100,7 @@ export class SseTransport extends BaseTransport {
 				},
 			};
 
-			this.sseConnections.set(sessionId, connection);
+			this.sessions.set(sessionId, connection);
 
 			// Set up connection event handlers
 			res.on('close', () => {
@@ -144,7 +136,7 @@ export class SseTransport extends BaseTransport {
 				return;
 			}
 
-			const connection = this.sseConnections.get(sessionId);
+			const connection = this.sessions.get(sessionId);
 
 			if (!connection) {
 				logger.warn({ sessionId }, 'SSE message for unknown session');
@@ -152,8 +144,8 @@ export class SseTransport extends BaseTransport {
 				return;
 			}
 
-			// Update last activity
-			connection.metadata.lastActivity = new Date();
+			// Update last activity using base class helper
+			this.updateSessionActivity(sessionId);
 
 			// Handle message with the transport
 			await connection.transport.handlePostMessage(req, res, req.body);
@@ -173,7 +165,7 @@ export class SseTransport extends BaseTransport {
 	private createCleanupFunction(sessionId: string): () => Promise<void> {
 		return async () => {
 			try {
-				const connection = this.sseConnections.get(sessionId);
+				const connection = this.sessions.get(sessionId);
 				if (!connection) return;
 
 				logger.debug({ sessionId }, 'Cleaning up SSE connection');
@@ -191,7 +183,7 @@ export class SseTransport extends BaseTransport {
 				}
 
 				// Remove from map
-				this.sseConnections.delete(sessionId);
+				this.sessions.delete(sessionId);
 
 				logger.debug({ sessionId }, 'SSE connection cleaned up');
 			} catch (error) {
@@ -207,34 +199,8 @@ export class SseTransport extends BaseTransport {
 		cleanup: () => Promise<void>
 	): Promise<void> {
 		try {
-			// Set up oninitialized callback to capture client info
-			server.server.oninitialized = () => {
-				const connection = this.sseConnections.get(sessionId);
-				if (connection) {
-					const clientInfo = server.server.getClientVersion();
-					const clientCapabilities = server.server.getClientCapabilities();
-					
-					if (clientInfo) {
-						connection.metadata.clientInfo = clientInfo;
-					}
-					
-					if (clientCapabilities) {
-						connection.metadata.capabilities = {
-							sampling: !!clientCapabilities.sampling,
-							roots: !!clientCapabilities.roots,
-						};
-					}
-					
-					logger.info(
-						{
-							sessionId,
-							clientInfo: connection.metadata.clientInfo,
-							capabilities: connection.metadata.capabilities,
-						},
-						'Client info captured'
-					);
-				}
-			};
+			// Set up oninitialized callback to capture client info using base class helper
+			server.server.oninitialized = this.createClientInfoCapture(sessionId);
 
 			await server.connect(transport);
 		} catch (error) {
@@ -244,58 +210,27 @@ export class SseTransport extends BaseTransport {
 		}
 	}
 
-	private startStaleConnectionCheck(): void {
-		this.staleCheckInterval = setInterval(() => {
-			if (this.isShuttingDown) return;
-
-			const now = Date.now();
-			const staleSessionIds: string[] = [];
-
-			// Find stale sessions
-			for (const [sessionId, connection] of this.sseConnections) {
-				const timeSinceActivity = now - connection.metadata.lastActivity.getTime();
-				if (timeSinceActivity > this.STALE_TIMEOUT) {
-					staleSessionIds.push(sessionId);
-				}
-			}
-
-			// Remove stale sessions
-			for (const sessionId of staleSessionIds) {
-				const connection = this.sseConnections.get(sessionId);
-				if (connection) {
-					logger.info(
-						{ sessionId, timeSinceActivity: now - connection.metadata.lastActivity.getTime() },
-						'Removing stale SSE connection'
-					);
-					void this.closeConnection(sessionId);
-				}
-			}
-		}, this.STALE_CHECK_INTERVAL);
-	}
-
 	/**
-	 * Mark transport as shutting down (called by entry point)
+	 * Remove a stale session - implementation for StatefulTransport
 	 */
-	override shutdown(): void {
-		this.isShuttingDown = true;
+	protected async removeStaleSession(sessionId: string): Promise<void> {
+		logger.info({ sessionId }, 'Removing stale SSE connection');
+		await this.closeConnection(sessionId);
 	}
 
 	async cleanup(): Promise<void> {
 		logger.info(
 			{
-				activeConnections: this.sseConnections.size,
+				activeConnections: this.sessions.size,
 			},
 			'Starting SSE transport cleanup'
 		);
 
-		// Stop stale checker
-		if (this.staleCheckInterval) {
-			clearInterval(this.staleCheckInterval);
-			this.staleCheckInterval = undefined;
-		}
+		// Stop stale checker using base class helper
+		this.stopStaleConnectionCheck();
 
 		// Get all session IDs to avoid mutation during iteration
-		const sessionIds = Array.from(this.sseConnections.keys());
+		const sessionIds = Array.from(this.sessions.keys());
 
 		// Close all connections in parallel
 		const cleanupPromises = sessionIds.map((sessionId) =>
@@ -307,25 +242,16 @@ export class SseTransport extends BaseTransport {
 		await Promise.allSettled(cleanupPromises);
 
 		// Ensure map is cleared
-		this.sseConnections.clear();
+		this.sessions.clear();
 
 		logger.info('SSE transport cleanup completed');
-	}
-
-	// Public management methods
-
-	/**
-	 * Get the number of active SSE connections
-	 */
-	override getActiveConnectionCount(): number {
-		return this.sseConnections.size;
 	}
 
 	/**
 	 * Force close a specific connection
 	 */
 	async closeConnection(sessionId: string): Promise<boolean> {
-		const connection = this.sseConnections.get(sessionId);
+		const connection = this.sessions.get(sessionId);
 		if (!connection) {
 			logger.debug({ sessionId }, 'Attempted to close non-existent connection');
 			return false;
@@ -338,24 +264,6 @@ export class SseTransport extends BaseTransport {
 			logger.error({ error, sessionId }, 'Error closing connection');
 			return false;
 		}
-	}
-
-	/**
-	 * Check if server is accepting new connections
-	 */
-	isAcceptingConnections(): boolean {
-		return !this.isShuttingDown;
-	}
-
-	/**
-	 * Get all active sessions with their metadata
-	 */
-	override getSessions(): SessionMetadata[] {
-		const sessions: SessionMetadata[] = [];
-		for (const connection of this.sseConnections.values()) {
-			sessions.push({ ...connection.metadata });
-		}
-		return sessions;
 	}
 
 }

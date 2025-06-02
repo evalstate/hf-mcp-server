@@ -1,4 +1,4 @@
-import { BaseTransport, type TransportOptions, type BaseSession, type SessionMetadata } from './base-transport.js';
+import { StatefulTransport, type TransportOptions, type BaseSession } from './base-transport.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { randomUUID } from 'node:crypto';
 import type { Request, Response } from 'express';
@@ -8,14 +8,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
 type Session = BaseSession<StreamableHTTPServerTransport>;
 
-export class StreamableHttpTransport extends BaseTransport {
-	private sessions = new Map<string, Session>();
-	private staleCheckInterval?: NodeJS.Timeout;
-	private isShuttingDown = false;
-
-	// Configuration from environment variables
-	private readonly STALE_CHECK_INTERVAL = parseInt(process.env.MCP_CLIENT_CONNECTION_CHECK || '30000', 10);
-	private readonly STALE_TIMEOUT = parseInt(process.env.MCP_CLIENT_CONNECTION_TIMEOUT || '60000', 10);
+export class StreamableHttpTransport extends StatefulTransport<Session> {
 
 	initialize(_options: TransportOptions): Promise<void> {
 		this.setupRoutes();
@@ -57,10 +50,7 @@ export class StreamableHttpTransport extends BaseTransport {
 
 			// Update activity timestamp for existing sessions
 			if (sessionId && this.sessions.has(sessionId)) {
-				const session = this.sessions.get(sessionId);
-				if (session) {
-					session.metadata.lastActivity = new Date();
-				}
+				this.updateSessionActivity(sessionId);
 			}
 
 			switch (method) {
@@ -197,24 +187,8 @@ export class StreamableHttpTransport extends BaseTransport {
 
 		server.server.oninitialized = () => {
 			const sessionId = transport.sessionId;
-			const session = sessionId ? this.sessions.get(sessionId) : undefined;
-			if (session) {
-				const clientInfo = server.server.getClientVersion();
-				const clientCapabilities = server.server.getClientCapabilities();
-				if (clientInfo) {
-					session.metadata.clientInfo = clientInfo;
-				}
-
-				if (clientCapabilities) {
-					session.metadata.capabilities = {
-						sampling: !!clientCapabilities.sampling,
-						roots: !!clientCapabilities.roots,
-					};
-				}
-				logger.info(
-					{ clientInfo, clientCapabilities },
-					`Client Initialized ${clientInfo?.name || 'unknown'} ${clientInfo?.version || 'unknown'}`
-				);
+			if (sessionId) {
+				this.createClientInfoCapture(sessionId)();
 			}
 		};
 
@@ -238,45 +212,17 @@ export class StreamableHttpTransport extends BaseTransport {
 		logger.debug({ sessionId }, 'Session removed');
 	}
 
-	private startStaleConnectionCheck(): void {
-		// Uses JavaScript's event loop - no separate thread
-		this.staleCheckInterval = setInterval(() => {
-			if (this.isShuttingDown) return;
-
-			const now = Date.now();
-			const staleSessionIds: string[] = [];
-
-			// Find stale sessions
-			for (const [sessionId, session] of this.sessions) {
-				const timeSinceActivity = now - session.metadata.lastActivity.getTime();
-				if (timeSinceActivity > this.STALE_TIMEOUT) {
-					staleSessionIds.push(sessionId);
-				}
-			}
-
-			// Remove stale sessions
-			// TODO: Future enhancement - implement ping mechanism
-			// Could check if transport/server supports ping before removing
-			for (const sessionId of staleSessionIds) {
-				logger.info({ sessionId }, 'Removing stale session');
-				void this.removeSession(sessionId);
-			}
-		}, this.STALE_CHECK_INTERVAL);
-	}
-
 	/**
-	 * Mark transport as shutting down (called by entry point)
+	 * Remove a stale session - implementation for StatefulTransport
 	 */
-	override shutdown(): void {
-		this.isShuttingDown = true;
+	protected async removeStaleSession(sessionId: string): Promise<void> {
+		logger.info({ sessionId }, 'Removing stale session');
+		await this.removeSession(sessionId);
 	}
 
 	async cleanup(): Promise<void> {
-		// Stop stale checker
-		if (this.staleCheckInterval) {
-			clearInterval(this.staleCheckInterval);
-			this.staleCheckInterval = undefined;
-		}
+		// Stop stale checker using base class helper
+		this.stopStaleConnectionCheck();
 
 		// Close all sessions gracefully
 		const closePromises = Array.from(this.sessions.keys()).map((sessionId) =>
@@ -289,30 +235,5 @@ export class StreamableHttpTransport extends BaseTransport {
 
 		this.sessions.clear();
 		logger.info('StreamableHTTP transport cleanup complete');
-	}
-
-	/**
-	 * Get the number of active connections
-	 */
-	override getActiveConnectionCount(): number {
-		return this.sessions.size;
-	}
-
-	/**
-	 * Get all active sessions with their metadata
-	 */
-	override getSessions(): SessionMetadata[] {
-		const sessions: SessionMetadata[] = [];
-		for (const session of this.sessions.values()) {
-			sessions.push({ ...session.metadata });
-		}
-		return sessions;
-	}
-
-	/**
-	 * Check if server is accepting new connections
-	 */
-	isAcceptingConnections(): boolean {
-		return !this.isShuttingDown;
 	}
 }
