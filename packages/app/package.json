@@ -25,6 +25,7 @@
 	},
 	"dependencies": {
 		"@hf-mcp/mcp": "workspace:*",
+		"@huggingface/hub": "^2.1.0",
 		"@modelcontextprotocol/sdk": "^1.11.2",
 		"@radix-ui/react-checkbox": "^1.2.3",
 		"@radix-ui/react-label": "^2.1.4",
