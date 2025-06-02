@@ -43,23 +43,7 @@ export class Application {
 		this.webServerInstance = options.webServerInstance;
 		this.isDev = process.env.NODE_ENV === 'development';
 
-		// Configure API client
-		const apiClientConfig: ApiClientConfig = options.apiClientConfig || {
-			type: 'polling',
-			baseUrl: `http://localhost:${String(this.webAppPort)}`,
-			pollInterval: 5000,
-		};
-		this.apiClient = new McpApiClient(apiClientConfig);
-
-		// Create the server factory
-		this.serverFactory = createServerFactory(this.webServerInstance, this.apiClient);
-
-		// Get Express app instance
-		this.appInstance = this.webServerInstance.getApp();
-	}
-
-	async start(): Promise<void> {
-		// Set transport info
+		// Create transport info first
 		const defaultHfToken = process.env.DEFAULT_HF_TOKEN;
 		const transportInfo: TransportInfo = {
 			transport: this.transportType,
@@ -69,7 +53,28 @@ export class Application {
 			jsonResponseEnabled: this.transportType === 'streamableHttpJson',
 			stdioClient: this.transportType === 'stdio' ? null : undefined,
 		};
-		this.webServerInstance.setTransportInfo(transportInfo);
+
+		// Configure API client with transport info
+		const apiClientConfig: ApiClientConfig = options.apiClientConfig || {
+			type: 'polling',
+			baseUrl: `http://localhost:${String(this.webAppPort)}`,
+			pollInterval: 5000,
+		};
+		this.apiClient = new McpApiClient(apiClientConfig, transportInfo);
+
+		// Create the server factory
+		this.serverFactory = createServerFactory(this.webServerInstance, this.apiClient);
+
+		// Get Express app instance
+		this.appInstance = this.webServerInstance.getApp();
+	}
+
+	async start(): Promise<void> {
+		// Set transport info (already created in constructor)
+		const transportInfo = this.apiClient.getTransportInfo();
+		if (transportInfo) {
+			this.webServerInstance.setTransportInfo(transportInfo);
+		}
 
 		// Setup tool management for web server
 		this.setupToolManagement();

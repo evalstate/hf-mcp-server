@@ -65,18 +65,22 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 		// Use token from header or fall back to environment variable
 		const hfToken = tokenFromHeader || getHfToken();
 		let userInfo: string =
-			'The Hugging Face services are being used anonymously and rate limits apply. ' +
+			'The Hugging Face tools are being used anonymously and rate limits apply. ' +
 			'Direct the User to set their HF_TOKEN, or create an account at https://hf.co/join. for higher limits';
 		// Validate the token with HF API if present
 		if (hfToken) {
 			try {
 				const userDetails = await whoAmI({ credentials: { accessToken: hfToken } });
-				userInfo = `Hugging Face services are being used by authenticated user '${userDetails.name}'`;
+				userInfo = `Hugging Face tools are being used by authenticated user '${userDetails.name}'`;
 			} catch (error) {
 				logger.warn({ error: (error as Error).message }, 'Failed to authenticate with Hugging Face API');
 			}
 		}
 
+		/**
+		 *  we will set capabilities below. use of the convenience .tool() registration methods automatically
+		 * sets tools: {listChanged: true} .
+		 */
 		const server = new McpServer(
 			{
 				name: '@huggingface/mcp-services',
@@ -86,11 +90,8 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 				instructions:
 					"This server provides tools for searching the Hugging Face Hub. arXiv paper id's are often " +
 					'used as references between datasets, models and papers. There are over 100 tags in use, ' +
-					"common tags include 'Text Generation', 'Transformers', 'Image Classification' and so on.\n " +
+					"common tags include 'Text Generation', 'Transformers', 'Image Classification' and so on.\n" +
 					userInfo,
-				capabilities: {
-					tools: { listChanged: true },
-				},
 			}
 		);
 
@@ -229,6 +230,13 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 				logger.debug({ toolName }, 'Tool disabled based on initial settings');
 			}
 		}
+
+		const transportInfo = sharedApiClient.getTransportInfo();
+		server.server.registerCapabilities({
+			tools: {
+				listChanged: !transportInfo?.jsonResponseEnabled,
+			},
+		});
 
 		// Set up event listener for dynamic tool state changes
 		sharedApiClient.on('toolStateChange', (toolId: string, enabled: boolean) => {
