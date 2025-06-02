@@ -48,9 +48,10 @@ export class StdioTransport extends StatefulTransport<StdioSession> {
 	/**
 	 * STDIO doesn't need stale session removal since there's only one persistent session
 	 */
-	protected async removeStaleSession(sessionId: string): Promise<void> {
+	protected removeStaleSession(sessionId: string): Promise<void> {
 		// STDIO has only one session and it's not subject to staleness
 		logger.debug({ sessionId }, 'STDIO session staleness check (no-op)');
+		return Promise.resolve();
 	}
 
 	async cleanup(): Promise<void> {
