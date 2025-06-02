@@ -14,7 +14,7 @@ export class StdioTransport extends BaseTransport {
 		const transport = new StdioServerTransport();
 		
 		// Create server instance using factory (null headers for STDIO)
-		const server = this.serverFactory(null);
+		const server = await this.serverFactory(null);
 
 		// Create session with metadata tracking
 		this.session = {

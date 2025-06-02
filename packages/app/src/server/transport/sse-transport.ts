@@ -70,7 +70,7 @@ export class SseTransport extends BaseTransport {
 			}
 
 			// Create server instance using factory with request headers
-			const server = this.serverFactory(req.headers as Record<string, string>);
+			const server = await this.serverFactory(req.headers as Record<string, string>);
 
 			// Create new transport
 			const transport = new SSEServerTransport('/message', res);
@@ -316,7 +316,7 @@ export class SseTransport extends BaseTransport {
 		return !this.isShuttingDown;
 	}
 
-	private setupClientInfoCapture(transport: SSEServerTransport, server: McpServer, sessionId: string): void {
+	private setupClientInfoCapture(_transport: SSEServerTransport, server: McpServer, sessionId: string): void {
 		// Intercept the server's initialization handler to capture client info
 		const originalSetHandler = server.server.setRequestHandler.bind(server.server);
 		const connections = this.sseConnections;

@@ -1,14 +1,5 @@
-interface TransportInfo {
-	transport: 'stdio' | 'sse' | 'streamableHttp' | 'streamableHttpJson' | 'unknown';
-	port?: number;
-	hfTokenMasked?: string;
-	hfTokenSet?: boolean;
-	jsonResponseEnabled?: boolean;
-	stdioClient?: {
-		name: string;
-		version: string;
-	} | null;
-}
+import type { TransportInfo } from '../../shared/transport-info.js';
+import { getTokenDisplayText } from '../../shared/transport-info.js';
 
 interface ConnectionFooterProps {
 	isLoading: boolean;
@@ -127,9 +118,9 @@ export function ConnectionFooter({ isLoading, error, transportInfo }: Connection
 				</div>
 
 				<div className="flex items-center gap-1">
-					<span className="text-muted-foreground"> HF Token:</span>
-					<span className={`font-mono ${!transportInfo.hfTokenSet ? 'text-red-500' : ''}`}>
-						{transportInfo.hfTokenSet ? transportInfo.hfTokenMasked : '⚠️ Not configured'}
+					<span className="text-muted-foreground"> Default HF Token:</span>
+					<span className={`font-mono ${getTokenDisplayText(transportInfo).isWarning ? 'text-red-500' : ''}`}>
+						{getTokenDisplayText(transportInfo).text}
 					</span>
 				</div>
 			</div>

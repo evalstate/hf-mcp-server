@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { logger } from './logger.js';
 import type { AppSettings } from '../../shared/settings.js';
+import type { TransportInfo } from '../../shared/transport-info.js';
 
 export interface ToolStateChangeCallback {
     (toolId: string, enabled: boolean): void;
@@ -31,10 +32,12 @@ export class McpApiClient extends EventEmitter {
     private cache: Map<string, boolean> = new Map();
     private gradioEndpoints: GradioEndpoint[] = [];
     private isPolling = false;
+    private transportInfo: TransportInfo | null = null;
 
-    constructor(config: ApiClientConfig) {
+    constructor(config: ApiClientConfig, transportInfo?: TransportInfo) {
         super();
         this.config = config;
+        this.transportInfo = transportInfo || null;
         
         // Initialize static data if provided
         if (config.type === 'static') {
@@ -47,6 +50,10 @@ export class McpApiClient extends EventEmitter {
                 this.gradioEndpoints = [...config.staticGradioEndpoints];
             }
         }
+    }
+
+    getTransportInfo(): TransportInfo | null {
+        return this.transportInfo;
     }
 
     async getSettings(): Promise<AppSettings | null> {

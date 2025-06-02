@@ -108,8 +108,8 @@ export const formatSearchResults = (query: string, results: SpaceSearchResult[],
 	}
 
 	const showingText = results.length < totalCount 
-		? `Showing ${results.length} of ${totalCount} results`
-		: `All ${results.length} results`;
+		? `Showing ${results.length.toString()} of ${totalCount.toString()} results`
+		: `All ${results.length.toString()} results`;
 	let markdown = `# Space Search Results for the query '${query}' (${showingText})\n\n`;
 	markdown += '| Space | Description | Author | ID | Category |  Likes | Trending Score | Relevance |\n';
 	markdown += '|-------|-------------|--------|----|----------|--------|----------------|-----------|\n';

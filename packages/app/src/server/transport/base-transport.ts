@@ -5,7 +5,7 @@ import type { Express } from 'express';
  * Factory function to create server instances
  * This should be provided during transport construction to enable per-connection server instances
  */
-export type ServerFactory = (headers: Record<string, string> | null) => McpServer;
+export type ServerFactory = (headers: Record<string, string> | null) => Promise<McpServer>;
 
 export interface TransportOptions {
 	port?: number;

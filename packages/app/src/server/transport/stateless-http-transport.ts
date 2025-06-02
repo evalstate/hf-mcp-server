@@ -42,7 +42,7 @@ export class StatelessHttpTransport extends BaseTransport {
 
 		try {
 			// Create new server instance using factory with request headers
-			server = this.serverFactory(req.headers as Record<string, string>);
+			server = await this.serverFactory(req.headers as Record<string, string>);
 			
 			// Create new transport instance for this request
 			transport = new StreamableHTTPServerTransport({

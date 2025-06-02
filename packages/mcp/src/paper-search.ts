@@ -118,8 +118,8 @@ function formatSearchResults(
 	const r: string[] = [];
 	const showingText =
 		papers.length < totalCount
-			? `Showing ${papers.length} of ${totalCount} papers that matched the query '${query}'`
-			: `All ${papers.length} papers that matched the query '${query}'`;
+			? `${totalCount.toString()} papers matched the query '${query}'. Here are the first ${papers.length.toString()} results.`
+			: `All ${papers.length.toString()} papers that matched the query '${query}'`;
 	r.push(showingText);
 
 	for (const result of papers) {
