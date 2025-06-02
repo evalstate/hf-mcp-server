@@ -41,8 +41,14 @@ export class StatelessHttpTransport extends BaseTransport {
 		let transport: StreamableHTTPServerTransport | null = null;
 
 		try {
-			// Create new server instance using factory with request headers
-			server = await this.serverFactory(req.headers as Record<string, string>);
+			// Create new server instance using factory with request headers and bouquet
+			const headers = req.headers as Record<string, string>;
+			const bouquet = req.query.bouquet as string | undefined;
+			if (bouquet) {
+				headers['x-mcp-bouquet'] = bouquet;
+				logger.info({ bouquet }, 'Stateless HTTP: Passing bouquet parameter to server factory');
+			}
+			server = await this.serverFactory(headers);
 			
 			// Create new transport instance for this request
 			transport = new StreamableHTTPServerTransport({

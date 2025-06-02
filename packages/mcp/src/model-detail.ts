@@ -208,7 +208,7 @@ export class ModelDetailTool {
 					});
 					// eslint-disable-next-line @typescript-eslint/no-unused-vars
 				} catch (ignoreUnformattedSpaces) {
-					console.error(`Error  processing spaces for model ${modelId}:`);
+					console.error(`Error processing spaces for model ${modelId}:`);
 				}
 			}
 

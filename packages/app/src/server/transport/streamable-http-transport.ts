@@ -103,7 +103,12 @@ export class StreamableHttpTransport extends BaseTransport {
 			transport = existingSession.transport;
 		} else if (!sessionId && isInitializeRequest(req.body)) {
 			// Create new session only for initialization requests
-			transport = await this.createSession(req.headers as Record<string, string>);
+			const headers = req.headers as Record<string, string>;
+			const bouquet = req.query.bouquet as string | undefined;
+			if (bouquet) {
+				headers['x-mcp-bouquet'] = bouquet;
+			}
+			transport = await this.createSession(headers);
 		} else if (!sessionId) {
 			// No session ID and not an initialization request
 			res

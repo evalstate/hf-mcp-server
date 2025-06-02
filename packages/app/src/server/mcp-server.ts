@@ -43,6 +43,11 @@ const getHfToken = (): string | undefined => {
 	return process.env.DEFAULT_HF_TOKEN;
 };
 
+// Define bouquet configurations
+const BOUQUETS: Record<string, string[]> = {
+	spaces: ['space_search', 'duplicate_space'],
+};
+
 /**
  * Creates a ServerFactory function that produces McpServer instances with all tools registered
  * The shared ApiClient provides global tool state management across all server instances
@@ -53,15 +58,18 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 
 	return async (headers: Record<string, string> | null): Promise<McpServer> => {
 		let tokenFromHeader: string | undefined;
-		if (headers && 'authorization' in headers) {
-			const authHeader = headers.authorization || '';
-			const match = authHeader.match(/^Bearer\s+(.+)$/i);
-			if (match) {
-				tokenFromHeader = match[1];
+		let bouquet: string | undefined;
+		if (headers) {
+			if ('authorization' in headers) {
+				const authHeader = headers.authorization || '';
+				if (authHeader.startsWith('Bearer ')) tokenFromHeader = authHeader.slice(7).trim();
+			}
+			// Extract bouquet from custom header
+			if ('x-mcp-bouquet' in headers) {
+				bouquet = headers['x-mcp-bouquet'];
+				logger.info({ bouquet }, 'Bouquet parameter received');
 			}
 		}
-
-		// Use token from header or fall back to environment variable
 		const hfToken = tokenFromHeader || getHfToken();
 		let userInfo: string =
 			'The Hugging Face tools are being used anonymously and rate limits apply. ' +
@@ -224,12 +232,20 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 			}
 		);
 
-		// Apply initial tool states based on current settings
+		// Apply initial tool states based on current settings and bouquet
 		for (const [toolName, toolInstance] of Object.entries(toolInstances)) {
-			const isEnabled = sharedApiClient.getCachedToolState(toolName);
+			let isEnabled = sharedApiClient.getCachedToolState(toolName);
+			
+			// If a bouquet is specified, override the settings
+			if (bouquet && BOUQUETS[bouquet]) {
+				const allowedTools = BOUQUETS[bouquet];
+				isEnabled = allowedTools?.includes(toolName) ?? false;
+				logger.info({ toolName, bouquet, isEnabled }, 'Tool state set by bouquet');
+			}
+			
 			if (!isEnabled) {
 				toolInstance.disable();
-				logger.debug({ toolName }, 'Tool disabled based on initial settings');
+				logger.debug({ toolName }, 'Tool disabled');
 			}
 		}
 
@@ -240,21 +256,23 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 			},
 		});
 
-		// Set up event listener for dynamic tool state changes
-		sharedApiClient.on('toolStateChange', (toolId: string, enabled: boolean) => {
-			const toolInstance = toolInstances[toolId];
-			if (toolInstance) {
-				if (enabled) {
-					toolInstance.enable();
-					logger.info({ toolId }, 'Tool enabled via API event');
+		if (!transportInfo?.jsonResponseEnabled) {
+			// Set up event listener for dynamic tool state changes
+			sharedApiClient.on('toolStateChange', (toolId: string, enabled: boolean) => {
+				const toolInstance = toolInstances[toolId];
+				if (toolInstance) {
+					if (enabled) {
+						toolInstance.enable();
+						logger.info({ toolId }, 'Tool enabled via API event');
+					} else {
+						toolInstance.disable();
+						logger.info({ toolId }, 'Tool disabled via API event');
+					}
 				} else {
-					toolInstance.disable();
-					logger.info({ toolId }, 'Tool disabled via API event');
+					logger.warn({ toolId }, 'Received tool state change for unknown tool');
 				}
-			} else {
-				logger.warn({ toolId }, 'Received tool state change for unknown tool');
-			}
-		});
+			});
+		}
 
 		return server;
 	};

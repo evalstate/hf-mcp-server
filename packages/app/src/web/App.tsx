@@ -110,38 +110,38 @@ function App() {
 			id: 'paper_search',
 			label: 'Papers Search',
 			description: 'Find Machine Learning Research Papers.',
-			settings: settings.tools.paper_search || { enabled: false },
+			settings: settings.tools.paper_search || { enabled: true },
 		},
 		space_search: {
 			// Changed from space_semantic_search
 			id: 'space_search',
 			label: 'Space Search',
 			description: 'Find Gradio Hugging Face Spaces.',
-			settings: settings.tools.space_search || { enabled: false },
+			settings: settings.tools.space_search || { enabled: true },
 		},
 		model_search: {
 			id: 'model_search',
 			label: 'Model Search',
 			description: 'Search for ML models with filters for task, library, etc.',
-			settings: settings.tools.model_search || { enabled: false },
+			settings: settings.tools.model_search || { enabled: true },
 		},
 		model_detail: {
 			id: 'model_detail',
 			label: 'Model Details',
 			description: 'Get detailed information about a specific model.',
-			settings: settings.tools.model_detail || { enabled: false },
+			settings: settings.tools.model_detail || { enabled: true },
 		},
 		dataset_search: {
 			id: 'dataset_search',
 			label: 'Dataset Search',
 			description: 'Search for datasets with filters for author, tags, etc.',
-			settings: settings.tools.dataset_search || { enabled: false },
+			settings: settings.tools.dataset_search || { enabled: true },
 		},
 		dataset_detail: {
 			id: 'dataset_detail',
 			label: 'Dataset Details',
 			description: 'Get detailed information about a specific dataset.',
-			settings: settings.tools.dataset_detail || { enabled: false },
+			settings: settings.tools.dataset_detail || { enabled: true },
 		},
 	};
 
@@ -149,8 +149,8 @@ function App() {
 		duplicate_space: {
 			id: 'duplicate_space',
 			label: 'Duplicate Space',
-			description: 'Create a copy of any Hugging Face Space to your account.',
-			settings: settings.tools.duplicate_space || { enabled: false },
+			description: 'Duplicate any Hugging Face Space to your account.',
+			settings: settings.tools.duplicate_space || { enabled: true },
 		},
 	};
 

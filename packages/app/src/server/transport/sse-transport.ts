@@ -51,6 +51,7 @@ export class SseTransport extends BaseTransport {
 			}
 
 			const existingSessionId = req.query.sessionId as string | undefined;
+			const bouquet = req.query.bouquet as string | undefined;
 
 			// Handle reconnection attempts
 			if (existingSessionId) {
@@ -69,8 +70,13 @@ export class SseTransport extends BaseTransport {
 				}
 			}
 
-			// Create server instance using factory with request headers
-			const server = await this.serverFactory(req.headers as Record<string, string>);
+			// Create server instance using factory with request headers and bouquet
+			const headers = req.headers as Record<string, string>;
+			if (bouquet) {
+				headers['x-mcp-bouquet'] = bouquet;
+				logger.info({ bouquet }, 'SSE: Passing bouquet parameter to server factory');
+			}
+			const server = await this.serverFactory(headers);
 
 			// Create new transport
 			const transport = new SSEServerTransport('/message', res);

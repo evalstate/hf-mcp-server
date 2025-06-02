@@ -2,10 +2,17 @@
 
 # Default to stdio transport if not specified
 TRANSPORT="${TRANSPORT:-stdio}"
+# Convert transport to lowercase for case-insensitive comparison
+TRANSPORT=$(echo "$TRANSPORT" | tr '[:upper:]' '[:lower:]')
 # Get port from environment or use default
 PORT="${PORT:-3000}"
 # Other options
 JSON_MODE="${JSON_MODE:-false}"
+
+# For stdio mode, use HF_TOKEN as DEFAULT_HF_TOKEN if DEFAULT_HF_TOKEN is not set
+if [ "$TRANSPORT" = "stdio" ] && [ -z "$DEFAULT_HF_TOKEN" ] && [ -n "$HF_TOKEN" ]; then
+  export DEFAULT_HF_TOKEN="$HF_TOKEN"
+fi
 
 # Only echo if not using stdio transport
 if [ "$TRANSPORT" != "stdio" ]; then
