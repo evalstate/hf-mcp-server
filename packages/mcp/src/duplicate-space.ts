@@ -43,11 +43,11 @@ export const DUPLICATE_SPACE_TOOL_CONFIG = {
 	description: '', // This will be dynamically set with username
 	schema: z.object({
 		sourceSpaceId: z.string().min(1).describe("Space ID to copy (e.g., 'username/space-name')"),
-		newSpaceId: z.string().optional().describe('Name for the new space (optional, defaults to source name)'),
+		newSpaceId: z.string().optional().describe('Name for the new space (optional, defaults to source space-name)'),
 		hardware: z
 			.enum(['freecpu', 'zerogpu'])
 			.optional()
-			.describe('Either "freecpu" or "zerogpu" (optional, defaults based on source)'),
+			.describe('Either "freecpu" or "zerogpu" (defaults based on source). Both options are in the free tier.'),
 		private: z
 			.boolean()
 			.optional()
@@ -80,7 +80,7 @@ export class DuplicateSpaceTool extends HfApiCall<DuplicateSpaceParams, Duplicat
 
 	static createToolConfig(username?: string): typeof DUPLICATE_SPACE_TOOL_CONFIG {
 		const description = username
-			? `Duplicate a Hugging Face Space. Target space will be created as ${username}/<targetName>.`
+			? `Duplicate a Hugging Face Space. Target space will be created as ${username}/<new-space-name>.`
 			: `Requires Authentication. Direct User to set a Hugging Face token or go to hf.co/join to create an account.`;
 		return {
 			...DUPLICATE_SPACE_TOOL_CONFIG,
