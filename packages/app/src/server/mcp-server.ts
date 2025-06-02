@@ -218,6 +218,7 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 		);
 
 		const duplicateToolConfig = DuplicateSpaceTool.createToolConfig(username);
+		logger.info({ username, description: duplicateToolConfig.description }, 'Creating duplicate tool config');
 		toolInstances[duplicateToolConfig.name] = server.tool(
 			duplicateToolConfig.name,
 			duplicateToolConfig.description,

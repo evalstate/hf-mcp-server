@@ -71,18 +71,20 @@ const HARDWARE_MAP = {
 const FREE_HARDWARE = ['cpu-basic', 'zero-a10g'];
 
 export class DuplicateSpaceTool extends HfApiCall<DuplicateSpaceParams, DuplicateSpaceResult> {
-	private username: string;
+	private username?: string;
 
 	constructor(hfToken?: string, username?: string) {
 		super('https://huggingface.co/api', hfToken);
-		this.username = username || 'unknown';
+		this.username = username;
 	}
 
 	static createToolConfig(username?: string): typeof DUPLICATE_SPACE_TOOL_CONFIG {
-		const userPrefix = username ? `${username}/` : '';
+		const description = username
+			? `Duplicate a Hugging Face Space. Target space will be created as ${username}/<targetName>.`
+			: `Requires Authentication. Direct User to set a Hugging Face token or go to hf.co/join to create an account.`;
 		return {
 			...DUPLICATE_SPACE_TOOL_CONFIG,
-			description: `Duplicate a Hugging Face Space to ${userPrefix}/<targetName>.`,
+			description,
 		};
 	}
 
@@ -118,6 +120,8 @@ export class DuplicateSpaceTool extends HfApiCall<DuplicateSpaceParams, Duplicat
 
 	async duplicate(params: DuplicateSpaceParams): Promise<DuplicateSpaceResult> {
 		const { sourceSpaceId, newSpaceName, hardware, private: isPrivate = true } = params;
+
+		if (!this.username) throw new Error('Set a valid Hugging Face token, or go to hf.co/join to create an 🤗 account.');
 
 		try {
 			// Step 1: Get source space info

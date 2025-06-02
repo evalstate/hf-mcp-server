@@ -38,7 +38,7 @@ case "$TRANSPORT" in
   sse)
     node $DIST_PATH/sse.js --port "$PORT"
     ;;
-  streamableHttp)
+  streamablehttp)
     # Check if JSON mode is enabled
     if [ "$JSON_MODE" = "true" ]; then
       echo "JSON response mode enabled"
@@ -47,7 +47,7 @@ case "$TRANSPORT" in
       node $DIST_PATH/streamableHttp.js --port "$PORT"
     fi
     ;;
-  streamableHttpJson)
+  streamablehttpjson)
     echo "Using streamableHttpJson transport type (JSON response mode enabled)"
     node $DIST_PATH/streamableHttp.js --port "$PORT" --json
     ;;
