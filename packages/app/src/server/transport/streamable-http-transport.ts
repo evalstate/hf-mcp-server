@@ -1,12 +1,10 @@
-import { BaseTransport, type TransportOptions, type BaseSession } from './base-transport.js';
+import { BaseTransport, type TransportOptions, type BaseSession, type SessionMetadata } from './base-transport.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { randomUUID } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { logger } from '../lib/logger.js';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
-import type { ZodObject, ZodLiteral } from 'zod';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 type Session = BaseSession<StreamableHTTPServerTransport>;
 
@@ -94,7 +92,6 @@ export class StreamableHttpTransport extends BaseTransport {
 		let transport: StreamableHTTPServerTransport;
 
 		if (sessionId && this.sessions.has(sessionId)) {
-			// Use existing session
 			const existingSession = this.sessions.get(sessionId);
 			if (!existingSession) {
 				res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(req.body)));
@@ -167,7 +164,7 @@ export class StreamableHttpTransport extends BaseTransport {
 	private async createSession(requestHeaders?: Record<string, string>): Promise<StreamableHTTPServerTransport> {
 		// Create server instance using factory with request headers
 		const server = await this.serverFactory(requestHeaders || null);
-		
+
 		const transport = new StreamableHTTPServerTransport({
 			sessionIdGenerator: () => randomUUID(),
 			onsessioninitialized: (sessionId: string) => {
@@ -198,82 +195,33 @@ export class StreamableHttpTransport extends BaseTransport {
 			}
 		};
 
+		server.server.oninitialized = () => {
+			const sessionId = transport.sessionId;
+			const session = sessionId ? this.sessions.get(sessionId) : undefined;
+			if (session) {
+				const clientInfo = server.server.getClientVersion();
+				const clientCapabilities = server.server.getClientCapabilities();
+				if (clientInfo) {
+					session.metadata.clientInfo = clientInfo;
+				}
+
+				if (clientCapabilities) {
+					session.metadata.capabilities = {
+						sampling: !!clientCapabilities.sampling,
+						roots: !!clientCapabilities.roots,
+					};
+				}
+				logger.info(
+					{ clientInfo, clientCapabilities },
+					`Client Initialized ${clientInfo?.name || 'unknown'} ${clientInfo?.version || 'unknown'}`
+				);
+			}
+		};
+
 		// Connect to session-specific server
 		await server.connect(transport);
 
-		// Set up client info capture for this session's server
-		this.setupClientInfoCapture(transport, server);
-
 		return transport;
-	}
-
-	private setupClientInfoCapture(transport: StreamableHTTPServerTransport, server: McpServer): void {
-		// Intercept the server's initialization handler to capture client info
-		const originalSetHandler = server.server.setRequestHandler.bind(server.server);
-		const sessions = this.sessions;
-
-		// Type-safe wrapper that preserves the original signature
-		server.server.setRequestHandler = function <T extends ZodObject<{ method: ZodLiteral<string> }>>(
-			schema: T,
-			handler: Parameters<typeof originalSetHandler<T>>[1]
-		): void {
-			// Check if this is the initialize request handler by examining the method
-			if (schema.shape.method.value === 'initialize') {
-				interface InitRequest {
-					params?: {
-						clientInfo?: { name: string; version: string };
-						capabilities?: {
-							sampling?: unknown;
-							roots?: unknown;
-						};
-					};
-				}
-
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				const wrappedHandler = async (request: any, extra: any) => {
-					// Capture client info for this specific transport/session
-					const sessionId = transport.sessionId;
-					if (sessionId && sessions.has(sessionId)) {
-						const session = sessions.get(sessionId);
-						// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-						if (!session) return await handler(request, extra);
-
-						const typedRequest = request as InitRequest;
-						if (typedRequest.params?.clientInfo) {
-							session.metadata.clientInfo = {
-								name: typedRequest.params.clientInfo.name,
-								version: typedRequest.params.clientInfo.version,
-							};
-						}
-
-						if (typedRequest.params?.capabilities) {
-							Object.assign(session.metadata.capabilities, {
-								sampling: !!typedRequest.params.capabilities.sampling,
-								roots: !!typedRequest.params.capabilities.roots,
-							});
-						}
-
-						logger.info(
-							{
-								sessionId,
-								clientInfo: session.metadata.clientInfo,
-								capabilities: session.metadata.capabilities,
-							},
-							'Client info captured'
-						);
-					}
-
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-					return await handler(request, extra);
-				};
-
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-				originalSetHandler(schema, wrappedHandler as any);
-				return;
-			}
-
-			originalSetHandler(schema, handler);
-		};
 	}
 
 	private async removeSession(sessionId: string): Promise<void> {
@@ -343,12 +291,22 @@ export class StreamableHttpTransport extends BaseTransport {
 		logger.info('StreamableHTTP transport cleanup complete');
 	}
 
-
 	/**
 	 * Get the number of active connections
 	 */
 	override getActiveConnectionCount(): number {
 		return this.sessions.size;
+	}
+
+	/**
+	 * Get all active sessions with their metadata
+	 */
+	override getSessions(): SessionMetadata[] {
+		const sessions: SessionMetadata[] = [];
+		for (const session of this.sessions.values()) {
+			sessions.push({ ...session.metadata });
+		}
+		return sessions;
 	}
 
 	/**

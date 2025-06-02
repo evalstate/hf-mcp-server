@@ -130,6 +130,10 @@ export class Application {
 
 		try {
 			this.transport = createTransport(this.transportType, this.serverFactory, this.appInstance);
+			
+			// Pass transport to web server for session management
+			this.webServerInstance.setTransport(this.transport);
+			
 			await this.transport.initialize({
 				port: this.webAppPort,
 			});

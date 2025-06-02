@@ -1,10 +1,17 @@
 #!/usr/bin/env node
 
+// Set environment variables BEFORE importing logger
+process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+process.env.TRANSPORT = process.env.TRANSPORT || 'STDIO';
+
 import { Application } from './application.js';
 import { WebServer } from './web-server.js';
 import { DEFAULT_WEB_APP_PORT } from '../shared/constants.js';
 import { parseArgs } from 'node:util';
-import { logger } from './lib/logger.js';
+import { logger, forceLoggerToStderr } from './lib/logger.js';
+
+// Force logger to use STDERR. The environment variable may not have been set in dev, so just force it.
+forceLoggerToStderr();
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -14,10 +21,7 @@ const { values } = parseArgs({
 	args: process.argv.slice(2),
 });
 
-logger.info('Starting default (STDIO) server...');
-
-process.env.NODE_ENV = process.env.NODE_ENV || 'production';
-process.env.TRANSPORT = process.env.TRANSPORT || 'STDIO';
+logger.info('Starting (STDIO) server...');
 
 const port = parseInt((values.port as string) || process.env.WEB_APP_PORT || DEFAULT_WEB_APP_PORT.toString());
 

@@ -1,9 +1,8 @@
-import { BaseTransport, type TransportOptions, type BaseSession } from './base-transport.js';
+import { BaseTransport, type TransportOptions, type BaseSession, type SessionMetadata } from './base-transport.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
-import type { ZodObject, ZodLiteral } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 interface SSEConnection extends BaseSession<SSEServerTransport> {
@@ -208,10 +207,36 @@ export class SseTransport extends BaseTransport {
 		cleanup: () => Promise<void>
 	): Promise<void> {
 		try {
-			await server.connect(transport);
+			// Set up oninitialized callback to capture client info
+			server.server.oninitialized = () => {
+				const connection = this.sseConnections.get(sessionId);
+				if (connection) {
+					const clientInfo = server.server.getClientVersion();
+					const clientCapabilities = server.server.getClientCapabilities();
+					
+					if (clientInfo) {
+						connection.metadata.clientInfo = clientInfo;
+					}
+					
+					if (clientCapabilities) {
+						connection.metadata.capabilities = {
+							sampling: !!clientCapabilities.sampling,
+							roots: !!clientCapabilities.roots,
+						};
+					}
+					
+					logger.info(
+						{
+							sessionId,
+							clientInfo: connection.metadata.clientInfo,
+							capabilities: connection.metadata.capabilities,
+						},
+						'Client info captured'
+					);
+				}
+			};
 
-			// Set up client info capture
-			this.setupClientInfoCapture(transport, server, sessionId);
+			await server.connect(transport);
 		} catch (error) {
 			logger.error({ error, sessionId }, 'Failed to connect transport to server');
 			await cleanup();
@@ -322,71 +347,15 @@ export class SseTransport extends BaseTransport {
 		return !this.isShuttingDown;
 	}
 
-	private setupClientInfoCapture(_transport: SSEServerTransport, server: McpServer, sessionId: string): void {
-		// Intercept the server's initialization handler to capture client info
-		const originalSetHandler = server.server.setRequestHandler.bind(server.server);
-		const connections = this.sseConnections;
-
-		// Type-safe wrapper that preserves the original signature
-		server.server.setRequestHandler = function <T extends ZodObject<{ method: ZodLiteral<string> }>>(
-			schema: T,
-			handler: Parameters<typeof originalSetHandler<T>>[1]
-		): void {
-			// Check if this is the initialize request handler by examining the method
-			if (schema.shape.method.value === 'initialize') {
-				interface InitRequest {
-					params?: {
-						clientInfo?: { name: string; version: string };
-						capabilities?: {
-							sampling?: unknown;
-							roots?: unknown;
-						};
-					};
-				}
-
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				const wrappedHandler = async (request: any, extra: any) => {
-					// Capture client info for this specific transport/session
-					if (connections.has(sessionId)) {
-						const connection = connections.get(sessionId);
-						// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-						if (!connection) return await handler(request, extra);
-
-						const typedRequest = request as InitRequest;
-						if (typedRequest.params?.clientInfo) {
-							connection.metadata.clientInfo = {
-								name: typedRequest.params.clientInfo.name,
-								version: typedRequest.params.clientInfo.version,
-							};
-						}
-
-						if (typedRequest.params?.capabilities) {
-							Object.assign(connection.metadata.capabilities, {
-								sampling: !!typedRequest.params.capabilities.sampling,
-								roots: !!typedRequest.params.capabilities.roots,
-							});
-						}
-
-						logger.info(
-							{
-								sessionId,
-								clientInfo: connection.metadata.clientInfo,
-								capabilities: connection.metadata.capabilities,
-							},
-							'Client info captured'
-						);
-					}
-
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-					return await handler(request, extra);
-				};
-
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-				originalSetHandler(schema, wrappedHandler as any);
-				return;
-			}
-
-			originalSetHandler(schema, handler);
-		};
+	/**
+	 * Get all active sessions with their metadata
+	 */
+	override getSessions(): SessionMetadata[] {
+		const sessions: SessionMetadata[] = [];
+		for (const connection of this.sseConnections.values()) {
+			sessions.push({ ...connection.metadata });
+		}
+		return sessions;
 	}
+
 }

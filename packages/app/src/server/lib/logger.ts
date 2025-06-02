@@ -32,4 +32,28 @@ if (isDev) {
 	);
 }
 
+// Function to reconfigure logger for STDIO transport
+export function forceLoggerToStderr(): void {
+	const isDev = process.env.NODE_ENV === 'development';
+	const level = process.env.LOG_LEVEL || 'info';
+
+	if (isDev) {
+		// Development: use pretty printing to stderr
+		const options: LoggerOptions = {
+			level,
+			transport: {
+				target: 'pino-pretty',
+				options: {
+					colorize: true,
+					destination: 2, // stderr
+				},
+			},
+		};
+		Object.assign(logger, pino(options));
+	} else {
+		// Production: plain output to stderr
+		Object.assign(logger, pino({ level }, pino.destination(2)));
+	}
+}
+
 export { logger };

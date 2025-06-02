@@ -1,15 +1,9 @@
 //import "./App.css";
 
-import { useEffect, useState } from 'react';
+import useSWR, { mutate } from 'swr';
 import { ToolsCard } from './components/ToolsCard';
 import { ConnectionFooter } from './components/ConnectionFooter';
-
-type TransportInfo = {
-	transport: 'stdio' | 'sse' | 'streamableHttp' | 'unknown';
-	port?: number;
-	hfTokenMasked?: string;
-	hfTokenSet?: boolean;
-};
+import type { TransportInfo } from '../shared/transport-info.js';
 
 type ToolSettings = {
 	enabled: boolean;
@@ -21,59 +15,52 @@ type AppSettings = {
 	};
 };
 
+// SWR fetcher function
+const fetcher = (url: string) =>
+	fetch(url).then((res) => {
+		if (!res.ok) {
+			throw new Error(`Failed to fetch: ${res.status}`);
+		}
+		return res.json();
+	});
+
 function App() {
-	const [transportInfo, setTransportInfo] = useState<TransportInfo>({
-		transport: 'unknown',
-	});
-	const [isLoading, setIsLoading] = useState<boolean>(true);
-	const [error, setError] = useState<string | null>(null);
-	const [settings, setSettings] = useState<AppSettings>({
-		tools: {
-			space_search: { enabled: false },
-			model_search: { enabled: false },
-			model_detail: { enabled: false },
-			paper_search: { enabled: false },
-			dataset_search: { enabled: false },
-			dataset_detail: { enabled: false },
-			duplicate_space: { enabled: false },
-		},
+	// Use SWR for transport info with auto-refresh
+	const { data: transportInfo, error: transportError } = useSWR<TransportInfo>('/api/transport', fetcher, {
+		refreshInterval: 3000, // Refresh every 3 seconds
+		revalidateOnFocus: true,
+		revalidateOnReconnect: true,
 	});
 
-	useEffect(() => {
-		// Fetch transport information and settings from the API
-		const fetchData = async () => {
-			try {
-				setIsLoading(true);
+	// Use SWR for sessions to trigger stdioClient update
+	useSWR('/api/sessions', fetcher, {
+		refreshInterval: 3000, // Refresh every 3 seconds
+		revalidateOnFocus: true,
+	});
 
-				// Fetch transport info
-				const transportResponse = await fetch('/api/transport');
-				if (!transportResponse.ok) {
-					throw new Error(`Failed to fetch transport info: ${transportResponse.status}`);
-				}
-				const transportData = await transportResponse.json();
-				setTransportInfo(transportData);
+	// Use SWR for settings
+	const { data: settings } = useSWR<AppSettings>('/api/settings', fetcher);
 
-				// Fetch settings
-				const settingsResponse = await fetch('/api/settings');
-				if (!settingsResponse.ok) {
-					throw new Error(`Failed to fetch settings: ${settingsResponse.status}`);
-				}
-				const settingsData = await settingsResponse.json();
-				setSettings(settingsData);
-			} catch (err) {
-				console.error('Error fetching data:', err);
-				setError(err instanceof Error ? err.message : 'Unknown error occurred');
-			} finally {
-				setIsLoading(false);
-			}
-		};
-
-		fetchData();
-	}, []);
+	const isLoading = !transportInfo && !transportError;
+	const error = transportError ? transportError.message : null;
 
 	// Handle checkbox changes
 	const handleToolToggle = async (toolId: string, checked: boolean) => {
 		try {
+			// Optimistic update - immediately update the UI
+			const currentSettings = settings || { tools: {} };
+			const optimisticSettings = {
+				...currentSettings,
+				tools: {
+					...currentSettings.tools,
+					[toolId]: { enabled: checked },
+				},
+			};
+
+			// Update the cache optimistically
+			mutate('/api/settings', optimisticSettings, false);
+
+			// Make the API call
 			const response = await fetch(`/api/settings/tools/${toolId}`, {
 				method: 'POST',
 				headers: {
@@ -86,21 +73,16 @@ function App() {
 				throw new Error(`Failed to update tool settings: ${response.status}`);
 			}
 
-			const updatedToolSettings = await response.json();
-
-			// Update local state
-			setSettings((prevSettings) => ({
-				...prevSettings,
-				tools: {
-					...prevSettings.tools,
-					[toolId]: updatedToolSettings,
-				},
-			}));
+			// Revalidate to get fresh data from server
+			mutate('/api/settings');
 
 			console.error(`${toolId} is now ${checked ? 'enabled' : 'disabled'}`);
 		} catch (err) {
 			console.error(`Error updating tool settings:`, err);
 			alert(`Error updating ${toolId}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+
+			// Revert optimistic update on error
+			mutate('/api/settings');
 		}
 	};
 
@@ -110,38 +92,38 @@ function App() {
 			id: 'paper_search',
 			label: 'Papers Search',
 			description: 'Find Machine Learning Research Papers.',
-			settings: settings.tools.paper_search || { enabled: true },
+			settings: settings?.tools?.paper_search || { enabled: true },
 		},
 		space_search: {
 			// Changed from space_semantic_search
 			id: 'space_search',
 			label: 'Space Search',
 			description: 'Find Gradio Hugging Face Spaces.',
-			settings: settings.tools.space_search || { enabled: true },
+			settings: settings?.tools?.space_search || { enabled: true },
 		},
 		model_search: {
 			id: 'model_search',
 			label: 'Model Search',
 			description: 'Search for ML models with filters for task, library, etc.',
-			settings: settings.tools.model_search || { enabled: true },
+			settings: settings?.tools?.model_search || { enabled: true },
 		},
 		model_detail: {
 			id: 'model_detail',
 			label: 'Model Details',
 			description: 'Get detailed information about a specific model.',
-			settings: settings.tools.model_detail || { enabled: true },
+			settings: settings?.tools?.model_detail || { enabled: true },
 		},
 		dataset_search: {
 			id: 'dataset_search',
 			label: 'Dataset Search',
 			description: 'Search for datasets with filters for author, tags, etc.',
-			settings: settings.tools.dataset_search || { enabled: true },
+			settings: settings?.tools?.dataset_search || { enabled: true },
 		},
 		dataset_detail: {
 			id: 'dataset_detail',
 			label: 'Dataset Details',
 			description: 'Get detailed information about a specific dataset.',
-			settings: settings.tools.dataset_detail || { enabled: true },
+			settings: settings?.tools?.dataset_detail || { enabled: true },
 		},
 	};
 
@@ -150,7 +132,7 @@ function App() {
 			id: 'duplicate_space',
 			label: 'Duplicate Space',
 			description: 'Duplicate any Hugging Face Space to your account.',
-			settings: settings.tools.duplicate_space || { enabled: true },
+			settings: settings?.tools?.duplicate_space || { enabled: true },
 		},
 	};
 
@@ -171,7 +153,7 @@ function App() {
 				/>
 			</div>
 
-			<ConnectionFooter isLoading={isLoading} error={error} transportInfo={transportInfo} />
+			<ConnectionFooter isLoading={isLoading} error={error} transportInfo={transportInfo || { transport: 'unknown' }} />
 		</>
 	);
 }

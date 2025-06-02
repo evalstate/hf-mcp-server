@@ -52,7 +52,7 @@ const BOUQUETS: Record<string, string[]> = {
  * Creates a ServerFactory function that produces McpServer instances with all tools registered
  * The shared ApiClient provides global tool state management across all server instances
  */
-export const createServerFactory = (webServerInstance: WebServer, sharedApiClient: McpApiClient): ServerFactory => {
+export const createServerFactory = (_webServerInstance: WebServer, sharedApiClient: McpApiClient): ServerFactory => {
 	const require = createRequire(import.meta.url);
 	const { version } = require('../../package.json') as { version: string };
 
@@ -103,26 +103,6 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 					userInfo,
 			}
 		);
-
-		// Set up client info capture and STDIO handling
-		server.server.oninitialized = () => {
-			const clientInfo = server.server.getClientVersion();
-			logger.info(
-				{ client: clientInfo },
-				`Initialized ${clientInfo?.name || '<unknown>'} ${clientInfo?.version || '<unknown>'}`
-			);
-
-			// Store client info for STDIO connections (no headers means STDIO)
-			if (!headers && clientInfo) {
-				const clientData = {
-					name: clientInfo.name || '<unknown>',
-					version: clientInfo.version || '<unknown>',
-				};
-				webServerInstance.setClientInfo(clientData);
-			}
-
-			// Tool state management is now handled globally at the Application level
-		};
 
 		// Always register all tools and store instances for dynamic control
 		const toolInstances: { [toolId: string]: Tool } = {};
@@ -236,14 +216,14 @@ export const createServerFactory = (webServerInstance: WebServer, sharedApiClien
 		// Apply initial tool states based on current settings and bouquet
 		for (const [toolName, toolInstance] of Object.entries(toolInstances)) {
 			let isEnabled = sharedApiClient.getCachedToolState(toolName);
-			
+
 			// If a bouquet is specified, override the settings
 			if (bouquet && BOUQUETS[bouquet]) {
 				const allowedTools = BOUQUETS[bouquet];
 				isEnabled = allowedTools?.includes(toolName) ?? false;
 				logger.info({ toolName, bouquet, isEnabled }, 'Tool state set by bouquet');
 			}
-			
+
 			if (!isEnabled) {
 				toolInstance.disable();
 				logger.debug({ toolName }, 'Tool disabled');

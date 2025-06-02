@@ -94,13 +94,13 @@ export class DuplicateSpaceTool extends HfApiCall<DuplicateSpaceParams, Duplicat
 			const [providedUser, spaceNamePart] = spaceName.split('/');
 			if (providedUser !== this.username) {
 				throw new Error(
-					`Invalid space ID: ${spaceName}. You can only create spaces in your own namespace. Try "${this.username}/${spaceNamePart ?? 'space-name'}"`
+					`Invalid space ID: ${spaceName}. You can only create spaces in your own namespace. Try "${this.username || 'your-username'}/${spaceNamePart || 'space-name'}"`
 				);
 			}
 			return spaceName;
 		}
 		// Otherwise, prepend with username
-		return `${this.username}/${spaceName}`;
+		return `${this.username || 'unknown'}/${spaceName}`;
 	}
 
 	async getSpaceInfo(spaceId: string): Promise<SpaceInfo> {

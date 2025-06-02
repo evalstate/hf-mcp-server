@@ -6,6 +6,7 @@ import type { TransportInfo } from '../shared/transport-info.js';
 import type { ToolSettings } from '../shared/settings.js';
 import { settingsService } from '../shared/settings.js';
 import { logger } from './lib/logger.js';
+import type { BaseTransport } from './transport/base-transport.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +25,7 @@ export class WebServer {
 		stdioClient: null,
 	};
 	private registeredTools: { [toolId: string]: RegisteredTool } = {};
+	private transport?: BaseTransport;
 
 	constructor() {
 		this.app = express() as Express;
@@ -48,6 +50,10 @@ export class WebServer {
 
 	public setRegisteredTools(tools: { [toolId: string]: RegisteredTool }): void {
 		this.registeredTools = tools;
+	}
+
+	public setTransport(transport: BaseTransport): void {
+		this.transport = transport;
 	}
 
 	public getTransportInfo(): TransportInfo {
@@ -131,6 +137,29 @@ export class WebServer {
 		// Transport info endpoint
 		this.app.get('/api/transport', (_req, res) => {
 			res.json(this.transportInfo);
+		});
+
+		// Sessions endpoint
+		this.app.get('/api/sessions', (_req, res) => {
+			if (!this.transport) {
+				res.json([]);
+				return;
+			}
+			
+			const sessions = this.transport.getSessions();
+			
+			// For STDIO transport, also update the stdioClient info if we have a session
+			if (this.transportInfo.transport === 'stdio' && sessions.length > 0) {
+				const stdioSession = sessions[0];
+				if (stdioSession?.clientInfo && !this.transportInfo.stdioClient) {
+					this.transportInfo.stdioClient = {
+						name: stdioSession.clientInfo.name,
+						version: stdioSession.clientInfo.version,
+					};
+				}
+			}
+			
+			res.json(sessions);
 		});
 
 		// Settings endpoint

@@ -9,6 +9,7 @@ export type ServerFactory = (headers: Record<string, string> | null) => Promise<
 
 export interface TransportOptions {
 	port?: number;
+	onClientInfoUpdate?: (clientInfo: { name: string; version: string }) => void;
 }
 
 /**
@@ -76,4 +77,10 @@ export abstract class BaseTransport {
 	 * Returns -1 (STATELESS_MODE) for stateless transports
 	 */
 	abstract getActiveConnectionCount(): number;
+
+	/**
+	 * Get all active sessions with their metadata
+	 * Returns an array of session metadata for connection dashboard
+	 */
+	abstract getSessions(): SessionMetadata[];
 }
