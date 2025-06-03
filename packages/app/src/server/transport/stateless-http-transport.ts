@@ -18,7 +18,7 @@ export class StatelessHttpTransport extends BaseTransport {
 
 		// Explicitly reject GET requests
 		this.app.get('/mcp', (_req: Request, res: Response) => {
-			logger.warn('Rejected GET request to /mcp in stateless mode');
+			logger.debug('Rejected GET request to /mcp in stateless mode');
 			res
 				.status(405)
 				.json(JsonRpcErrors.methodNotAllowed(null, 'Method not allowed. Use POST for stateless JSON-RPC requests.'));
@@ -45,6 +45,8 @@ export class StatelessHttpTransport extends BaseTransport {
 
 		try {
 			// Create new server instance using factory with request headers and bouquet
+			logger.debug({ headerCount: Object.keys(req.headers).length }, 'Request received');
+			logger.error({ headers: req.headers }, 'DO NOT USE ** NOT A PRODUCTION BUILD Request Headers');
 			const headers = req.headers as Record<string, string>;
 			const bouquet = req.query.bouquet as string | undefined;
 			if (bouquet) {

@@ -136,7 +136,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 						clientInfo: session.metadata.clientInfo,
 						capabilities: session.metadata.capabilities,
 					},
-					'Client info captured'
+					'Client Initialization Request'
 				);
 			}
 		};

@@ -56,10 +56,26 @@ export class Application {
 		};
 
 		// Configure API client with transport info
+		const defaultGradioEndpoints = [
+			{
+				url: 'https://evalstate-flux1-schnell.hf.space/gradio_api/mcp/sse',
+				enabled: true,
+			},
+			{
+				url: 'https://evalstate-csm-1b.hf.space/gradio_api/mcp/sse',
+				enabled: true,
+			},
+			{
+				url: '',
+				enabled: true,
+			},
+		];
+
 		const apiClientConfig: ApiClientConfig = options.apiClientConfig || {
 			type: 'polling',
 			baseUrl: `http://localhost:${String(this.webAppPort)}`,
 			pollInterval: 5000,
+			staticGradioEndpoints: defaultGradioEndpoints,
 		};
 		this.apiClient = new McpApiClient(apiClientConfig, transportInfo);
 
@@ -127,6 +143,9 @@ export class Application {
 
 		// Pass registered tools to WebServer
 		this.webServerInstance.setRegisteredTools(registeredTools);
+		
+		// Pass API client to WebServer for Gradio endpoints
+		this.webServerInstance.setApiClient(this.apiClient);
 	}
 
 	private async initializeTransport(): Promise<void> {

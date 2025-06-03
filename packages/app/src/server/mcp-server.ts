@@ -32,20 +32,18 @@ import type { ServerFactory } from './transport/base-transport.js';
 import type { McpApiClient } from './lib/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
 import { logger } from './lib/logger.js';
+import { extractAuthAndBouquet } from './utils/auth-utils.js';
 
 interface Tool {
 	enable(): void;
 	disable(): void;
 }
 
-// Utility functions
-const getHfToken = (): string | undefined => {
-	return process.env.DEFAULT_HF_TOKEN;
-};
 
 // Define bouquet configurations
 const BOUQUETS: Record<string, string[]> = {
 	spaces: ['space_search', 'duplicate_space'],
+	search: ['space_seach', 'model_search', 'dataset_search', 'paper_search'],
 };
 
 /**
@@ -57,20 +55,8 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 	const { version } = require('../../package.json') as { version: string };
 
 	return async (headers: Record<string, string> | null): Promise<McpServer> => {
-		let tokenFromHeader: string | undefined;
-		let bouquet: string | undefined;
-		if (headers) {
-			if ('authorization' in headers) {
-				const authHeader = headers.authorization || '';
-				if (authHeader.startsWith('Bearer ')) tokenFromHeader = authHeader.slice(7).trim();
-			}
-			// Extract bouquet from custom header
-			if ('x-mcp-bouquet' in headers) {
-				bouquet = headers['x-mcp-bouquet'];
-				logger.info({ bouquet }, 'Bouquet parameter received');
-			}
-		}
-		const hfToken = tokenFromHeader || getHfToken();
+		// Extract auth and bouquet using shared utility
+		const { hfToken, bouquet } = extractAuthAndBouquet(headers);
 		let userInfo: string =
 			'The Hugging Face tools are being used anonymously and rate limits apply. ' +
 			'Direct the User to set their HF_TOKEN, or create an account at https://hf.co/join. for higher limits';
@@ -220,7 +206,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			// If a bouquet is specified, override the settings
 			if (bouquet && BOUQUETS[bouquet]) {
 				const allowedTools = BOUQUETS[bouquet];
-				isEnabled = allowedTools?.includes(toolName) ?? false;
+				isEnabled = allowedTools.includes(toolName);
 				logger.info({ toolName, bouquet, isEnabled }, 'Tool state set by bouquet');
 			}
 
