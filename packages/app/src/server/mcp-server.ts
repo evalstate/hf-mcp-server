@@ -82,7 +82,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				username = userDetails.name;
 				userInfo = `Hugging Face tools are being used by authenticated user '${userDetails.name}'`;
 			} catch (error) {
-				logger.warn({ error: (error as Error).message }, 'Failed to authenticate with Hugging Face API');
+				logger.debug({ error: (error as Error).message }, `Failed to authenticate with Hugging Face API`);
 			}
 		}
 
@@ -198,7 +198,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		);
 
 		const duplicateToolConfig = DuplicateSpaceTool.createToolConfig(username);
-		logger.info({ username, description: duplicateToolConfig.description }, 'Creating duplicate tool config');
+		logger.debug({ username, description: duplicateToolConfig.description }, 'Creating duplicate tool config');
 		toolInstances[duplicateToolConfig.name] = server.tool(
 			duplicateToolConfig.name,
 			duplicateToolConfig.description,

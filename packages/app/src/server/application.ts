@@ -6,6 +6,7 @@ import type { BaseTransport, ServerFactory } from './transport/base-transport.js
 import type { WebServer } from './web-server.js';
 import { logger } from './lib/logger.js';
 import { createServerFactory } from './mcp-server.js';
+import { createProxyServerFactory } from './mcp-proxy.js';
 import { McpApiClient, type ApiClientConfig } from './lib/mcp-api-client.js';
 import {
 	SEMANTIC_SEARCH_TOOL_CONFIG,
@@ -63,7 +64,10 @@ export class Application {
 		this.apiClient = new McpApiClient(apiClientConfig, transportInfo);
 
 		// Create the server factory
-		this.serverFactory = createServerFactory(this.webServerInstance, this.apiClient);
+		const originalServerFactory = createServerFactory(this.webServerInstance, this.apiClient);
+		
+		// Wrap with proxy (for now just passes through, later will add remote tools)
+		this.serverFactory = createProxyServerFactory(this.webServerInstance, this.apiClient, originalServerFactory);
 
 		// Get Express app instance
 		this.appInstance = this.webServerInstance.getApp();
