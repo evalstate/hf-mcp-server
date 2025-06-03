@@ -3,14 +3,12 @@ import { listModels, type ModelEntry } from '@huggingface/hub';
 import type { PipelineType } from '@huggingface/hub';
 import { formatDate, formatNumber } from './model-utils.js';
 
-export const ModelSearchDescription = 'Search Hugging Face Models for machine learning.';
-
 export const TAGS_TO_RETURN = 20;
 // Model Search Tool Configuration
 export const MODEL_SEARCH_TOOL_CONFIG = {
 	name: 'model_search',
 	description:
-		'Find ML models on Hugging Face by name, author, task type, or library. Returns detailed info about matching models including downloads, likes, tags, and direct links.',
+		'Find Machine Learning models hosted on Hugging Face. Use a general query, or specify author, task or library. Returns detailed info about matching models including downloads, likes, tags, and direct links.',
 	schema: z.object({
 		query: z.string().optional().describe('Search term for finding models by name or description'),
 		author: z
@@ -23,11 +21,6 @@ export const MODEL_SEARCH_TOOL_CONFIG = {
 			.describe("Model task type (e.g., 'text-generation', 'image-classification', 'translation')"),
 		library: z.string().optional().describe("Framework the model uses (e.g., 'transformers', 'diffusers', 'timm')"),
 		limit: z.number().min(1).max(100).optional().default(20).describe('Maximum number of results to return (1-100)'),
-		sort: z
-			.enum(['downloads', 'likes', 'lastModified'])
-			.optional()
-			.default('downloads')
-			.describe('How to order results (download count, likes, or last modified date)'),
 	}),
 	annotations: {
 		title: 'Model Search',
@@ -36,7 +29,7 @@ export const MODEL_SEARCH_TOOL_CONFIG = {
 		openWorldHint: true,
 	},
 } as const;
-
+//huggingface.co/api/models?search=llama&expand=transformersInfo
 // Define search parameter types
 export type ModelSearchParams = z.infer<typeof MODEL_SEARCH_TOOL_CONFIG.schema>;
 
@@ -77,7 +70,6 @@ export class ModelSearchTool {
 				owner?: string;
 				task?: PipelineType;
 				tags?: string[];
-				sort?: string;
 			} = {};
 
 			// Handle query parameter
@@ -96,11 +88,6 @@ export class ModelSearchTool {
 			// Add library as a tag filter if specified
 			if (params.library) {
 				searchParams.tags = [params.library];
-			}
-
-			// Pass the sort parameter directly to the API
-			if (params.sort) {
-				searchParams.sort = params.sort;
 			}
 
 			const models: ExtendedModelEntry[] = [];
@@ -132,34 +119,6 @@ export class ModelSearchTool {
 			throw error;
 		}
 	}
-
-	/**
-	 * Simple search by text query (convenience method)
-	 */
-	async searchByQuery(query: string, limit: number = 20): Promise<string> {
-		return this.searchWithParams({ query, limit, sort: 'downloads' });
-	}
-
-	/**
-	 * Search by author/organization
-	 */
-	async searchByAuthor(author: string, limit: number = 20): Promise<string> {
-		return this.searchWithParams({ author, limit, sort: 'downloads' });
-	}
-
-	/**
-	 * Search by task
-	 */
-	async searchByTask(task: string, limit: number = 20): Promise<string> {
-		return this.searchWithParams({ task, limit, sort: 'downloads' });
-	}
-
-	/**
-	 * Search by library
-	 */
-	async searchByLibrary(library: string, limit: number = 20): Promise<string> {
-		return this.searchWithParams({ library, limit, sort: 'downloads' });
-	}
 }
 
 // Formatting Function
@@ -175,9 +134,10 @@ function formatSearchResults(models: ExtendedModelEntry[], params: Partial<Model
 
 	const searchDesc = searchTerms.length > 0 ? ` matching ${searchTerms.join(', ')}` : '';
 
-	const resultText = models.length === params.limit 
-		? `Showing first ${models.length.toString()} models${searchDesc}:`
-		: `Found ${models.length.toString()} models${searchDesc}:`;
+	const resultText =
+		models.length === params.limit
+			? `Showing first ${models.length.toString()} models${searchDesc}:`
+			: `Found ${models.length.toString()} models${searchDesc}:`;
 	r.push(resultText);
 	r.push('');
 

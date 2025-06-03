@@ -14,26 +14,28 @@ import { HfApiCall } from './hf-api-call.js';
 // 105 papers in summary mode is ~ 23094 tokens
 // 105 papers in full mode is ~ 45797 tokens
 
-export const PaperSearchDescription = 'Search Hugging Face for Machine Learning research papers.';
-
 export const DEFAULT_AUTHORS_TO_SHOW = 8;
 const RESULTS_TO_RETURN = 10;
 
 export const PAPER_SEARCH_TOOL_CONFIG = {
 	name: 'paper_search',
 	description:
-		'Search for Machine Learning research papers on Hugging Face. ' +
+		'Find Machine Learning research papers on the Hugging Face hub. ' +
 		"Include 'Link to paper' When presenting the results. " +
 		'Consider whether tabulating results matches user intent.',
 	schema: z.object({
-		query: z.string().min(3, 'Supply at least one search term').max(200, 'Query too long').describe('Search query'),
+		query: z
+			.string()
+			.min(3, 'Supply at least one search term')
+			.max(200, 'Query too long')
+			.describe('Semantic Search query'),
 		results_limit: z.number().optional().default(12).describe('Number of results to return'),
 		concise_only: z
 			.boolean()
 			.optional()
 			.default(false)
 			.describe(
-				'Return a 2 sentence summary of the abstract. Use for very broad search terms and using a high results limit. Check with User if unsure.'
+				'Return a 2 sentence summary of the abstract. Use for broad search terms which may return a lot of results. Check with User if unsure.'
 			),
 	}),
 	annotations: {
