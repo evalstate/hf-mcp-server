@@ -1,5 +1,10 @@
 import useSWR from 'swr';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Separator } from './ui/separator';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { AlertTriangle, Activity, Wifi, WifiOff, Clock, Hash, TrendingUp } from 'lucide-react';
 import type { TransportMetricsResponse } from '../../shared/transport-metrics.js';
 
 // SWR fetcher function
@@ -63,15 +68,31 @@ function formatMilliseconds(ms: number): string {
 }
 
 /**
+ * Get connection status badge variant
+ */
+function getConnectionBadgeVariant(isConnected: boolean): "success" | "secondary" {
+	return isConnected ? "success" : "secondary";
+}
+
+/**
+ * Check if client was seen recently (within last 5 minutes)
+ */
+function isRecentlyActive(lastSeen: string): boolean {
+	const now = new Date();
+	const lastSeenTime = new Date(lastSeen);
+	const diffMs = now.getTime() - lastSeenTime.getTime();
+	const diffMinutes = Math.floor(diffMs / 60000);
+	return diffMinutes < 5;
+}
+
+/**
  * Format connection display for client
  */
-function formatConnectionDisplay(active: number, total: number, isConnected: boolean, isStateless: boolean = false): string {
-	const emoji = isConnected ? '🟢' : '🔴';
+function formatConnectionDisplay(active: number, total: number, isStateless: boolean = false): string {
 	if (isStateless) {
-		// For stateless mode, just show total requests count
-		return `${total} requests ${emoji}`;
+		return "-";
 	}
-	return `${active}/${total} ${emoji}`;
+	return `${active}/${total}`;
 }
 
 export function TransportMetricsCard() {
@@ -90,10 +111,16 @@ export function TransportMetricsCard() {
 		return (
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-red-600">⚠️ Transport Metrics Error</CardTitle>
+					<CardTitle>📊 Transport Metrics</CardTitle>
 				</CardHeader>
 				<CardContent>
-					<p className="text-red-600">Failed to load transport metrics: {error.message}</p>
+					<Alert variant="destructive">
+						<AlertTriangle className="h-4 w-4" />
+						<AlertTitle>Error Loading Metrics</AlertTitle>
+						<AlertDescription>
+							Failed to load transport metrics: {error.message}
+						</AlertDescription>
+					</Alert>
 				</CardContent>
 			</Card>
 		);
@@ -150,140 +177,166 @@ export function TransportMetricsCard() {
 					Real-time connection and performance metrics for {transportTypeDisplay[metrics.transport] || metrics.transport} transport
 				</CardDescription>
 			</CardHeader>
-			<CardContent className="space-y-6">
+			<CardContent className="space-y-4">
 				{/* Transport Info */}
 				<div className="grid grid-cols-2 gap-4">
 					<div>
-						<p className="text-sm font-medium text-gray-600">Transport Type</p>
-						<p className="text-lg font-mono">
-							{transportTypeDisplay[metrics.transport] || metrics.transport}
-							{metrics.isStateless && <span className="text-xs text-gray-500 ml-2">(stateless)</span>}
-						</p>
+						<p className="text-sm font-medium text-muted-foreground">Transport Type</p>
+						<div className="flex items-center gap-2">
+							<p className="text-sm font-mono">
+								{transportTypeDisplay[metrics.transport] || metrics.transport}
+							</p>
+							{metrics.isStateless && <Badge variant="secondary">stateless</Badge>}
+						</div>
 					</div>
 					<div>
-						<p className="text-sm font-medium text-gray-600">Uptime</p>
-						<p className="text-lg font-mono">{formatUptime(metrics.uptimeSeconds)}</p>
-						<p className="text-xs text-gray-500">
-							Started {formatRelativeTime(metrics.startupTime)}
-						</p>
+						<p className="text-sm font-medium text-muted-foreground">Uptime</p>
+						<p className="text-sm font-mono">{formatUptime(metrics.uptimeSeconds)}</p>
 					</div>
 				</div>
 
 				{/* Configuration Settings */}
 				{metrics.configuration && (
-					<div>
-						<h3 className="text-sm font-semibold text-gray-700 mb-3">Configuration</h3>
-						<div className="grid grid-cols-2 gap-4">
-							<div>
-								<p className="text-sm font-medium text-gray-600">Stale Check Interval</p>
-								<p className="text-lg font-mono text-blue-600">
-									{formatMilliseconds(metrics.configuration.staleCheckInterval)}
-								</p>
-							</div>
-							<div>
-								<p className="text-sm font-medium text-gray-600">Stale Timeout</p>
-								<p className="text-lg font-mono text-orange-600">
-									{formatMilliseconds(metrics.configuration.staleTimeout)}
-								</p>
-							</div>
-						</div>
-						<p className="text-xs text-gray-500 mt-2">
-							Sessions are checked every {formatMilliseconds(metrics.configuration.staleCheckInterval)} and removed after {formatMilliseconds(metrics.configuration.staleTimeout)} of inactivity
-						</p>
-					</div>
-				)}
-
-				{/* Connection Metrics */}
-				<div>
-					<h3 className="text-sm font-semibold text-gray-700 mb-3">Connection Statistics</h3>
-					<div className="grid grid-cols-3 gap-4">
+					<>
+						<Separator />
 						<div>
-							<p className="text-sm font-medium text-gray-600">Active</p>
-							<p className="text-2xl font-bold text-green-600">
-								{metrics.connections.active === 'stateless' ? 'N/A' : metrics.connections.active}
+							<h3 className="text-sm font-semibold text-foreground mb-3">Configuration</h3>
+							<div className="grid grid-cols-2 gap-4">
+								<div>
+									<p className="text-sm font-medium text-muted-foreground">Stale Check Interval</p>
+									<p className="text-sm font-mono">
+										{formatMilliseconds(metrics.configuration.staleCheckInterval)}
+									</p>
+								</div>
+								<div>
+									<p className="text-sm font-medium text-muted-foreground">Stale Timeout</p>
+									<p className="text-sm font-mono">
+										{formatMilliseconds(metrics.configuration.staleTimeout)}
+									</p>
+								</div>
+							</div>
+							<p className="text-xs text-muted-foreground mt-2">
+								Sessions are checked every {formatMilliseconds(metrics.configuration.staleCheckInterval)} and removed after {formatMilliseconds(metrics.configuration.staleTimeout)} of inactivity
 							</p>
 						</div>
-						<div>
-							<p className="text-sm font-medium text-gray-600">Total</p>
-							<p className="text-2xl font-bold text-blue-600">{metrics.connections.total}</p>
-						</div>
-						{metrics.connections.cleaned !== undefined && (
-							<div>
-								<p className="text-sm font-medium text-gray-600">Cleaned</p>
-								<p className="text-2xl font-bold text-gray-600">{metrics.connections.cleaned}</p>
-							</div>
-						)}
-					</div>
-				</div>
+					</>
+				)}
 
-				{/* Request Metrics */}
+				<Separator />
+				{/* Metrics Table */}
 				<div>
-					<h3 className="text-sm font-semibold text-gray-700 mb-3">Request Statistics</h3>
-					<div className="grid grid-cols-2 gap-4">
-						<div>
-							<p className="text-sm font-medium text-gray-600">Total Requests</p>
-							<p className="text-2xl font-bold text-blue-600">{metrics.requests.total}</p>
-						</div>
-						<div>
-							<p className="text-sm font-medium text-gray-600">Avg per Minute</p>
-							<p className="text-2xl font-bold text-purple-600">{metrics.requests.averagePerMinute}</p>
-						</div>
-					</div>
-				</div>
-
-				{/* Error Metrics */}
-				<div>
-					<h3 className="text-sm font-semibold text-gray-700 mb-3">Error Statistics</h3>
-					<div className="grid grid-cols-2 gap-4">
-						<div>
-							<p className="text-sm font-medium text-gray-600">Expected Errors (4xx)</p>
-							<p className="text-2xl font-bold text-yellow-600">{metrics.errors.expected}</p>
-						</div>
-						<div>
-							<p className="text-sm font-medium text-gray-600">Unexpected Errors (5xx)</p>
-							<p className="text-2xl font-bold text-red-600">{metrics.errors.unexpected}</p>
-						</div>
-					</div>
+					<Table>
+						<TableBody>
+							{!metrics.isStateless && (
+								<TableRow>
+									<TableCell className="font-medium text-sm">Active Connections</TableCell>
+									<TableCell className="text-sm font-mono">{metrics.connections.active}</TableCell>
+								</TableRow>
+							)}
+							<TableRow>
+								<TableCell className="font-medium text-sm">{metrics.isStateless ? 'Total Requests' : 'Total Connections'}</TableCell>
+								<TableCell className="text-sm font-mono">{metrics.connections.total}</TableCell>
+							</TableRow>
+							{metrics.connections.cleaned !== undefined && (
+								<TableRow>
+									<TableCell className="font-medium text-sm">Cleaned Sessions</TableCell>
+									<TableCell className="text-sm font-mono">{metrics.connections.cleaned}</TableCell>
+								</TableRow>
+							)}
+							<TableRow>
+								<TableCell className="font-medium text-sm">Total Requests</TableCell>
+								<TableCell className="text-sm font-mono">{metrics.requests.total}</TableCell>
+							</TableRow>
+							<TableRow>
+								<TableCell className="font-medium text-sm">Requests per Minute</TableCell>
+								<TableCell className="text-sm font-mono">{metrics.requests.averagePerMinute}</TableCell>
+							</TableRow>
+							<TableRow>
+								<TableCell className="font-medium text-sm">Client Errors (4xx)</TableCell>
+								<TableCell className="text-sm font-mono">{metrics.errors.expected}</TableCell>
+							</TableRow>
+							<TableRow>
+								<TableCell className="font-medium text-sm">Server Errors (5xx)</TableCell>
+								<TableCell className="text-sm font-mono">{metrics.errors.unexpected}</TableCell>
+							</TableRow>
+						</TableBody>
+					</Table>
 					{metrics.errors.lastError && (
-						<div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
-							<p className="text-sm font-medium text-red-700">Last Error:</p>
-							<p className="text-sm text-red-600 font-mono">{metrics.errors.lastError.type}: {metrics.errors.lastError.message}</p>
-							<p className="text-xs text-red-500">{formatRelativeTime(metrics.errors.lastError.timestamp)}</p>
-						</div>
+						<Alert variant="destructive" className="mt-3">
+							<AlertTriangle className="h-4 w-4" />
+							<AlertTitle>Last Error</AlertTitle>
+							<AlertDescription>
+								<p className="font-mono text-sm">{metrics.errors.lastError.type}: {metrics.errors.lastError.message}</p>
+								<p className="text-xs mt-1">{formatRelativeTime(metrics.errors.lastError.timestamp)}</p>
+							</AlertDescription>
+						</Alert>
 					)}
 				</div>
 
 				{/* Client Identities */}
 				{sortedClients.length > 0 && (
-					<div>
-						<h3 className="text-sm font-semibold text-gray-700 mb-3">Client Identities</h3>
-						<div className="space-y-2">
-							{sortedClients.map((client) => (
-								<div key={`${client.name}@${client.version}`} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-									<div>
-										<p className="font-medium font-mono">{client.name}@{client.version}</p>
-										<p className="text-sm text-gray-600">
-											{client.requestCount} requests • First seen {formatRelativeTime(client.firstSeen)}
-										</p>
-									</div>
-									<div className="text-right">
-										<p className="font-medium">
-											{formatConnectionDisplay(client.activeConnections, client.totalConnections, client.isConnected, metrics.isStateless)}
-										</p>
-										<p className="text-xs text-gray-500">
-											Last seen {formatRelativeTime(client.lastSeen)}
-										</p>
-									</div>
-								</div>
-							))}
+					<>
+						<Separator />
+						<div>
+							<h3 className="text-sm font-semibold text-foreground mb-3">Client Identities</h3>
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead>Client</TableHead>
+										<TableHead>Requests</TableHead>
+										<TableHead>Connections</TableHead>
+										<TableHead>Status</TableHead>
+										<TableHead>Last Seen</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{sortedClients.map((client) => (
+										<TableRow key={`${client.name}@${client.version}`}>
+											<TableCell>
+												<div>
+													<p className="font-medium font-mono text-sm">{client.name}@{client.version}</p>
+													<p className="text-xs text-muted-foreground">
+														First seen {formatRelativeTime(client.firstSeen)}
+													</p>
+												</div>
+											</TableCell>
+											<TableCell className="font-mono text-sm">{client.requestCount}</TableCell>
+											<TableCell className="font-mono text-sm">
+												{formatConnectionDisplay(client.activeConnections, client.totalConnections, metrics.isStateless)}
+											</TableCell>
+											<TableCell>
+												{metrics.isStateless ? (
+													isRecentlyActive(client.lastSeen) ? (
+														<Badge variant="success" className="gap-1">
+															<Activity className="h-3 w-3" />
+															Recent
+														</Badge>
+													) : (
+														<Badge variant="secondary" className="gap-1">
+															<Clock className="h-3 w-3" />
+															Idle
+														</Badge>
+													)
+												) : (
+													<Badge variant={getConnectionBadgeVariant(client.isConnected)} className="gap-1">
+														{client.isConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+														{client.isConnected ? 'Connected' : 'Disconnected'}
+													</Badge>
+												)}
+											</TableCell>
+											<TableCell className="text-sm text-muted-foreground">
+												{formatRelativeTime(client.lastSeen)}
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
 						</div>
-						{sortedClients.length === 0 && (
-							<p className="text-sm text-gray-500 italic">No client identities reported yet</p>
-						)}
-					</div>
+					</>
 				)}
 
-				<div className="text-xs text-gray-400 text-center pt-4 border-t">
+				<Separator />
+				<div className="text-xs text-muted-foreground text-center">
 					Metrics update every 3 seconds • Times are relative to current time
 				</div>
 			</CardContent>
