@@ -3,6 +3,7 @@
 import useSWR, { mutate } from 'swr';
 import { ToolsCard } from './components/ToolsCard';
 import { GradioEndpointsCard, type GradioEndpoint } from './components/GradioEndpointsCard';
+import { TransportMetricsCard } from './components/TransportMetricsCard';
 import { ConnectionFooter } from './components/ConnectionFooter';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './components/ui/tabs';
 import type { TransportInfo } from '../shared/transport-info.js';
@@ -214,12 +215,16 @@ function App() {
 		<>
 			<div className="min-h-screen p-8">
 				<div className="max-w-2xl mx-auto">
-					<Tabs defaultValue="search" className="w-full">
+					<Tabs defaultValue="metrics" className="w-full">
 						<TabsList className="mb-6">
+							<TabsTrigger value="metrics">📊 Transport Metrics</TabsTrigger>
 							<TabsTrigger value="search">🔍 Search Tools</TabsTrigger>
 							<TabsTrigger value="spaces">🚀 Space Tools</TabsTrigger>
 							<TabsTrigger value="gradio">⚡ Gradio Endpoints</TabsTrigger>
 						</TabsList>
+						<TabsContent value="metrics">
+							<TransportMetricsCard />
+						</TabsContent>
 						<TabsContent value="search">
 							<ToolsCard
 								title="🤗 Hugging Face Search Tools (MCP)"

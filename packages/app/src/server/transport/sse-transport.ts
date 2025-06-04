@@ -15,11 +15,13 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 	async initialize(_options: TransportOptions): Promise<void> {
 		// SSE endpoint for client connections
 		this.app.get('/sse', (req: Request, res: Response) => {
+			this.trackRequest();
 			void this.handleSseConnection(req, res);
 		});
 
 		// Handle messages for all SSE sessions
 		this.app.post('/message', (req: Request, res: Response) => {
+			this.trackRequest();
 			void this.handleSseMessage(req, res);
 		});
 
@@ -37,6 +39,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			// Reject new connections during shutdown
 			if (this.isShuttingDown) {
 				logger.warn('Rejecting SSE connection during shutdown');
+				this.trackError(503);
 				res.status(503).json(JsonRpcErrors.serverShuttingDown());
 				return;
 			}
@@ -101,6 +104,9 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			};
 
 			this.sessions.set(sessionId, connection);
+			
+			// Track the session creation for metrics
+			this.trackSessionCreated();
 
 			// Set up connection event handlers
 			res.on('close', () => {
@@ -110,6 +116,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 
 			res.on('error', (error) => {
 				logger.error({ error, sessionId }, 'SSE connection error');
+				this.trackError(500, error);
 				void cleanup();
 			});
 
@@ -119,6 +126,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			logger.debug({ sessionId }, 'SSE transport fully initialized');
 		} catch (error) {
 			logger.error({ error }, 'Error establishing SSE connection');
+			this.trackError(500, error instanceof Error ? error : new Error(String(error)));
 
 			if (!res.headersSent) {
 				res.status(500).json(JsonRpcErrors.internalError(null, 'Internal server error establishing SSE connection'));
@@ -132,6 +140,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 
 			if (!sessionId) {
 				logger.warn('SSE message received without sessionId');
+				this.trackError(400);
 				res.status(400).json(JsonRpcErrors.invalidParams('sessionId is required', extractJsonRpcId(req.body)));
 				return;
 			}
@@ -140,6 +149,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 
 			if (!connection) {
 				logger.warn({ sessionId }, 'SSE message for unknown session');
+				this.trackError(404);
 				res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(req.body)));
 				return;
 			}
@@ -153,6 +163,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			logger.debug({ sessionId }, 'SSE message handled successfully');
 		} catch (error) {
 			logger.error({ error }, 'Error handling SSE message');
+			this.trackError(500, error instanceof Error ? error : new Error(String(error)));
 
 			if (!res.headersSent) {
 				res
@@ -182,7 +193,8 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 					logger.error({ error, sessionId }, 'Error closing transport');
 				}
 
-				// Remove from map
+				// Remove from map and track cleanup
+				this.trackSessionCleaned(connection);
 				this.sessions.delete(sessionId);
 
 				logger.debug({ sessionId }, 'SSE connection cleaned up');
@@ -202,9 +214,16 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			// Set up oninitialized callback to capture client info using base class helper
 			server.server.oninitialized = this.createClientInfoCapture(sessionId);
 
+			// Set up error tracking for server errors
+			server.server.onerror = (error) => {
+				this.trackError(undefined, error);
+				logger.error({ error, sessionId }, 'SSE server error');
+			};
+
 			await server.connect(transport);
 		} catch (error) {
 			logger.error({ error, sessionId }, 'Failed to connect transport to server');
+			this.trackError(500, error instanceof Error ? error : new Error(String(error)));
 			await cleanup();
 			throw error;
 		}

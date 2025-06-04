@@ -24,6 +24,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 	private setupRoutes(): void {
 		// Initialize new session or handle existing session request
 		this.app.post('/mcp', (req, res) => {
+			this.trackRequest();
 			void (async () => {
 				await this.handleRequest(req, res, 'POST');
 			})();
@@ -31,6 +32,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 
 		// SSE stream endpoint
 		this.app.get('/mcp', (req, res) => {
+			this.trackRequest();
 			void (async () => {
 				await this.handleRequest(req, res, 'GET');
 			})();
@@ -38,6 +40,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 
 		// Session termination
 		this.app.delete('/mcp', (req, res) => {
+			this.trackRequest();
 			void (async () => {
 				await this.handleRequest(req, res, 'DELETE');
 			})();
@@ -66,6 +69,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 			}
 		} catch (error) {
 			logger.error({ error, method }, 'Request handling error');
+			this.trackError(500, error instanceof Error ? error : new Error(String(error)));
 			if (!res.headersSent) {
 				res.status(500).json(JsonRpcErrors.internalError(extractJsonRpcId(req.body ?? null)));
 			}
@@ -75,6 +79,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 	private async handlePostRequest(req: Request, res: Response, sessionId?: string): Promise<void> {
 		// Reject new connections during shutdown
 		if (!sessionId && this.isShuttingDown) {
+			this.trackError(503);
 			res.status(503).json(JsonRpcErrors.serverShuttingDown(extractJsonRpcId(req.body)));
 			return;
 		}
@@ -84,6 +89,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 		if (sessionId && this.sessions.has(sessionId)) {
 			const existingSession = this.sessions.get(sessionId);
 			if (!existingSession) {
+				this.trackError(404);
 				res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(req.body)));
 				return;
 			}
@@ -98,6 +104,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 			transport = await this.createSession(headers);
 		} else if (!sessionId) {
 			// No session ID and not an initialization request
+			this.trackError(400);
 			res
 				.status(400)
 				.json(
@@ -106,6 +113,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 			return;
 		} else {
 			// Invalid session ID
+			this.trackError(404);
 			res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(req.body)));
 			return;
 		}
@@ -115,12 +123,14 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 
 	private async handleGetRequest(req: Request, res: Response, sessionId?: string): Promise<void> {
 		if (!sessionId || !this.sessions.has(sessionId)) {
+			this.trackError(400);
 			res.status(400).json(JsonRpcErrors.sessionNotFound(sessionId || 'missing', null));
 			return;
 		}
 
 		const session = this.sessions.get(sessionId);
 		if (!session) {
+			this.trackError(404);
 			res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, null));
 			return;
 		}
@@ -135,6 +145,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 
 	private async handleDeleteRequest(req: Request, res: Response, sessionId?: string): Promise<void> {
 		if (!sessionId || !this.sessions.has(sessionId)) {
+			this.trackError(404);
 			res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId || 'missing', extractJsonRpcId(req.body)));
 			return;
 		}
@@ -143,6 +154,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 
 		const session = this.sessions.get(sessionId);
 		if (!session) {
+			this.trackError(404);
 			res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(req.body)));
 			return;
 		}
@@ -173,6 +185,8 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 				};
 
 				this.sessions.set(sessionId, session);
+				// Track the session creation for metrics
+				this.trackSessionCreated();
 			},
 		});
 
@@ -192,6 +206,12 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 			}
 		};
 
+		// Set up error tracking for server errors
+		server.server.onerror = (error) => {
+			this.trackError(undefined, error);
+			logger.error({ error, sessionId: transport.sessionId }, 'StreamableHTTP server error');
+		};
+
 		// Connect to session-specific server
 		await server.connect(transport);
 
@@ -208,6 +228,8 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 			logger.error({ error, sessionId }, 'Error closing transport');
 		}
 
+		// Track session cleanup for metrics
+		this.trackSessionCleaned(session);
 		this.sessions.delete(sessionId);
 		logger.debug({ sessionId }, 'Session removed');
 	}

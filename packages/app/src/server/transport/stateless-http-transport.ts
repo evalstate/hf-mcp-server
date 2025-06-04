@@ -13,11 +13,14 @@ export class StatelessHttpTransport extends BaseTransport {
 	initialize(_options: TransportOptions): Promise<void> {
 		// Handle POST requests (the only valid method for stateless JSON-RPC)
 		this.app.post('/mcp', (req: Request, res: Response) => {
+			this.trackRequest();
 			void this.handleJsonRpcRequest(req, res);
 		});
 
 		// Explicitly reject GET requests
 		this.app.get('/mcp', (_req: Request, res: Response) => {
+			this.trackRequest();
+			this.trackError(405);
 			logger.debug('Rejected GET request to /mcp in stateless mode');
 			res
 				.status(405)
@@ -26,6 +29,8 @@ export class StatelessHttpTransport extends BaseTransport {
 
 		// Explicitly reject DELETE requests
 		this.app.delete('/mcp', (_req: Request, res: Response) => {
+			this.trackRequest();
+			this.trackError(405);
 			logger.warn('Rejected DELETE request to /mcp in stateless mode');
 			res
 				.status(405)
@@ -44,6 +49,8 @@ export class StatelessHttpTransport extends BaseTransport {
 			| undefined;
 
 		try {
+			// Track new connection for metrics (each request is a "connection" in stateless mode)
+			this.trackNewConnection();
 			// Create new server instance using factory with request headers and bouquet
 			logger.debug({ headerCount: Object.keys(req.headers).length }, 'Request received');
 			const headers = req.headers as Record<string, string>;
@@ -56,6 +63,14 @@ export class StatelessHttpTransport extends BaseTransport {
 
 			// After handling, check if it was an initialize request
 			if (requestBody?.method === 'initialize') {
+				const clientInfo = requestBody.params?.clientInfo as { name?: string; version?: string } | undefined;
+				
+				// Track client info for metrics if available
+				if (clientInfo?.name && clientInfo?.version) {
+					this.associateSessionWithClient({ name: clientInfo.name, version: clientInfo.version });
+					this.updateClientActivity({ name: clientInfo.name, version: clientInfo.version });
+				}
+				
 				logger.info(
 					{
 						clientInfo: requestBody.params?.clientInfo,
@@ -91,6 +106,12 @@ export class StatelessHttpTransport extends BaseTransport {
 				void cleanup();
 			});
 
+			// Set up error tracking for server errors
+			server.server.onerror = (error) => {
+				this.trackError(undefined, error);
+				logger.error({ error }, 'Stateless HTTP server error');
+			};
+
 			// Connect and handle
 			await server.connect(transport);
 
@@ -104,6 +125,7 @@ export class StatelessHttpTransport extends BaseTransport {
 			);
 		} catch (error) {
 			logger.error({ error }, 'Error handling request');
+			this.trackError(500, error instanceof Error ? error : new Error(String(error)));
 
 			// Ensure cleanup on error
 			if (transport) {
@@ -142,6 +164,8 @@ export class StatelessHttpTransport extends BaseTransport {
 	 * Get the number of active connections - returns STATELESS_MODE for stateless transport
 	 */
 	getActiveConnectionCount(): number {
+		// Set metrics active connection count to 'stateless'
+		this.metrics.connections.active = 'stateless';
 		return STATELESS_MODE;
 	}
 

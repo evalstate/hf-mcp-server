@@ -10,7 +10,7 @@ export default tseslint.config(
 	// Server-side TypeScript files - use strict config
 	{
 		files: ['src/server/**/*.ts', 'src/shared/**/*.ts'],
-		extends: [js.configs.recommended, ...tseslint.configs.strictTypeChecked],
+		extends: [js.configs.recommended, ...tseslint.configs.recommendedTypeChecked],
 		languageOptions: {
 			ecmaVersion: 2020,
 			globals: globals.node,

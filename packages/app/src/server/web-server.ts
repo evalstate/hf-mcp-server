@@ -8,6 +8,7 @@ import { settingsService } from '../shared/settings.js';
 import { logger } from './lib/logger.js';
 import type { BaseTransport } from './transport/base-transport.js';
 import type { McpApiClient } from './lib/mcp-api-client.js';
+import { formatMetricsForAPI } from '../shared/transport-metrics.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -166,6 +167,45 @@ export class WebServer {
 			}
 			
 			res.json(sessions);
+		});
+
+		// Transport metrics endpoint
+		this.app.get('/api/transport-metrics', (_req, res) => {
+			if (!this.transport) {
+				res.status(503).json({ error: 'Transport not initialized' });
+				return;
+			}
+
+			try {
+				// Get raw metrics from transport
+				const metrics = this.transport.getMetrics();
+				
+				// Determine if transport is stateless
+				const isStateless = this.transportInfo.transport === 'streamableHttpJson';
+				
+				// Get configuration for stateful transports
+				const config = this.transport.getConfiguration();
+				
+				// Format for API response
+				const formattedMetrics = formatMetricsForAPI(
+					metrics,
+					this.transportInfo.transport,
+					isStateless
+				);
+
+				// Add configuration if available
+				if (!isStateless && config.staleCheckInterval && config.staleTimeout) {
+					formattedMetrics.configuration = {
+						staleCheckInterval: config.staleCheckInterval,
+						staleTimeout: config.staleTimeout
+					};
+				}
+
+				res.json(formattedMetrics);
+			} catch (error) {
+				logger.error({ error }, 'Error retrieving transport metrics');
+				res.status(500).json({ error: 'Failed to retrieve transport metrics' });
+			}
 		});
 
 		// Settings endpoint
