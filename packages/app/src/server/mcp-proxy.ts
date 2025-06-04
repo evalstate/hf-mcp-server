@@ -26,6 +26,12 @@ export const createProxyServerFactory = (
 			logger.info({ bouquet }, 'Bouquet parameter will be handled by original server factory');
 		}
 
+		// Skip Gradio endpoints if bouquet is "search"
+		if (bouquet === 'search') {
+			logger.info('Bouquet is "search", skipping Gradio endpoints');
+			return server;
+		}
+
 		// Get enabled Gradio endpoints from the API client
 		const gradioEndpoints = sharedApiClient.getGradioEndpoints();
 		logger.info(

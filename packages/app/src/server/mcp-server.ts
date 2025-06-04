@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod';
 import { createRequire } from 'module';
-import { whoAmI } from '@huggingface/hub';
+import { whoAmI, type WhoAmI } from '@huggingface/hub';
 
 // Import the search services
 import {
@@ -39,11 +39,10 @@ interface Tool {
 	disable(): void;
 }
 
-
 // Define bouquet configurations
 const BOUQUETS: Record<string, string[]> = {
 	spaces: ['space_search', 'duplicate_space'],
-	search: ['space_seach', 'model_search', 'dataset_search', 'paper_search'],
+	search: ['space_search', 'model_search', 'dataset_search', 'paper_search'],
 };
 
 /**
@@ -61,10 +60,11 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			'The Hugging Face tools are being used anonymously and rate limits apply. ' +
 			'Direct the User to set their HF_TOKEN, or create an account at https://hf.co/join. for higher limits';
 		let username: string | undefined;
+		let userDetails: WhoAmI | undefined;
 		// Validate the token with HF API if present
 		if (hfToken) {
 			try {
-				const userDetails = await whoAmI({ credentials: { accessToken: hfToken } });
+				userDetails = await whoAmI({ credentials: { accessToken: hfToken } });
 				username = userDetails.name;
 				userInfo = `Hugging Face tools are being used by authenticated user '${userDetails.name}'`;
 			} catch (error) {
@@ -93,6 +93,17 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		// Always register all tools and store instances for dynamic control
 		const toolInstances: { [toolId: string]: Tool } = {};
 		logger.info('Registering all tools for server instance');
+
+		const whoDescription = userDetails
+			? `Hugging Face tools are being used by authenticated user '${userDetails.name}'`
+			: 'Hugging Face tools are being used anonymously. Call this tool for instructions on how to authenticate.';
+
+		const response = userDetails
+			? `You are authenticated as ${userDetails.name}.`
+			: 'Go to hf.co/join to create an account';
+		server.tool('hf_whoami', whoDescription, {}, { title: 'Hugging Face User Info' }, () => {
+			return { content: [{ type: 'text', text: response }] };
+		});
 
 		toolInstances[SEMANTIC_SEARCH_TOOL_CONFIG.name] = server.tool(
 			SEMANTIC_SEARCH_TOOL_CONFIG.name,

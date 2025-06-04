@@ -32,17 +32,17 @@ interface EndpointConnection {
 	tool: Tool;
 }
 
-type EndpointConnectionResult = 
+type EndpointConnectionResult =
 	| {
-		success: true;
-		endpointId: string;
-		connection: EndpointConnection;
-	}
+			success: true;
+			endpointId: string;
+			connection: EndpointConnection;
+	  }
 	| {
-		success: false;
-		endpointId: string;
-		error: Error;
-	};
+			success: false;
+			endpointId: string;
+			error: Error;
+	  };
 
 const CONNECTION_TIMEOUT_MS = 12000;
 
@@ -67,7 +67,7 @@ async function connectToSingleEndpoint(
 ): Promise<EndpointConnection> {
 	const endpointId = `endpoint${(originalIndex + 1).toString()}`;
 	const remoteUrl = new URL(endpoint.url);
-	
+
 	logger.info({ url: remoteUrl.toString(), endpointId }, 'Connecting to remote SSE endpoint');
 
 	// Create MCP client
@@ -161,6 +161,9 @@ async function connectToSingleEndpoint(
 
 /**
  * Connects to multiple Gradio endpoints in parallel with timeout
+ *
+ * HIGH PRIO TODO -- ADD A SHORT TERM CACHE FOR ENDPOINT DEFINITIONS
+ *
  */
 export async function connectToGradioEndpoints(
 	gradioEndpoints: GradioEndpoint[],
@@ -179,38 +182,42 @@ export async function connectToGradioEndpoints(
 	// Create connection tasks with timeout
 	const connectionTasks = enabledWithIndex.map(({ endpoint, originalIndex }) => {
 		const endpointId = `endpoint${(originalIndex + 1).toString()}`;
-		
+
 		return Promise.race([
 			connectToSingleEndpoint(endpoint, originalIndex, hfToken),
-			createTimeout(CONNECTION_TIMEOUT_MS)
+			createTimeout(CONNECTION_TIMEOUT_MS),
 		])
-			.then((connection): EndpointConnectionResult => ({
-				success: true,
-				endpointId,
-				connection,
-			}))
-			.catch((error: unknown): EndpointConnectionResult => ({
-				success: false,
-				endpointId,
-				error: error instanceof Error ? error : new Error(String(error)),
-			}));
+			.then(
+				(connection): EndpointConnectionResult => ({
+					success: true,
+					endpointId,
+					connection,
+				})
+			)
+			.catch(
+				(error: unknown): EndpointConnectionResult => ({
+					success: false,
+					endpointId,
+					error: error instanceof Error ? error : new Error(String(error)),
+				})
+			);
 	});
 
 	// Execute all connections in parallel
 	const results = await Promise.all(connectionTasks);
 
 	// Log results
-	const successful = results.filter(r => r.success);
-	const failed = results.filter(r => !r.success);
+	const successful = results.filter((r) => r.success);
+	const failed = results.filter((r) => !r.success);
 
 	logger.info(
 		{
 			total: results.length,
 			successful: successful.length,
 			failed: failed.length,
-			failedEndpoints: failed.map(f => ({ 
-				endpointId: f.endpointId, 
-				error: f.error.message
+			failedEndpoints: failed.map((f) => ({
+				endpointId: f.endpointId,
+				error: f.error.message,
 			})),
 		},
 		'Gradio endpoint connection results'

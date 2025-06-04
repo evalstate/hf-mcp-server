@@ -46,7 +46,6 @@ export class StatelessHttpTransport extends BaseTransport {
 		try {
 			// Create new server instance using factory with request headers and bouquet
 			logger.debug({ headerCount: Object.keys(req.headers).length }, 'Request received');
-			logger.error({ headers: req.headers }, 'DO NOT USE ** NOT A PRODUCTION BUILD Request Headers');
 			const headers = req.headers as Record<string, string>;
 			const bouquet = req.query.bouquet as string | undefined;
 			if (bouquet) {
