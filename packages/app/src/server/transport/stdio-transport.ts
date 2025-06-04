@@ -30,17 +30,36 @@ export class StdioTransport extends StatefulTransport<StdioSession> {
 
 		// Store session in map
 		this.sessions.set(this.SESSION_ID, session);
+		
+		// Track the session creation for metrics
+		this.trackSessionCreated();
 
 		try {
+			// Set up request/response interceptors for metrics
+			const originalSendMessage = transport.send.bind(transport);
+			transport.send = (message) => {
+				this.trackRequest();
+				this.updateSessionActivity(this.SESSION_ID);
+				return originalSendMessage(message);
+			};
+
 			// Set up oninitialized callback to capture client info using base class helper
 			server.server.oninitialized = this.createClientInfoCapture(this.SESSION_ID);
+
+			// Set up error tracking
+			server.server.onerror = (error) => {
+				this.trackError(undefined, error);
+				logger.error({ error }, 'STDIO server error');
+			};
 
 			await server.connect(transport);
 			logger.info('STDIO transport initialized');
 		} catch (error) {
 			logger.error({ error }, 'Error connecting STDIO transport');
 			// Clean up on error
+			const session = this.sessions.get(this.SESSION_ID);
 			this.sessions.delete(this.SESSION_ID);
+			this.trackSessionCleaned(session);
 			throw error;
 		}
 	}
@@ -67,6 +86,8 @@ export class StdioTransport extends StatefulTransport<StdioSession> {
 			} catch (error) {
 				logger.error({ error }, 'Error closing STDIO server');
 			}
+			// Track session cleanup for metrics
+			this.trackSessionCleaned(session);
 		}
 		this.sessions.clear();
 		logger.info('STDIO transport cleaned up');

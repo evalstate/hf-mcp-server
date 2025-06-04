@@ -3,7 +3,9 @@
 import useSWR, { mutate } from 'swr';
 import { ToolsCard } from './components/ToolsCard';
 import { GradioEndpointsCard, type GradioEndpoint } from './components/GradioEndpointsCard';
+import { TransportMetricsCard } from './components/TransportMetricsCard';
 import { ConnectionFooter } from './components/ConnectionFooter';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './components/ui/tabs';
 import type { TransportInfo } from '../shared/transport-info.js';
 
 type ToolSettings = {
@@ -211,24 +213,43 @@ function App() {
 
 	return (
 		<>
-			<div className="flex h-screen w-screen items-center justify-center flex-col gap-6 pb-12">
-				<ToolsCard
-					title="🤗 Hugging Face Search Tools (MCP)"
-					description="Find and use Hugging Face and Community content."
-					tools={searchTools}
-					onToolToggle={handleToolToggle}
-				/>
-				<ToolsCard
-					title="🤗 Hugging Face Space Tools (MCP)"
-					description="Manage and duplicate Hugging Face Spaces."
-					tools={spaceTools}
-					onToolToggle={handleToolToggle}
-				/>
-				<GradioEndpointsCard
-					endpoints={gradioEndpoints}
-					onEndpointToggle={handleGradioEndpointToggle}
-					onEndpointUrlChange={handleGradioEndpointUrlChange}
-				/>
+			<div className="min-h-screen p-8">
+				<div className="max-w-2xl mx-auto">
+					<Tabs defaultValue="metrics" className="w-full">
+						<TabsList className="mb-6">
+							<TabsTrigger value="metrics">📊 Transport Metrics</TabsTrigger>
+							<TabsTrigger value="search">🔍 Search Tools</TabsTrigger>
+							<TabsTrigger value="spaces">🚀 Space Tools</TabsTrigger>
+							<TabsTrigger value="gradio">⚡ Gradio Endpoints</TabsTrigger>
+						</TabsList>
+						<TabsContent value="metrics">
+							<TransportMetricsCard />
+						</TabsContent>
+						<TabsContent value="search">
+							<ToolsCard
+								title="🤗 Hugging Face Search Tools (MCP)"
+								description="Find and use Hugging Face and Community content."
+								tools={searchTools}
+								onToolToggle={handleToolToggle}
+							/>
+						</TabsContent>
+						<TabsContent value="spaces">
+							<ToolsCard
+								title="🤗 Hugging Face Space Tools (MCP)"
+								description="Manage and duplicate Hugging Face Spaces."
+								tools={spaceTools}
+								onToolToggle={handleToolToggle}
+							/>
+						</TabsContent>
+						<TabsContent value="gradio">
+							<GradioEndpointsCard
+								endpoints={gradioEndpoints}
+								onEndpointToggle={handleGradioEndpointToggle}
+								onEndpointUrlChange={handleGradioEndpointUrlChange}
+							/>
+						</TabsContent>
+					</Tabs>
+				</div>
 			</div>
 
 			<ConnectionFooter isLoading={isLoading} error={error} transportInfo={transportInfo || { transport: 'unknown' }} />
