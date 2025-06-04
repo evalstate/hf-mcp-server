@@ -7,6 +7,7 @@ import type { ToolSettings } from '../shared/settings.js';
 import { settingsService } from '../shared/settings.js';
 import { logger } from './lib/logger.js';
 import type { BaseTransport } from './transport/base-transport.js';
+import type { McpApiClient } from './lib/mcp-api-client.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,6 +27,7 @@ export class WebServer {
 	};
 	private registeredTools: { [toolId: string]: RegisteredTool } = {};
 	private transport?: BaseTransport;
+	private apiClient?: McpApiClient;
 
 	constructor() {
 		this.app = express() as Express;
@@ -54,6 +56,10 @@ export class WebServer {
 
 	public setTransport(transport: BaseTransport): void {
 		this.transport = transport;
+	}
+
+	public setApiClient(apiClient: McpApiClient): void {
+		this.apiClient = apiClient;
 	}
 
 	public getTransportInfo(): TransportInfo {
@@ -185,6 +191,75 @@ export class WebServer {
 			}
 
 			res.json(updatedSettings);
+		});
+
+		// Gradio endpoints endpoint
+		this.app.get('/api/gradio-endpoints', (_req, res) => {
+			if (!this.apiClient) {
+				res.json([]);
+				return;
+			}
+			res.json(this.apiClient.getGradioEndpoints());
+		});
+
+		// Update Gradio endpoint status
+		this.app.post('/api/gradio-endpoints/:index', express.json(), (req, res) => {
+			const index = parseInt(req.params.index);
+			const { enabled } = req.body as { enabled: boolean };
+			
+			if (!this.apiClient) {
+				res.status(500).json({ error: 'API client not initialized' });
+				return;
+			}
+
+			const endpoints = this.apiClient.getGradioEndpoints();
+			if (index < 0 || index >= endpoints.length) {
+				res.status(404).json({ error: 'Endpoint not found' });
+				return;
+			}
+
+			// Update the state in the API client
+			this.apiClient.updateGradioEndpointState(index, enabled);
+			
+			// Get the updated endpoint
+			const updatedEndpoints = this.apiClient.getGradioEndpoints();
+			const updatedEndpoint = updatedEndpoints[index];
+			
+			res.json(updatedEndpoint);
+		});
+
+		// Update Gradio endpoint URL
+		this.app.put('/api/gradio-endpoints/:index', express.json(), (req, res) => {
+			const index = parseInt(req.params.index);
+			const { url } = req.body as { url: string };
+			
+			if (!this.apiClient) {
+				res.status(500).json({ error: 'API client not initialized' });
+				return;
+			}
+
+			const endpoints = this.apiClient.getGradioEndpoints();
+			if (index < 0 || index >= endpoints.length) {
+				res.status(404).json({ error: 'Endpoint not found' });
+				return;
+			}
+
+			// Validate URL
+			try {
+				new URL(url);
+			} catch {
+				res.status(400).json({ error: 'Invalid URL format' });
+				return;
+			}
+
+			// Update the URL in the API client
+			this.apiClient.updateGradioEndpointUrl(index, url);
+			
+			// Get the updated endpoint
+			const updatedEndpoints = this.apiClient.getGradioEndpoints();
+			const updatedEndpoint = updatedEndpoints[index];
+			
+			res.json(updatedEndpoint);
 		});
 	}
 }

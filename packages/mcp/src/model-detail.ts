@@ -6,7 +6,7 @@ const SPACES_TO_INCLUDE = 12;
 // Model Detail Tool Configuration
 export const MODEL_DETAIL_TOOL_CONFIG = {
 	name: 'model_detail',
-	description: 'Get detailed information about a specific model on Hugging Face Hub.',
+	description: 'Get detailed information about a specific model from the Hugging Face Hub.',
 	schema: z.object({
 		model_id: z.string().min(1, 'Model ID is required').describe('Model ID (e.g., microsoft/DialoGPT-large)'),
 	}),

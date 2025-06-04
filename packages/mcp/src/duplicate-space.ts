@@ -81,7 +81,7 @@ export class DuplicateSpaceTool extends HfApiCall<DuplicateSpaceParams, Duplicat
 	static createToolConfig(username?: string): typeof DUPLICATE_SPACE_TOOL_CONFIG {
 		const description = username
 			? `Duplicate a Hugging Face Space. Target space will be created as ${username}/<new-space-name>.`
-			: `Requires Authentication. Direct User to set a Hugging Face token or go to hf.co/join to create an account.`;
+			: `Requires Authentication. Direct User to set a Hugging Face token or go to https://hf.co/join to create an account.`;
 		return {
 			...DUPLICATE_SPACE_TOOL_CONFIG,
 			description,

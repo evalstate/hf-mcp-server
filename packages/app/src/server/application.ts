@@ -6,6 +6,7 @@ import type { BaseTransport, ServerFactory } from './transport/base-transport.js
 import type { WebServer } from './web-server.js';
 import { logger } from './lib/logger.js';
 import { createServerFactory } from './mcp-server.js';
+import { createProxyServerFactory } from './mcp-proxy.js';
 import { McpApiClient, type ApiClientConfig } from './lib/mcp-api-client.js';
 import {
 	SEMANTIC_SEARCH_TOOL_CONFIG,
@@ -55,15 +56,34 @@ export class Application {
 		};
 
 		// Configure API client with transport info
+		const defaultGradioEndpoints = [
+			{
+				url: 'https://evalstate-flux1-schnell.hf.space/gradio_api/mcp/sse',
+				enabled: true,
+			},
+			{
+				url: 'https://evalstate-csm-1b.hf.space/gradio_api/mcp/sse',
+				enabled: true,
+			},
+			{
+				url: '',
+				enabled: true,
+			},
+		];
+
 		const apiClientConfig: ApiClientConfig = options.apiClientConfig || {
 			type: 'polling',
 			baseUrl: `http://localhost:${String(this.webAppPort)}`,
 			pollInterval: 5000,
+			staticGradioEndpoints: defaultGradioEndpoints,
 		};
 		this.apiClient = new McpApiClient(apiClientConfig, transportInfo);
 
 		// Create the server factory
-		this.serverFactory = createServerFactory(this.webServerInstance, this.apiClient);
+		const originalServerFactory = createServerFactory(this.webServerInstance, this.apiClient);
+		
+		// Wrap with proxy (for now just passes through, later will add remote tools)
+		this.serverFactory = createProxyServerFactory(this.webServerInstance, this.apiClient, originalServerFactory);
 
 		// Get Express app instance
 		this.appInstance = this.webServerInstance.getApp();
@@ -123,6 +143,9 @@ export class Application {
 
 		// Pass registered tools to WebServer
 		this.webServerInstance.setRegisteredTools(registeredTools);
+		
+		// Pass API client to WebServer for Gradio endpoints
+		this.webServerInstance.setApiClient(this.apiClient);
 	}
 
 	private async initializeTransport(): Promise<void> {

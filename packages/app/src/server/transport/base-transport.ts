@@ -96,8 +96,8 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	protected staleCheckInterval?: NodeJS.Timeout;
 
 	// Configuration from environment variables
-	protected readonly STALE_CHECK_INTERVAL = parseInt(process.env.MCP_CLIENT_CONNECTION_CHECK || '30000', 10);
-	protected readonly STALE_TIMEOUT = parseInt(process.env.MCP_CLIENT_CONNECTION_TIMEOUT || '60000', 10);
+	protected readonly STALE_CHECK_INTERVAL = parseInt(process.env.MCP_CLIENT_CONNECTION_CHECK || '90000', 10);
+	protected readonly STALE_TIMEOUT = parseInt(process.env.MCP_CLIENT_CONNECTION_TIMEOUT || '300000', 10);
 
 	/**
 	 * Update the last activity timestamp for a session
@@ -118,25 +118,25 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 			if (session) {
 				const clientInfo = session.server.server.getClientVersion();
 				const clientCapabilities = session.server.server.getClientCapabilities();
-				
+
 				if (clientInfo) {
 					session.metadata.clientInfo = clientInfo;
 				}
-				
+
 				if (clientCapabilities) {
 					session.metadata.capabilities = {
 						sampling: !!clientCapabilities.sampling,
 						roots: !!clientCapabilities.roots,
 					};
 				}
-				
+
 				logger.info(
 					{
 						sessionId,
 						clientInfo: session.metadata.clientInfo,
 						capabilities: session.metadata.capabilities,
 					},
-					'Client info captured'
+					'Client Initialization Request'
 				);
 			}
 		};

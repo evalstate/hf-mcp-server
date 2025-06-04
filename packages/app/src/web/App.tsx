@@ -2,6 +2,7 @@
 
 import useSWR, { mutate } from 'swr';
 import { ToolsCard } from './components/ToolsCard';
+import { GradioEndpointsCard, type GradioEndpoint } from './components/GradioEndpointsCard';
 import { ConnectionFooter } from './components/ConnectionFooter';
 import type { TransportInfo } from '../shared/transport-info.js';
 
@@ -40,6 +41,9 @@ function App() {
 
 	// Use SWR for settings
 	const { data: settings } = useSWR<AppSettings>('/api/settings', fetcher);
+
+	// Use SWR for Gradio endpoints
+	const { data: gradioEndpoints = [] } = useSWR<GradioEndpoint[]>('/api/gradio-endpoints', fetcher);
 
 	const isLoading = !transportInfo && !transportError;
 	const error = transportError ? transportError.message : null;
@@ -86,6 +90,69 @@ function App() {
 		}
 	};
 
+	// Handle Gradio endpoint toggles
+	const handleGradioEndpointToggle = async (index: number, enabled: boolean) => {
+		try {
+			// Optimistic update
+			const optimisticEndpoints = [...gradioEndpoints];
+			if (optimisticEndpoints[index]) {
+				optimisticEndpoints[index] = { ...optimisticEndpoints[index], enabled };
+				mutate('/api/gradio-endpoints', optimisticEndpoints, false);
+			}
+
+			// Make API call
+			const response = await fetch(`/api/gradio-endpoints/${index}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ enabled }),
+			});
+
+			if (!response.ok) {
+				throw new Error(`Failed to update endpoint: ${response.status}`);
+			}
+
+			// Revalidate to ensure consistency
+			mutate('/api/gradio-endpoints');
+
+			console.log(`Gradio endpoint at index ${index} is now ${enabled ? 'enabled' : 'disabled'}`);
+		} catch (err) {
+			console.error(`Error updating Gradio endpoint:`, err);
+			alert(`Error updating endpoint: ${err instanceof Error ? err.message : 'Unknown error'}`);
+
+			// Revert optimistic update on error
+			mutate('/api/gradio-endpoints');
+		}
+	};
+
+	// Handle Gradio endpoint URL changes
+	const handleGradioEndpointUrlChange = async (index: number, url: string) => {
+		try {
+			// Make API call
+			const response = await fetch(`/api/gradio-endpoints/${index}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ url }),
+			});
+
+			if (!response.ok) {
+				const error = await response.json();
+				throw new Error(error.error || `Failed to update endpoint URL: ${response.status}`);
+			}
+
+			// Revalidate to ensure consistency
+			mutate('/api/gradio-endpoints');
+
+			console.log(`Gradio endpoint at index ${index} URL updated to ${url}`);
+		} catch (err) {
+			console.error(`Error updating Gradio endpoint URL:`, err);
+			alert(`Error updating endpoint URL: ${err instanceof Error ? err.message : 'Unknown error'}`);
+
+			// Revert by revalidating
+			mutate('/api/gradio-endpoints');
+		}
+	};
+
+	/** should we use annotations / Title here? */
 	const searchTools = {
 		paper_search: {
 			// Changed from paper_semantic_search
@@ -104,25 +171,25 @@ function App() {
 		model_search: {
 			id: 'model_search',
 			label: 'Model Search',
-			description: 'Search for ML models with filters for task, library, etc.',
+			description: 'Find models with filters for task, library, etc.',
 			settings: settings?.tools?.model_search || { enabled: true },
 		},
 		model_detail: {
 			id: 'model_detail',
 			label: 'Model Details',
-			description: 'Get detailed information about a specific model.',
+			description: 'Detailed information about a specific model.',
 			settings: settings?.tools?.model_detail || { enabled: true },
 		},
 		dataset_search: {
 			id: 'dataset_search',
 			label: 'Dataset Search',
-			description: 'Search for datasets with filters for author, tags, etc.',
+			description: 'Find datasets with filters for author, tags, etc.',
 			settings: settings?.tools?.dataset_search || { enabled: true },
 		},
 		dataset_detail: {
 			id: 'dataset_detail',
 			label: 'Dataset Details',
-			description: 'Get detailed information about a specific dataset.',
+			description: 'Detailed information about a specific dataset.',
 			settings: settings?.tools?.dataset_detail || { enabled: true },
 		},
 	};
@@ -131,7 +198,7 @@ function App() {
 		duplicate_space: {
 			id: 'duplicate_space',
 			label: 'Duplicate Space',
-			description: 'Duplicate any Hugging Face Space to your account.',
+			description: 'Duplicate a Space to your account.',
 			settings: settings?.tools?.duplicate_space || { enabled: true },
 		},
 	};
@@ -150,6 +217,11 @@ function App() {
 					description="Manage and duplicate Hugging Face Spaces."
 					tools={spaceTools}
 					onToolToggle={handleToolToggle}
+				/>
+				<GradioEndpointsCard
+					endpoints={gradioEndpoints}
+					onEndpointToggle={handleGradioEndpointToggle}
+					onEndpointUrlChange={handleGradioEndpointUrlChange}
 				/>
 			</div>
 

@@ -29,15 +29,14 @@ interface SpaceSearchParams {
 // Default number of results to return
 const RESULTS_TO_RETURN = 10;
 
-export const SemanticSearchDescription = 'Search Hugging Face Spaces with semantic search.';
-
 export const SEMANTIC_SEARCH_TOOL_CONFIG = {
 	name: 'space_search',
-	description: 'Search for Hugging Face Spaces. ' + 'Include links to the Space when presenting the results.',
+	description:
+		'Find Hugging Face Spaces using semantic search. ' + 'Include links to the Space when presenting the results.',
 	schema: z.object({
-		query: z.string().min(1, 'Search query is required').max(50, 'Query too long').describe('Semantic Search Query'),
+		query: z.string().min(1, 'Query is required').max(50, 'Query too long').describe('Semantic Search Query'),
 		limit: z.number().optional().default(RESULTS_TO_RETURN).describe('Number of results to return'),
-		mcp: z.boolean().optional().default(false).describe('Only include MCP Server enabled Spaces'),
+		mcp: z.boolean().optional().default(false).describe('Only return MCP Server enabled Spaces'),
 	}),
 	annotations: {
 		title: 'Hugging Face Space Search',
@@ -66,7 +65,11 @@ export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SpaceSearchRes
 	 * @param limit Maximum number of results to return
 	 * @returns An array of search results
 	 */
-	async search(query: string, limit: number = RESULTS_TO_RETURN, mcp: boolean = false): Promise<{ results: SpaceSearchResult[], totalCount: number }> {
+	async search(
+		query: string,
+		limit: number = RESULTS_TO_RETURN,
+		mcp: boolean = false
+	): Promise<{ results: SpaceSearchResult[]; totalCount: number }> {
 		try {
 			// Validate input before making API call
 			if (!query) {
@@ -107,9 +110,10 @@ export const formatSearchResults = (query: string, results: SpaceSearchResult[],
 		return `No matching Hugging Face Spaces found for the query '${query}'. Try a different query.`;
 	}
 
-	const showingText = results.length < totalCount 
-		? `Showing ${results.length.toString()} of ${totalCount.toString()} results`
-		: `All ${results.length.toString()} results`;
+	const showingText =
+		results.length < totalCount
+			? `Showing ${results.length.toString()} of ${totalCount.toString()} results`
+			: `All ${results.length.toString()} results`;
 	let markdown = `# Space Search Results for the query '${query}' (${showingText})\n\n`;
 	markdown += '| Space | Description | Author | ID | Category |  Likes | Trending Score | Relevance |\n';
 	markdown += '|-------|-------------|--------|----|----------|--------|----------------|-----------|\n';

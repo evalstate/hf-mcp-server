@@ -1,15 +1,12 @@
 import { z } from 'zod';
 import { listDatasets, type DatasetEntry } from '@huggingface/hub';
 import { formatDate, formatNumber } from './model-utils.js';
-
-export const DatasetSearchDescription = 'Search Hugging Face Datasets for machine learning.';
-
 const TAGS_TO_RETURN = 20;
 // Dataset Search Tool Configuration
 export const DATASET_SEARCH_TOOL_CONFIG = {
 	name: 'dataset_search',
 	description:
-		'Find datasets on Hugging Face by name, author, task type, or tags. Returns detailed info about matching datasets including downloads, likes, tags, and direct links.',
+		'Find Datasets hosted on the Hugging Face hub. Use a general query, or specify author and tags. Returns detailed info about matching datasets including downloads, likes, tags, and direct links.',
 	schema: z.object({
 		query: z.string().optional().describe('Search term for finding datasets by name or description'),
 		author: z
@@ -23,11 +20,6 @@ export const DATASET_SEARCH_TOOL_CONFIG = {
 				"Tags to filter datasets (e.g., ['language:en', 'size_categories:1M<n<10M', 'task_categories:text-classification'])"
 			),
 		limit: z.number().min(1).max(100).optional().default(20).describe('Maximum number of results to return (1-100)'),
-		sort: z
-			.enum(['downloads', 'likes', 'lastModified'])
-			.optional()
-			.default('downloads')
-			.describe('How to order results (download count, likes, or last modified date)'),
 	}),
 	annotations: {
 		title: 'Dataset Search',
@@ -48,7 +40,6 @@ interface ExtendedDatasetEntry extends DatasetEntry {
 	downloadsAllTime?: number;
 	description?: string;
 }
-
 /**
  * Service for searching Hugging Face Datasets using the official huggingface.js library
  */
@@ -75,7 +66,6 @@ export class DatasetSearchTool {
 				query?: string;
 				owner?: string;
 				tags?: string[];
-				sort?: string;
 			} = {};
 
 			// Handle query parameter
@@ -91,16 +81,12 @@ export class DatasetSearchTool {
 				searchParams.tags = params.tags;
 			}
 
-			// Pass the sort parameter directly to the API
-			if (params.sort) {
-				searchParams.sort = params.sort;
-			}
-
 			const datasets: ExtendedDatasetEntry[] = [];
 
 			// Collect results from the async generator
 			for await (const dataset of listDatasets({
 				search: searchParams,
+				// cardData is more than we want for this....
 				additionalFields: ['author', 'tags', 'downloadsAllTime', 'description'],
 				limit: params.limit,
 				...(this.accessToken && { credentials: { accessToken: this.accessToken } }),
@@ -124,27 +110,6 @@ export class DatasetSearchTool {
 			throw error;
 		}
 	}
-
-	/**
-	 * Simple search by text query (convenience method)
-	 */
-	async searchByQuery(query: string, limit: number = 20): Promise<string> {
-		return this.searchWithParams({ query, limit, sort: 'downloads' });
-	}
-
-	/**
-	 * Search by author/organization
-	 */
-	async searchByAuthor(author: string, limit: number = 20): Promise<string> {
-		return this.searchWithParams({ author, limit, sort: 'downloads' });
-	}
-
-	/**
-	 * Search by tags
-	 */
-	async searchByTags(tags: string[], limit: number = 20): Promise<string> {
-		return this.searchWithParams({ tags, limit, sort: 'downloads' });
-	}
 }
 
 // Formatting Function
@@ -159,9 +124,10 @@ function formatSearchResults(datasets: ExtendedDatasetEntry[], params: Partial<D
 
 	const searchDesc = searchTerms.length > 0 ? ` matching ${searchTerms.join(', ')}` : '';
 
-	const resultText = datasets.length === params.limit 
-		? `Showing first ${datasets.length.toString()} datasets${searchDesc}:`
-		: `Found ${datasets.length.toString()} datasets${searchDesc}:`;
+	const resultText =
+		datasets.length === params.limit
+			? `Showing first ${datasets.length.toString()} datasets${searchDesc}:`
+			: `Found ${datasets.length.toString()} datasets${searchDesc}:`;
 	r.push(resultText);
 	r.push('');
 
