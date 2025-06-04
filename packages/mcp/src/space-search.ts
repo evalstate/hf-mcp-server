@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { HfApiCall } from './hf-api-call.js';
+import { escapeMarkdown } from './utilities.js';
 
 // Define the SearchResult interface
 export interface SpaceSearchResult {
@@ -139,23 +140,3 @@ export const formatSearchResults = (query: string, results: SpaceSearchResult[],
 
 	return markdown;
 };
-
-/**
- * Escapes special markdown characters in a string
- * @param text The text to escape
- * @returns The escaped text
- */
-function escapeMarkdown(text: string): string {
-	if (!text) return '';
-	// Replace pipe characters and newlines for table compatibility
-	// Plus additional markdown formatting characters for better safety
-	return text
-		.replace(/\|/g, '\\|')
-		.replace(/\n/g, ' ')
-		.replace(/\*/g, '\\*')
-		.replace(/_/g, '\\_')
-		.replace(/~/g, '\\~')
-		.replace(/`/g, '\\`')
-		.replace(/>/g, '\\>')
-		.replace(/#/g, '\\#');
-}

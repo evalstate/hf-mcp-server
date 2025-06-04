@@ -201,6 +201,12 @@ function App() {
 			description: 'Duplicate a Space to your account.',
 			settings: settings?.tools?.duplicate_space || { enabled: true },
 		},
+		space_info: {
+			id: 'space_info',
+			label: 'Spaces Information',
+			description: 'Get detailed information about your Spaces.',
+			settings: settings?.tools?.space_info || { enabled: true },
+		},
 	};
 
 	return (
