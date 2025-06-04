@@ -234,17 +234,15 @@ export function TransportMetricsCard() {
 								</TableRow>
 							)}
 							<TableRow>
-								<TableCell className="font-medium text-sm">{metrics.isStateless ? 'Total Requests' : 'Total Connections'}</TableCell>
+								<TableCell className="font-medium text-sm">{metrics.isStateless ? 'Request Count (HTTP)' : 'Total Connections'}</TableCell>
 								<TableCell className="text-sm font-mono">{metrics.connections.total}</TableCell>
 							</TableRow>
-							{metrics.connections.cleaned !== undefined && (
-								<TableRow>
-									<TableCell className="font-medium text-sm">Cleaned Sessions</TableCell>
-									<TableCell className="text-sm font-mono">{metrics.connections.cleaned}</TableCell>
-								</TableRow>
-							)}
 							<TableRow>
-								<TableCell className="font-medium text-sm">Total Requests</TableCell>
+								<TableCell className="font-medium text-sm">Cleaned Sessions</TableCell>
+								<TableCell className="text-sm font-mono">{metrics.connections.cleaned ?? 0}</TableCell>
+							</TableRow>
+							<TableRow>
+								<TableCell className="font-medium text-sm">Request Count (MCP)</TableCell>
 								<TableCell className="text-sm font-mono">{metrics.requests.total}</TableCell>
 							</TableRow>
 							<TableRow>
@@ -283,7 +281,7 @@ export function TransportMetricsCard() {
 								<TableHeader>
 									<TableRow>
 										<TableHead>Client</TableHead>
-										<TableHead>Requests</TableHead>
+										<TableHead>Request Count</TableHead>
 										<TableHead>Connections</TableHead>
 										<TableHead>Status</TableHead>
 										<TableHead>Last Seen</TableHead>
