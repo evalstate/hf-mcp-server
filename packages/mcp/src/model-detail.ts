@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { modelInfo } from '@huggingface/hub';
-import { formatDate, formatNumber } from './model-utils.js';
+import { formatDate, formatNumber } from './utilities.js';
 
 const SPACES_TO_INCLUDE = 12;
 // Model Detail Tool Configuration
@@ -261,7 +261,7 @@ function formatModelDetails(model: ModelInformation): string {
 	}
 
 	// Dates
-	r.push(`- **Updated:** ${formatDate(model.updatedAt.toISOString())}`);
+	r.push(`- **Updated:** ${formatDate(model.updatedAt)}`);
 
 	// Status indicators
 	const status = [];

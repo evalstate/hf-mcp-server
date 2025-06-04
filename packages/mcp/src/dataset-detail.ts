@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { datasetInfo } from '@huggingface/hub';
-import { formatDate, formatNumber } from './model-utils.js';
+import { formatDate, formatNumber } from './utilities.js';
 
 // Dataset Detail Tool Configuration
 export const DATASET_DETAIL_TOOL_CONFIG = {
@@ -190,7 +190,7 @@ function formatDatasetDetails(dataset: DatasetInformation): string {
 	}
 
 	// Dates
-	r.push(`- **Updated:** ${formatDate(dataset.updatedAt.toISOString())}`);
+	r.push(`- **Updated:** ${formatDate(dataset.updatedAt)}`);
 
 	// Status indicators
 	const status = [];

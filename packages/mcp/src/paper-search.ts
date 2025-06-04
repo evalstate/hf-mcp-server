@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { HfApiCall } from './hf-api-call.js';
+import { formatDate } from './utilities.js';
 
 // https://github.com/huggingface/huggingface_hub/blob/a26b93e8ba0b51ce76ce5c2044896587c47c6b60/src/huggingface_hub/hf_api.py#L1481-L1542
 // Raw JSON response for https://hf.co/api/papers/search?q=llama%203%20herd Llama Herd is ~50,000 tokens
@@ -120,8 +121,8 @@ function formatSearchResults(
 	const r: string[] = [];
 	const showingText =
 		papers.length < totalCount
-			? `${totalCount.toString()} papers matched the query '${query}'. Here are the first ${papers.length.toString()} results.`
-			: `All ${papers.length.toString()} papers that matched the query '${query}'`;
+			? `${totalCount} papers matched the query '${query}'. Here are the first ${papers.length} results.`
+			: `All ${papers.length} papers that matched the query '${query}'`;
 	r.push(showingText);
 
 	for (const result of papers) {
@@ -131,7 +132,10 @@ function formatSearchResults(
 		r.push('');
 		r.push(`## ${title}`);
 		r.push('');
-		r.push(published(result.paper.publishedAt));
+		const publishedDate = result.paper.publishedAt
+			? `Published on ${formatDate(result.paper.publishedAt)}`
+			: 'Publication date not available';
+		r.push(publishedDate);
 		r.push(authors(result.paper.authors));
 		r.push('');
 		// Handle concise_only option: use ai_summary when enabled, or fallback to ai_summary if summary is blank
@@ -146,14 +150,12 @@ function formatSearchResults(
 		r.push(result.paper.ai_keywords ? `**AI Keywords**: ${result.paper.ai_keywords.join(', ')}` : '');
 
 		const upvotes: string =
-			result.paper.upvotes && result.paper.upvotes > 0 ? `Upvoted ${result.paper.upvotes.toString()} times` : '';
+			result.paper.upvotes && result.paper.upvotes > 0 ? `Upvoted ${result.paper.upvotes} times` : '';
 
 		if (result.numComments && result.numComments > 0) {
 			if (result.isAuthorParticipating)
-				r.push(
-					`${upvotes}. The authors are participating in a discussion with ${result.numComments.toString()} comments.`
-				);
-			else r.push(`${upvotes}. There is a community discussion with ${result.numComments.toString()} comments.`);
+				r.push(`${upvotes}. The authors are participating in a discussion with ${result.numComments} comments.`);
+			else r.push(`${upvotes}. There is a community discussion with ${result.numComments} comments.`);
 		} else {
 			if ('' != upvotes) r.push(upvotes);
 		}
@@ -163,27 +165,6 @@ function formatSearchResults(
 	r.push('');
 	r.push('---');
 	return r.join('\n');
-}
-
-export function published(published: string | undefined): string {
-	try {
-		if (!published) return 'Publication date not available';
-		const date = new Date(published);
-
-		// Check if date is valid (invalid dates return NaN when converted to number)
-		if (isNaN(date.getTime())) {
-			return 'Publication date not available';
-		}
-
-		// Format using Intl.DateTimeFormat for locale-aware formatting
-		const day = date.getDate().toString();
-		const month = date.toLocaleString('en', { month: 'short' });
-		const year = date.getFullYear().toString();
-
-		return `Published on ${day.toString()} ${month}, ${year.toString()}`;
-	} catch {
-		return 'Publication date not available';
-	}
 }
 
 export function authors(authors: Author[] | undefined, authorsToShow: number = DEFAULT_AUTHORS_TO_SHOW): string {
@@ -196,7 +177,7 @@ export function authors(authors: Author[] | undefined, authorsToShow: number = D
 	}
 
 	if (authors.length > authorsToShow) {
-		f.push(`and ${(authors.length - authorsToShow).toString()} more.`);
+		f.push(`and ${authors.length - authorsToShow} more.`);
 	}
 	return `**Authors:** ${f.join(', ')}`;
 }

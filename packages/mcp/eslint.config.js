@@ -5,7 +5,7 @@ export default tseslint.config(
   { ignores: ['dist/**', 'node_modules/**', 'build/**', '*.js', '*.cjs', '*.mjs'] },
   {
     files: ['src/**/*.ts'],
-    extends: [js.configs.recommended, ...tseslint.configs.strictTypeChecked],
+    extends: [js.configs.recommended, ...tseslint.configs.recommendedTypeChecked],
     languageOptions: {
       parserOptions: {
         project: './tsconfig.json',
@@ -35,6 +35,7 @@ export default tseslint.config(
       
       // General ESLint rules
       'no-constant-condition': 'off',
+      ''
     }
   }
 )

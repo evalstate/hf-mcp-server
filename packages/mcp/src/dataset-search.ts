@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { listDatasets, type DatasetEntry } from '@huggingface/hub';
-import { formatDate, formatNumber } from './model-utils.js';
+import { formatDate, formatNumber } from './utilities.js';
 const TAGS_TO_RETURN = 20;
 // Dataset Search Tool Configuration
 export const DATASET_SEARCH_TOOL_CONFIG = {
@@ -175,7 +175,7 @@ function formatSearchResults(datasets: ExtendedDatasetEntry[], params: Partial<D
 		}
 
 		if (dataset.updatedAt.toISOString() !== dataset.createdAt) {
-			r.push(`**Updated:** ${formatDate(dataset.updatedAt.toISOString())}`);
+			r.push(`**Updated:** ${formatDate(dataset.updatedAt)}`);
 		}
 
 		r.push(`**Link:** [https://hf.co/datasets/${dataset.name}](https://hf.co/datasets/${dataset.name})`);

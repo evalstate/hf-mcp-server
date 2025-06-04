@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { listModels, type ModelEntry } from '@huggingface/hub';
 import type { PipelineType } from '@huggingface/hub';
-import { formatDate, formatNumber } from './model-utils.js';
+import { formatDate, formatNumber } from './utilities.js';
 
 export const TAGS_TO_RETURN = 20;
 // Model Search Tool Configuration
@@ -180,7 +180,7 @@ function formatSearchResults(models: ExtendedModelEntry[], params: Partial<Model
 			r.push(`**Created:** ${formatDate(model.createdAt)}`);
 		}
 		if (model.updatedAt.toISOString() !== model.createdAt) {
-			r.push(`**Updated:** ${formatDate(model.updatedAt.toISOString())}`);
+			r.push(`**Updated:** ${formatDate(model.updatedAt)}`);
 		}
 
 		r.push(`**Link:** [https://hf.co/${model.name}](https://hf.co/${model.name})`);

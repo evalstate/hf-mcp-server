@@ -26,6 +26,9 @@ import {
 	DuplicateSpaceTool,
 	formatDuplicateResult,
 	type DuplicateSpaceParams,
+	SpaceInfoTool,
+	formatSpaceInfoResult,
+	type SpaceInfoParams,
 } from '@hf-mcp/mcp';
 
 import type { ServerFactory } from './transport/base-transport.js';
@@ -41,7 +44,7 @@ interface Tool {
 
 // Define bouquet configurations
 const BOUQUETS: Record<string, string[]> = {
-	spaces: ['space_search', 'duplicate_space'],
+	spaces: ['space_search', 'duplicate_space', 'space_info'],
 	search: ['space_search', 'model_search', 'dataset_search', 'paper_search'],
 };
 
@@ -206,6 +209,21 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				const result = await duplicateSpace.duplicate(params);
 				return {
 					content: [{ type: 'text', text: formatDuplicateResult(result) }],
+				};
+			}
+		);
+
+		const spaceInfoToolConfig = SpaceInfoTool.createToolConfig(username);
+		toolInstances[spaceInfoToolConfig.name] = server.tool(
+			spaceInfoToolConfig.name,
+			spaceInfoToolConfig.description,
+			spaceInfoToolConfig.schema.shape,
+			spaceInfoToolConfig.annotations,
+			async (params: SpaceInfoParams) => {
+				const spaceInfoTool = new SpaceInfoTool(hfToken, username);
+				const result = await formatSpaceInfoResult(spaceInfoTool, params);
+				return {
+					content: [{ type: 'text', text: result }],
 				};
 			}
 		);
