@@ -68,7 +68,7 @@ async function connectToSingleEndpoint(
 	const endpointId = `endpoint${(originalIndex + 1).toString()}`;
 	const remoteUrl = new URL(endpoint.url);
 
-	logger.info({ url: remoteUrl.toString(), endpointId }, 'Connecting to remote SSE endpoint');
+	logger.debug({ url: remoteUrl.toString(), endpointId }, 'Connecting to remote SSE endpoint');
 
 	// Create MCP client
 	const remoteClient = new Client(
@@ -104,13 +104,13 @@ async function connectToSingleEndpoint(
 			},
 		};
 
-		logger.info({ endpointId }, 'Including HF token in Gradio endpoint requests');
+		logger.debug({ endpointId }, 'Including HF token in Gradio endpoint requests');
 	}
 	const transport = new SSEClientTransport(remoteUrl, transportOptions);
 
 	// Connect the client to the transport
 	await remoteClient.connect(transport);
-	logger.info({ endpointId }, 'Connected to remote SSE endpoint');
+	logger.debug({ endpointId }, 'Connected to remote SSE endpoint');
 
 	// Get remote tools
 	const remoteToolsResponse = await remoteClient.request(
@@ -120,7 +120,7 @@ async function connectToSingleEndpoint(
 		ListToolsResultSchema
 	);
 
-	logger.info(
+	logger.debug(
 		{
 			endpointId,
 			toolCount: remoteToolsResponse.tools.length,
@@ -142,9 +142,9 @@ async function connectToSingleEndpoint(
 
 	if (inferTool) {
 		selectedTool = inferTool;
-		logger.info({ endpointId, toolName: selectedTool.name }, 'Selected tool containing "infer"');
+		logger.debug({ endpointId, toolName: selectedTool.name }, 'Selected tool containing "infer"');
 	} else if (selectedTool) {
-		logger.info({ endpointId, toolName: selectedTool.name }, 'Selected last tool (no "infer" tool found)');
+		logger.debug({ endpointId, toolName: selectedTool.name }, 'Selected last tool (no "infer" tool found)');
 	}
 
 	if (!selectedTool) {
@@ -175,7 +175,7 @@ export async function connectToGradioEndpoints(
 		.filter((item) => item.endpoint.enabled !== false && item.endpoint.url);
 
 	if (enabledWithIndex.length === 0) {
-		logger.info('No enabled Gradio endpoints to connect');
+		logger.debug('No enabled Gradio endpoints to connect');
 		return [];
 	}
 
@@ -210,7 +210,7 @@ export async function connectToGradioEndpoints(
 	const successful = results.filter((r) => r.success);
 	const failed = results.filter((r) => !r.success);
 
-	logger.info(
+	logger.debug(
 		{
 			total: results.length,
 			successful: successful.length,
@@ -238,7 +238,7 @@ export function registerRemoteTool(
 ): void {
 	// Use endpoint ID as prefix to avoid conflicts
 	const remoteName = `${endpointId}_${tool.name}`;
-	logger.info(
+	logger.debug(
 		{
 			endpointId,
 			originalName: tool.name,
@@ -298,10 +298,10 @@ export function registerRemoteTool(
 					},
 					CallToolResultSchema
 				);
-				logger.info({ tool: tool.name }, 'Remote tool call successful');
+				logger.debug({ tool: tool.name }, 'Remote tool call successful');
 				return result;
 			} catch (error) {
-				logger.error({ tool: tool.name, error }, 'Remote tool call failed');
+				logger.debug({ tool: tool.name, error }, 'Remote tool call failed');
 				throw error;
 			}
 		}

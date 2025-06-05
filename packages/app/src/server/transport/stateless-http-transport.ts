@@ -57,21 +57,20 @@ export class StatelessHttpTransport extends BaseTransport {
 			const bouquet = req.query.bouquet as string | undefined;
 			if (bouquet) {
 				headers['x-mcp-bouquet'] = bouquet;
-				logger.info({ bouquet }, 'Stateless HTTP: Passing bouquet parameter to server factory');
 			}
 			server = await this.serverFactory(headers);
 
 			// After handling, check if it was an initialize request
 			if (requestBody?.method === 'initialize') {
 				const clientInfo = requestBody.params?.clientInfo as { name?: string; version?: string } | undefined;
-				
+
 				// Track client info for metrics if available
 				if (clientInfo?.name && clientInfo?.version) {
 					this.associateSessionWithClient({ name: clientInfo.name, version: clientInfo.version });
 					this.updateClientActivity({ name: clientInfo.name, version: clientInfo.version });
 				}
-				
-				logger.info(
+
+				logger.debug(
 					{
 						clientInfo: requestBody.params?.clientInfo,
 						capabilities: requestBody.params?.capabilities,

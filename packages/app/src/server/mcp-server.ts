@@ -97,7 +97,6 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 
 		// Always register all tools and store instances for dynamic control
 		const toolInstances: { [toolId: string]: Tool } = {};
-		logger.info('Registering all tools for server instance');
 
 		const whoDescription = userDetails
 			? `Hugging Face tools are being used by authenticated user '${userDetails.name}'`
@@ -200,7 +199,6 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		);
 
 		const duplicateToolConfig = DuplicateSpaceTool.createToolConfig(username);
-		logger.debug({ username, description: duplicateToolConfig.description }, 'Creating duplicate tool config');
 		toolInstances[duplicateToolConfig.name] = server.tool(
 			duplicateToolConfig.name,
 			duplicateToolConfig.description,
@@ -253,12 +251,11 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			if (bouquet && BOUQUETS[bouquet]) {
 				const allowedTools = BOUQUETS[bouquet];
 				isEnabled = allowedTools.includes(toolName);
-				logger.info({ toolName, bouquet, isEnabled }, 'Tool state set by bouquet');
+				logger.debug({ toolName, bouquet, isEnabled }, 'Tool state set by bouquet');
 			}
 
 			if (!isEnabled) {
 				toolInstance.disable();
-				logger.debug({ toolName }, 'Tool disabled');
 			}
 		}
 

@@ -81,7 +81,7 @@ export class Application {
 
 		// Create the server factory
 		const originalServerFactory = createServerFactory(this.webServerInstance, this.apiClient);
-		
+
 		// Wrap with proxy (for now just passes through, later will add remote tools)
 		this.serverFactory = createProxyServerFactory(this.webServerInstance, this.apiClient, originalServerFactory);
 
@@ -143,7 +143,7 @@ export class Application {
 
 		// Pass registered tools to WebServer
 		this.webServerInstance.setRegisteredTools(registeredTools);
-		
+
 		// Pass API client to WebServer for Gradio endpoints
 		this.webServerInstance.setApiClient(this.apiClient);
 	}
@@ -153,10 +153,10 @@ export class Application {
 
 		try {
 			this.transport = createTransport(this.transportType, this.serverFactory, this.appInstance);
-			
+
 			// Pass transport to web server for session management
 			this.webServerInstance.setTransport(this.transport);
-			
+
 			await this.transport.initialize({
 				port: this.webAppPort,
 			});
@@ -183,8 +183,7 @@ export class Application {
 	private async startToolManagement(): Promise<void> {
 		// Start API client for global tool state management
 		await this.apiClient.startPolling((toolId, enabled) => {
-			logger.info(`Global tool ${toolId} ${enabled ? 'enabled' : 'disabled'}`);
-			// Note: The actual tool enable/disable is handled per-server in the ServerFactory
+			logger.debug(`Global tool ${toolId} ${enabled ? 'enabled' : 'disabled'}`);
 		});
 	}
 

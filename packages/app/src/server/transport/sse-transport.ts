@@ -11,7 +11,6 @@ interface SSEConnection extends BaseSession<SSEServerTransport> {
 }
 
 export class SseTransport extends StatefulTransport<SSEConnection> {
-
 	async initialize(_options: TransportOptions): Promise<void> {
 		// SSE endpoint for client connections
 		this.app.get('/sse', (req: Request, res: Response) => {
@@ -68,7 +67,6 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			const headers = req.headers as Record<string, string>;
 			if (bouquet) {
 				headers['x-mcp-bouquet'] = bouquet;
-				logger.info({ bouquet }, 'SSE: Passing bouquet parameter to server factory');
 			}
 			const server = await this.serverFactory(headers);
 
@@ -104,7 +102,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			};
 
 			this.sessions.set(sessionId, connection);
-			
+
 			// Track the session creation for metrics
 			this.trackSessionCreated();
 
@@ -284,5 +282,4 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			return false;
 		}
 	}
-
 }

@@ -125,7 +125,7 @@ export abstract class BaseTransport {
 			this.metrics.errors.lastError = {
 				type: error.constructor.name,
 				message: error.message,
-				timestamp: new Date()
+				timestamp: new Date(),
 			};
 		}
 	}
@@ -153,7 +153,7 @@ export abstract class BaseTransport {
 				lastSeen: new Date(),
 				isConnected: true,
 				activeConnections: 1,
-				totalConnections: 1
+				totalConnections: 1,
 			};
 			this.metrics.clients.set(clientKey, clientMetrics);
 		} else {
@@ -203,10 +203,9 @@ export abstract class BaseTransport {
 		const now = Date.now();
 		const startupTime = this.metrics.startupTime.getTime();
 		const uptimeMinutes = (now - startupTime) / (1000 * 60);
-		
-		this.metrics.requests.averagePerMinute = uptimeMinutes > 0 
-			? Math.round((this.metrics.requests.total / uptimeMinutes) * 100) / 100
-			: 0;
+
+		this.metrics.requests.averagePerMinute =
+			uptimeMinutes > 0 ? Math.round((this.metrics.requests.total / uptimeMinutes) * 100) / 100 : 0;
 	}
 }
 
@@ -258,7 +257,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 					};
 				}
 
-				logger.info(
+				logger.debug(
 					{
 						sessionId,
 						clientInfo: session.metadata.clientInfo,
@@ -381,7 +380,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	override getConfiguration(): { staleCheckInterval: number; staleTimeout: number } {
 		return {
 			staleCheckInterval: this.STALE_CHECK_INTERVAL,
-			staleTimeout: this.STALE_TIMEOUT
+			staleTimeout: this.STALE_TIMEOUT,
 		};
 	}
 }

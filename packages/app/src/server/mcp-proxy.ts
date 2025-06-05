@@ -23,18 +23,18 @@ export const createProxyServerFactory = (
 		// Extract auth and bouquet using shared utility (for consistency)
 		const { hfToken, bouquet } = extractAuthAndBouquet(headers);
 		if (bouquet) {
-			logger.info({ bouquet }, 'Bouquet parameter will be handled by original server factory');
+			logger.debug({ bouquet }, 'Bouquet parameter will be handled by original server factory');
 		}
 
 		// Skip Gradio endpoints if bouquet is "search"
 		if (bouquet === 'search') {
-			logger.info('Bouquet is "search", skipping Gradio endpoints');
+			logger.debug('Bouquet is "search", skipping Gradio endpoints');
 			return server;
 		}
 
 		// Get enabled Gradio endpoints from the API client
 		const gradioEndpoints = sharedApiClient.getGradioEndpoints();
-		logger.info(
+		logger.debug(
 			{
 				gradioEndpoints: gradioEndpoints.map((ep, i) => ({
 					index: i,
@@ -46,7 +46,7 @@ export const createProxyServerFactory = (
 		);
 
 		const enabledEndpoints = gradioEndpoints.filter((ep) => ep.enabled !== false);
-		logger.info(
+		logger.debug(
 			{
 				enabledCount: enabledEndpoints.length,
 				enabledUrls: enabledEndpoints.map((ep) => ep.url),
@@ -55,22 +55,22 @@ export const createProxyServerFactory = (
 		);
 
 		if (enabledEndpoints.length === 0) {
-			logger.info('No enabled Gradio endpoints, using local tools only');
+			logger.debug('No enabled Gradio endpoints, using local tools only');
 			return server;
 		}
 
 		// Connect to all enabled endpoints in parallel with timeout
 		const connections = await connectToGradioEndpoints(gradioEndpoints, hfToken);
-		
+
 		// Register tools from successful connections
 		for (const result of connections) {
 			if (!result.success) continue;
-			
+
 			const { endpointId, originalIndex, client, tool } = result.connection;
 			registerRemoteTool(server, endpointId, originalIndex, client, tool);
 		}
 
-		logger.info('Server ready with local and remote tools');
+		logger.debug('Server ready with local and remote tools');
 		return server;
 	};
 };
