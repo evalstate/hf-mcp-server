@@ -1,14 +1,21 @@
 import { z } from 'zod';
-import { listDatasets, type DatasetEntry } from '@huggingface/hub';
+import { HfApiCall } from './hf-api-call.js';
 import { formatDate, formatNumber } from './utilities.js';
 const TAGS_TO_RETURN = 20;
 // Dataset Search Tool Configuration
 export const DATASET_SEARCH_TOOL_CONFIG = {
 	name: 'dataset_search',
 	description:
-		'Find Datasets hosted on the Hugging Face hub. Use a general query, or specify author and tags. Returns detailed info about matching datasets including downloads, likes, tags, and direct links.',
+		'Find Datasets hosted on the Hugging Face hub. ' +
+		'Returns comprehensive information about matching datasets including downloads, likes, tags, and direct links. ' +
+		'Include links to the datasets in your response',
 	schema: z.object({
-		query: z.string().optional().describe('Search term for finding datasets by name or description'),
+		query: z
+			.string()
+			.optional()
+			.describe(
+				'Search term. Leave blank and specify "sort" and "limit" to get e.g. "Top 20 trending datasets", "Top 10 most recent datasets" etc" '
+			),
 		author: z
 			.string()
 			.optional()
@@ -19,7 +26,11 @@ export const DATASET_SEARCH_TOOL_CONFIG = {
 			.describe(
 				"Tags to filter datasets (e.g., ['language:en', 'size_categories:1M<n<10M', 'task_categories:text-classification'])"
 			),
-		limit: z.number().min(1).max(100).optional().default(20).describe('Maximum number of results to return (1-100)'),
+		sort: z
+			.enum(['trendingScore', 'downloads', 'likes', 'createdAt', 'lastModified'])
+			.optional()
+			.describe('Sort order: trendingScore, downloads, likes, createdAt, lastModified'),
+		limit: z.number().min(1).max(100).optional().default(20).describe('Maximum number of results to return'),
 	}),
 	annotations: {
 		title: 'Dataset Search',
@@ -32,28 +43,41 @@ export const DATASET_SEARCH_TOOL_CONFIG = {
 // Define search parameter types
 export type DatasetSearchParams = z.infer<typeof DATASET_SEARCH_TOOL_CONFIG.schema>;
 
-// Extended DatasetEntry interface to include more fields we want
-interface ExtendedDatasetEntry extends DatasetEntry {
+// API parameter interface for direct HF API calls
+interface DatasetApiParams {
+	search?: string;
 	author?: string;
-	tags?: string[];
-	createdAt?: string;
-	downloadsAllTime?: number;
+	filter?: string;
+	sort?: string;
+	direction?: string;
+	limit?: string;
+}
+
+// Dataset result interface matching HF API response
+interface DatasetApiResult {
+	_id: string;
+	id: string;
+	author: string;
+	likes: number;
+	downloads: number;
+	trendingScore?: number;
+	private: boolean;
+	gated: boolean;
+	tags: string[];
+	createdAt: string;
+	lastModified: string;
 	description?: string;
+	sha: string;
 }
 /**
- * Service for searching Hugging Face Datasets using the official huggingface.js library
+ * Service for searching Hugging Face Datasets using direct API calls
  */
-export class DatasetSearchTool {
-	private readonly hubUrl?: string;
-	private readonly accessToken?: string;
-
+export class DatasetSearchTool extends HfApiCall<DatasetApiParams, DatasetApiResult[]> {
 	/**
 	 * @param hfToken Optional Hugging Face token for API access
-	 * @param hubUrl Optional custom hub URL
 	 */
-	constructor(hfToken?: string, hubUrl?: string) {
-		this.accessToken = hfToken;
-		this.hubUrl = hubUrl;
+	constructor(hfToken?: string) {
+		super('https://huggingface.co/api/datasets', hfToken);
 	}
 
 	/**
@@ -61,42 +85,37 @@ export class DatasetSearchTool {
 	 */
 	async searchWithParams(params: Partial<DatasetSearchParams>): Promise<string> {
 		try {
-			// Convert our params to the format expected by the hub library
-			const searchParams: {
-				query?: string;
-				owner?: string;
-				tags?: string[];
-			} = {};
+			// Convert our params to the HF API format
+			const apiParams: DatasetApiParams = {};
 
-			// Handle query parameter
+			// Handle search query
 			if (params.query) {
-				searchParams.query = params.query;
+				apiParams.search = params.query;
 			}
 
+			// Handle author filter
 			if (params.author) {
-				searchParams.owner = params.author;
+				apiParams.author = params.author;
 			}
 
+			// Handle tags filter
 			if (params.tags && params.tags.length > 0) {
-				searchParams.tags = params.tags;
+				apiParams.filter = params.tags.join(',');
 			}
 
-			const datasets: ExtendedDatasetEntry[] = [];
-
-			// Collect results from the async generator
-			for await (const dataset of listDatasets({
-				search: searchParams,
-				// cardData is more than we want for this....
-				additionalFields: ['author', 'tags', 'downloadsAllTime', 'description'],
-				limit: params.limit,
-				...(this.accessToken && { credentials: { accessToken: this.accessToken } }),
-				...(this.hubUrl && { hubUrl: this.hubUrl }),
-			})) {
-				datasets.push({
-					...dataset,
-					createdAt: dataset.updatedAt.toISOString(),
-				} as ExtendedDatasetEntry);
+			// Handle sorting (always descending)
+			if (params.sort) {
+				apiParams.sort = params.sort;
+				apiParams.direction = '-1';
 			}
+
+			// Handle limit
+			if (params.limit) {
+				apiParams.limit = params.limit.toString();
+			}
+
+			// Call the API
+			const datasets = await this.callApi<DatasetApiResult[]>(apiParams);
 
 			if (datasets.length === 0) {
 				return `No datasets found for the given criteria.`;
@@ -113,7 +132,7 @@ export class DatasetSearchTool {
 }
 
 // Formatting Function
-function formatSearchResults(datasets: ExtendedDatasetEntry[], params: Partial<DatasetSearchParams>): string {
+function formatSearchResults(datasets: DatasetApiResult[], params: Partial<DatasetSearchParams>): string {
 	const r: string[] = [];
 
 	// Build search description
@@ -121,6 +140,7 @@ function formatSearchResults(datasets: ExtendedDatasetEntry[], params: Partial<D
 	if (params.query) searchTerms.push(`query "${params.query}"`);
 	if (params.author) searchTerms.push(`author "${params.author}"`);
 	if (params.tags && params.tags.length > 0) searchTerms.push(`tags [${params.tags.join(', ')}]`);
+	if (params.sort) searchTerms.push(`sorted by ${params.sort} (descending)`);
 
 	const searchDesc = searchTerms.length > 0 ? ` matching ${searchTerms.join(', ')}` : '';
 
@@ -132,7 +152,7 @@ function formatSearchResults(datasets: ExtendedDatasetEntry[], params: Partial<D
 	r.push('');
 
 	for (const dataset of datasets) {
-		r.push(`## ${dataset.name}`);
+		r.push(`## ${dataset.id}`);
 		r.push('');
 
 		// Description if available
@@ -145,6 +165,7 @@ function formatSearchResults(datasets: ExtendedDatasetEntry[], params: Partial<D
 		const info = [];
 		if (dataset.downloads) info.push(`**Downloads:** ${formatNumber(dataset.downloads)}`);
 		if (dataset.likes) info.push(`**Likes:** ${dataset.likes.toString()}`);
+		if (dataset.trendingScore) info.push(`**Trending Score:** ${dataset.trendingScore.toString()}`);
 
 		if (info.length > 0) {
 			r.push(info.join(' | '));
@@ -174,11 +195,11 @@ function formatSearchResults(datasets: ExtendedDatasetEntry[], params: Partial<D
 			r.push(`**Created:** ${formatDate(dataset.createdAt)}`);
 		}
 
-		if (dataset.updatedAt.toISOString() !== dataset.createdAt) {
-			r.push(`**Updated:** ${formatDate(dataset.updatedAt)}`);
+		if (dataset.lastModified && dataset.lastModified !== dataset.createdAt) {
+			r.push(`**Last Modified:** ${formatDate(dataset.lastModified)}`);
 		}
 
-		r.push(`**Link:** [https://hf.co/datasets/${dataset.name}](https://hf.co/datasets/${dataset.name})`);
+		r.push(`**Link:** [https://hf.co/datasets/${dataset.id}](https://hf.co/datasets/${dataset.id})`);
 		r.push('');
 		r.push('---');
 		r.push('');

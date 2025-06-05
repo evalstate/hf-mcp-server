@@ -100,6 +100,13 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		const toolInstances: { [name: string]: Tool } = {};
 		const currentToolStates: { [name: string]: boolean } = {};
 
+		// Initialize currentToolStates to match MCP SDK defaults (all tools start enabled)
+		const initializeToolStates = () => {
+			for (const toolName of Object.keys(toolInstances)) {
+				currentToolStates[toolName] = true; // MCP SDK default
+			}
+		};
+
 		const whoDescription = userDetails
 			? `Hugging Face tools are being used by authenticated user '${username}'`
 			: 'Hugging Face tools are being used anonymously and may be rate limited. Call this tool for instructions on joining and authenticating.';
@@ -131,7 +138,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			MODEL_SEARCH_TOOL_CONFIG.schema.shape,
 			MODEL_SEARCH_TOOL_CONFIG.annotations,
 			async (params: ModelSearchParams) => {
-				const modelSearch = new ModelSearchTool(hfToken, undefined);
+				const modelSearch = new ModelSearchTool(hfToken);
 				const results = await modelSearch.searchWithParams(params);
 				return {
 					content: [{ type: 'text', text: results }],
@@ -176,7 +183,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			DATASET_SEARCH_TOOL_CONFIG.schema.shape,
 			DATASET_SEARCH_TOOL_CONFIG.annotations,
 			async (params: DatasetSearchParams) => {
-				const datasetSearch = new DatasetSearchTool(hfToken, undefined);
+				const datasetSearch = new DatasetSearchTool(hfToken);
 				const results = await datasetSearch.searchWithParams(params);
 				return {
 					content: [{ type: 'text', text: results }],
@@ -255,11 +262,11 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				// Fetch current tool states from API with the user's token
 				const apiToolStates = await sharedApiClient.getToolStates(hfToken);
 				if (apiToolStates) {
-					enabledToolsList = Object.keys(apiToolStates).filter(toolName => apiToolStates[toolName]);
+					enabledToolsList = Object.keys(apiToolStates).filter((toolName) => apiToolStates[toolName]);
 				}
 				logger.debug({ enabledToolsList }, 'Using API for tool states');
 			}
-			
+
 			for (const [toolName, toolInstance] of Object.entries(toolInstances)) {
 				const isEnabled = enabledToolsList.includes(toolName);
 
@@ -267,7 +274,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				const currentState = currentToolStates[toolName];
 				if (currentState !== isEnabled) {
 					logger.info({ toolName, isEnabled, previousState: currentState }, 'Tool state changing');
-					
+
 					if (!isEnabled) {
 						toolInstance.disable();
 						logger.debug({ toolName }, 'Tool disabled');
@@ -275,7 +282,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 						toolInstance.enable();
 						logger.debug({ toolName }, 'Tool enabled');
 					}
-					
+
 					// Update tracked state
 					currentToolStates[toolName] = isEnabled;
 				} else {
@@ -283,6 +290,9 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				}
 			}
 		};
+
+		// Initialize tool states to match MCP SDK defaults before applying API states
+		initializeToolStates();
 
 		// Apply initial tool states (fetch from API)
 		void applyToolStates();
@@ -301,9 +311,9 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				// Re-apply all tool states when any change occurs
 				void applyToolStates();
 			};
-			
+
 			sharedApiClient.on('toolStateChange', toolStateChangeHandler);
-			
+
 			// Clean up event listener when server closes
 			server.server.onclose = () => {
 				sharedApiClient.removeListener('toolStateChange', toolStateChangeHandler);

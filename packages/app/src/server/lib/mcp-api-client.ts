@@ -106,20 +106,23 @@ export class McpApiClient extends EventEmitter {
 					const token = overrideToken || this.config.hfToken;
 					if (token) {
 						headers['Authorization'] = `Bearer ${token}`;
+						headers['Accept'] = 'application/json';
 					}
 
 					// Add 10 second timeout
 					const controller = new AbortController();
 					const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-					const response = await fetch(this.config.externalUrl, { 
+					const response = await fetch(this.config.externalUrl, {
 						headers,
-						signal: controller.signal 
+						signal: controller.signal,
 					});
-					
+
 					clearTimeout(timeoutId);
 					if (!response.ok) {
-						logger.warn(`Failed to fetch external settings: ${response.status.toString()} ${response.statusText} - defaulting to all tools enabled`);
+						logger.warn(
+							`Failed to fetch external settings: ${response.status.toString()} ${response.statusText} - defaulting to all tools enabled`
+						);
 						// Return empty array to enable all tools
 						return { builtInTools: [] };
 					}
