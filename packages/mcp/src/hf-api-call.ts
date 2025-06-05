@@ -89,10 +89,10 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 	 */
 	protected async fetchFromApi<T = TResponse>(url: URL | string, options?: globalThis.RequestInit): Promise<T> {
 		try {
-			const headers = {
+			const headers: Record<string, string> = {
 				'Content-Type': 'application/json',
-				...Object.fromEntries(Object.entries(options?.headers || {})),
-			} as Record<string, string>;
+				...(options?.headers as Record<string, string> || {}),
+			};
 			if (this.hfToken) {
 				headers['Authorization'] = `Bearer ${this.hfToken}`;
 			}
@@ -142,11 +142,11 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 	protected buildUrl(params: TParams): URL {
 		const url = new URL(this.apiUrl);
 
-		// Type assertion needed since TParams might be a custom interface
-		// that doesn't exactly match Record<string, string | undefined>
-		for (const [key, value] of Object.entries(params as Record<string, string | undefined>)) {
+		// Iterate over params in a type-safe way
+		for (const key in params) {
+			const value = params[key as keyof TParams];
 			if (value !== undefined) {
-				url.searchParams.append(key, value);
+				url.searchParams.append(key, String(value));
 			}
 		}
 

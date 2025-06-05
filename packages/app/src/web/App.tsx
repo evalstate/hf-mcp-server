@@ -1,15 +1,24 @@
 //import "./App.css";
 
+import { useState, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
 import { ToolsCard } from './components/ToolsCard';
-import { GradioEndpointsCard, type GradioEndpoint } from './components/GradioEndpointsCard';
+import { GradioEndpointsCard } from './components/GradioEndpointsCard';
 import { TransportMetricsCard } from './components/TransportMetricsCard';
 import { ConnectionFooter } from './components/ConnectionFooter';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './components/ui/tabs';
 import type { TransportInfo } from '../shared/transport-info.js';
 
+type SpaceTool = {
+	_id: string;
+	name: string;
+	subdomain: string;
+	emoji: string;
+};
+
 type AppSettings = {
 	builtInTools: string[];
+	spaceTools: SpaceTool[];
 };
 
 // SWR fetcher function
@@ -38,8 +47,11 @@ function App() {
 	// Use SWR for settings
 	const { data: settings } = useSWR<AppSettings>('/api/settings', fetcher);
 
-	// Use SWR for Gradio endpoints
-	const { data: gradioEndpoints = [] } = useSWR<GradioEndpoint[]>('/api/gradio-endpoints', fetcher);
+	// Simple state: 3 text boxes, 3 checkboxes
+	const [spaceNames, setSpaceNames] = useState<string[]>(['evalstate/flux1_schnell', 'abidlabs/EasyGhibli', '']);
+	const [spaceSubdomains, setSpaceSubdomains] = useState<string[]>(['evalstate-flux1-schnell', 'abidlabs-easyghibli', '']);
+	const [enabledSpaces, setEnabledSpaces] = useState<boolean[]>([true, true, false]);
+
 
 	const isLoading = !transportInfo && !transportError;
 	const error = transportError ? transportError.message : null;
@@ -88,67 +100,71 @@ function App() {
 		}
 	};
 
-	// Handle Gradio endpoint toggles
-	const handleGradioEndpointToggle = async (index: number, enabled: boolean) => {
-		try {
-			// Optimistic update
-			const optimisticEndpoints = [...gradioEndpoints];
-			if (optimisticEndpoints[index]) {
-				optimisticEndpoints[index] = { ...optimisticEndpoints[index], enabled };
-				mutate('/api/gradio-endpoints', optimisticEndpoints, false);
-			}
+	// Handle space tool toggle - just update checkbox and send to API
+	const handleSpaceToolToggle = async (index: number, enabled: boolean) => {
+		const newEnabled = [...enabledSpaces];
+		newEnabled[index] = enabled;
+		setEnabledSpaces(newEnabled);
+		
+		// Send only checked items to API
+		await updateSpaceToolsAPI(newEnabled);
+	};
 
-			// Make API call
-			const response = await fetch(`/api/gradio-endpoints/${index}`, {
+	// Handle space tool name change - just update the text box
+	const handleSpaceToolNameChange = async (index: number, name: string) => {
+		const newNames = [...spaceNames];
+		newNames[index] = name;
+		setSpaceNames(newNames);
+		
+		// Send to API if this one is checked
+		if (enabledSpaces[index]) {
+			await updateSpaceToolsAPI(enabledSpaces);
+		}
+	};
+
+	// Handle space tool subdomain change - just update the text box
+	const handleSpaceToolSubdomainChange = async (index: number, subdomain: string) => {
+		const newSubdomains = [...spaceSubdomains];
+		newSubdomains[index] = subdomain;
+		setSpaceSubdomains(newSubdomains);
+		
+		// Send to API if this one is checked
+		if (enabledSpaces[index]) {
+			await updateSpaceToolsAPI(enabledSpaces);
+		}
+	};
+	
+	// Simple helper to send current state to API
+	const updateSpaceToolsAPI = async (enabledArray: boolean[]) => {
+		try {
+			const spaceTools: SpaceTool[] = [];
+			
+			// Only include checked items
+			for (let i = 0; i < 3; i++) {
+				if (enabledArray[i] && spaceNames[i] && spaceSubdomains[i]) {
+					spaceTools.push({
+						_id: `space-${i}`,
+						name: spaceNames[i],
+						subdomain: spaceSubdomains[i],
+						emoji: '🔧'
+					});
+				}
+			}
+			
+			const response = await fetch('/api/settings', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ enabled }),
+				body: JSON.stringify({ spaceTools }),
 			});
 
 			if (!response.ok) {
-				throw new Error(`Failed to update endpoint: ${response.status}`);
+				throw new Error(`Failed to update space tools: ${response.status}`);
 			}
-
-			// Revalidate to ensure consistency
-			mutate('/api/gradio-endpoints');
-
-			console.log(`Gradio endpoint at index ${index} is now ${enabled ? 'enabled' : 'disabled'}`);
 		} catch (err) {
-			console.error(`Error updating Gradio endpoint:`, err);
-			alert(`Error updating endpoint: ${err instanceof Error ? err.message : 'Unknown error'}`);
-
-			// Revert optimistic update on error
-			mutate('/api/gradio-endpoints');
+			console.error('Error updating space tools:', err);
 		}
 	};
 
-	// Handle Gradio endpoint URL changes
-	const handleGradioEndpointUrlChange = async (index: number, url: string) => {
-		try {
-			// Make API call
-			const response = await fetch(`/api/gradio-endpoints/${index}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ url }),
-			});
-
-			if (!response.ok) {
-				const error = await response.json();
-				throw new Error(error.error || `Failed to update endpoint URL: ${response.status}`);
-			}
-
-			// Revalidate to ensure consistency
-			mutate('/api/gradio-endpoints');
-
-			console.log(`Gradio endpoint at index ${index} URL updated to ${url}`);
-		} catch (err) {
-			console.error(`Error updating Gradio endpoint URL:`, err);
-			alert(`Error updating endpoint URL: ${err instanceof Error ? err.message : 'Unknown error'}`);
-
-			// Revert by revalidating
-			mutate('/api/gradio-endpoints');
-		}
-	};
 
 	/** should we use annotations / Title here? */
 	const searchTools = {
@@ -222,7 +238,7 @@ function App() {
 							<TabsTrigger value="metrics">📊 Transport Metrics</TabsTrigger>
 							<TabsTrigger value="search">🔍 Search Tools</TabsTrigger>
 							<TabsTrigger value="spaces">🚀 Space Tools</TabsTrigger>
-							<TabsTrigger value="gradio">⚡ Gradio Endpoints</TabsTrigger>
+							<TabsTrigger value="gradio">🚀 Gradio Spaces</TabsTrigger>
 						</TabsList>
 						<TabsContent value="metrics">
 							<TransportMetricsCard />
@@ -245,9 +261,12 @@ function App() {
 						</TabsContent>
 						<TabsContent value="gradio">
 							<GradioEndpointsCard
-								endpoints={gradioEndpoints}
-								onEndpointToggle={handleGradioEndpointToggle}
-								onEndpointUrlChange={handleGradioEndpointUrlChange}
+								spaceNames={spaceNames}
+								spaceSubdomains={spaceSubdomains}
+								enabledSpaces={enabledSpaces}
+								onSpaceToolToggle={handleSpaceToolToggle}
+								onSpaceToolNameChange={handleSpaceToolNameChange}
+								onSpaceToolSubdomainChange={handleSpaceToolSubdomainChange}
 							/>
 						</TabsContent>
 					</Tabs>

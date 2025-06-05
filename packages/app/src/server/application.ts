@@ -8,6 +8,7 @@ import { logger } from './lib/logger.js';
 import { createServerFactory } from './mcp-server.js';
 import { createProxyServerFactory } from './mcp-proxy.js';
 import { McpApiClient, type ApiClientConfig } from './lib/mcp-api-client.js';
+import type { SpaceTool } from '../shared/settings.js';
 import {
 	SEMANTIC_SEARCH_TOOL_CONFIG,
 	MODEL_SEARCH_TOOL_CONFIG,
@@ -58,20 +59,38 @@ export class Application {
 		};
 
 		// Configure API client with transport info
-		const defaultGradioEndpoints = [
-			{
-				url: 'https://evalstate-flux1-schnell.hf.space/gradio_api/mcp/sse',
+		// Convert spaceTools to GradioEndpoints format for backward compatibility
+		const convertSpaceToolsToGradioEndpoints = (spaceTools: SpaceTool[]): { url: string; enabled: boolean }[] => {
+			const gradioEndpoints = spaceTools.map(spaceTool => ({
+				url: `https://${spaceTool.subdomain}.hf.space/gradio_api/mcp/sse`,
 				enabled: true,
+			}));
+			
+			// Ensure we always have 3 endpoints (pad with empty ones)
+			while (gradioEndpoints.length < 3) {
+				gradioEndpoints.push({ url: '', enabled: true });
+			}
+			
+			return gradioEndpoints;
+		};
+
+		// Default space tools (will be used if no external API is configured)
+		const defaultSpaceTools = [
+			{
+				_id: "6755d0d9e0ea01e11fa2a38a",
+				name: "evalstate/flux1_schnell",
+				subdomain: "evalstate-flux1-schnell",
+				emoji: "🏎️💨"
 			},
 			{
-				url: 'https://abidlabs-easyghibli.hf.space/gradio_api/mcp/sse',
-				enabled: true,
-			},
-			{
-				url: '',
-				enabled: true,
-			},
+				_id: "680be03dc38b7fa7d6855910",
+				name: "abidlabs/EasyGhibli",
+				subdomain: "abidlabs-easyghibli",
+				emoji: "🦀"
+			}
 		];
+
+		const defaultGradioEndpoints = convertSpaceToolsToGradioEndpoints(defaultSpaceTools);
 
 		let apiClientConfig: ApiClientConfig;
 

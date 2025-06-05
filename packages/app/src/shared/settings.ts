@@ -4,9 +4,16 @@
  */
 
 // Define the settings types
+export interface SpaceTool {
+  _id: string;
+  name: string;
+  subdomain: string;
+  emoji: string;
+}
+
 export interface AppSettings {
   builtInTools: string[];
-  // Future setting categories can be added here
+  spaceTools: SpaceTool[];
 }
 
 // Default settings
@@ -21,6 +28,20 @@ const defaultSettings: AppSettings = {
     'duplicate_space',
     'space_info',
     'space_files',
+  ],
+  spaceTools: [
+    {
+      _id: "6755d0d9e0ea01e11fa2a38a",
+      name: "evalstate/flux1_schnell",
+      subdomain: "evalstate-flux1-schnell",
+      emoji: "🏎️💨"
+    },
+    {
+      _id: "680be03dc38b7fa7d6855910",
+      name: "abidlabs/EasyGhibli",
+      subdomain: "abidlabs-easyghibli",
+      emoji: "🦀"
+    }
   ],
 };
 
@@ -42,6 +63,17 @@ export const settingsService = {
     settings = {
       ...settings,
       builtInTools: [...builtInTools],
+    };
+    return { ...settings };
+  },
+
+  /**
+   * Update space tools array
+   */
+  updateSpaceTools(spaceTools: SpaceTool[]): AppSettings {
+    settings = {
+      ...settings,
+      spaceTools: [...spaceTools],
     };
     return { ...settings };
   },

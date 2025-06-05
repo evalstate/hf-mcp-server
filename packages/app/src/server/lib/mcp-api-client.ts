@@ -104,12 +104,13 @@ export class McpApiClient extends EventEmitter {
 				try {
 					const headers: Record<string, string> = {};
 					const token = overrideToken || this.config.hfToken;
+
 					if (token) {
 						headers['Authorization'] = `Bearer ${token}`;
-						headers['Accept'] = 'application/json';
 					}
 
 					// Add 10 second timeout
+					headers['Accept'] = 'application/json';
 					const controller = new AbortController();
 					const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -124,13 +125,13 @@ export class McpApiClient extends EventEmitter {
 							`Failed to fetch external settings: ${response.status.toString()} ${response.statusText} - defaulting to all tools enabled`
 						);
 						// Return empty array to enable all tools
-						return { builtInTools: [] };
+						return { builtInTools: [], spaceTools: [] };
 					}
 					return (await response.json()) as AppSettings;
 				} catch (error) {
 					logger.warn({ error }, 'Error fetching settings from external API - defaulting to all tools enabled');
 					// Return empty array to enable all tools
-					return { builtInTools: [] };
+					return { builtInTools: [], spaceTools: [] };
 				}
 
 			default:
@@ -300,47 +301,6 @@ export class McpApiClient extends EventEmitter {
 			this.pollTimer = null;
 			this.isPolling = false;
 			logger.info('Stopped API polling');
-		}
-	}
-
-	async updateToolState(toolId: string, enabled: boolean): Promise<boolean> {
-		if (this.config.type === 'static') {
-			logger.warn('Cannot update tool state in static mode');
-			return false;
-		}
-
-		const baseUrl = this.config.type === 'polling' ? this.config.baseUrl : this.config.externalUrl;
-		if (!baseUrl) {
-			logger.error('No base URL configured for tool state updates');
-			return false;
-		}
-
-		try {
-			const headers: Record<string, string> = {
-				'Content-Type': 'application/json',
-			};
-
-			if (this.config.type === 'external' && this.config.hfToken) {
-				headers['Authorization'] = `Bearer ${this.config.hfToken}`;
-			}
-
-			const response = await fetch(`${baseUrl}/api/settings/tools/${toolId}`, {
-				method: 'POST',
-				headers,
-				body: JSON.stringify({ enabled }),
-			});
-
-			if (!response.ok) {
-				logger.error(`Failed to update tool state: ${response.status.toString()} ${response.statusText}`);
-				return false;
-			}
-
-			// Update local cache immediately
-			this.cache.set(toolId, enabled);
-			return true;
-		} catch (error) {
-			logger.error({ error }, `Error updating tool ${toolId} state`);
-			return false;
 		}
 	}
 
