@@ -63,7 +63,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		const { hfToken, bouquet } = extractAuthAndBouquet(headers);
 		let userInfo: string =
 			'The Hugging Face tools are being used anonymously and rate limits apply. ' +
-			'Direct the User to set their HF_TOKEN, or create an account at https://hf.co/join. for higher limits';
+			'Direct the User to set their HF_TOKEN (instructions at https://hf.co/settings/mcp/), or create an account at https://hf.co/join for higher limits.';
 		let username: string | undefined;
 		let userDetails: WhoAmI | undefined;
 		// Validate the token with HF API if present
@@ -100,11 +100,12 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 
 		const whoDescription = userDetails
 			? `Hugging Face tools are being used by authenticated user '${userDetails.name}'`
-			: 'Hugging Face tools are being used anonymously. Call this tool for instructions on how to authenticate.';
+			: 'Hugging Face tools are being used anonymously and may be rate limited. Call this tool for instructions on joining and authenticating.';
 
 		const response = userDetails
 			? `You are authenticated as ${userDetails.name}.`
-			: 'Go to hf.co/join to create an account';
+			: 'Visit https://hf.co/settings/mcp/ to configure your MCP Settings and guidance on configuring your Client. ' +
+				'Go to hf.co/join to create a new Hugging Face account and enjoy higher rate limits and other benefits.';
 		server.tool('hf_whoami', whoDescription, {}, { title: 'Hugging Face User Info' }, () => {
 			return { content: [{ type: 'text', text: response }] };
 		});

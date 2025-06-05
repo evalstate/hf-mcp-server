@@ -1,3 +1,8 @@
+export const NO_TOKEN_INSTRUCTIONS =
+	'This action Requires Authentication. Direct the User to set a Hugging Face token ' +
+	'Visit https://hf.co/settings/mcp/ for guidance on configuring your Client and MCP Settings. ' +
+	'Or go to https://hf.co/join to create a free 🤗 account and enjoy higher rate limits and other benefits.';
+
 // Utility functions for formatting
 export function formatDate(date: Date | string): string {
 	try {

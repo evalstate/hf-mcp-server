@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { HfApiCall } from './hf-api-call.js';
 import { explain } from './error-messages.js';
+import { NO_TOKEN_INSTRUCTIONS } from './utilities.js';
 
 export interface SpaceInfo {
 	runtime?: {
@@ -81,7 +82,7 @@ export class DuplicateSpaceTool extends HfApiCall<DuplicateSpaceParams, Duplicat
 	static createToolConfig(username?: string): typeof DUPLICATE_SPACE_TOOL_CONFIG {
 		const description = username
 			? `Duplicate a Hugging Face Space. Target space will be created as ${username}/<new-space-name>.`
-			: `Requires Authentication. Direct User to set a Hugging Face token or go to https://hf.co/join to create an account.`;
+			: NO_TOKEN_INSTRUCTIONS;
 		return {
 			...DUPLICATE_SPACE_TOOL_CONFIG,
 			description,
@@ -121,7 +122,7 @@ export class DuplicateSpaceTool extends HfApiCall<DuplicateSpaceParams, Duplicat
 	async duplicate(params: DuplicateSpaceParams): Promise<DuplicateSpaceResult> {
 		const { sourceSpaceId, newSpaceName, hardware, private: isPrivate = true } = params;
 
-		if (!this.username) throw new Error('Set a valid Hugging Face token, or go to hf.co/join to create an 🤗 account.');
+		if (!this.username) throw new Error(NO_TOKEN_INSTRUCTIONS);
 
 		try {
 			// Step 1: Get source space info

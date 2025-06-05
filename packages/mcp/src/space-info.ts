@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { HfApiCall } from './hf-api-call.js';
 import { listSpaces, spaceInfo } from '@huggingface/hub';
 import type { SpaceEntry, SpaceRuntime, SpaceSdk } from '@huggingface/hub';
-import { formatDate, formatNumber, escapeMarkdown } from './utilities.js';
+import { formatDate, formatNumber, escapeMarkdown, NO_TOKEN_INSTRUCTIONS } from './utilities.js';
 
 interface SpaceReport {
 	user: string;
@@ -80,11 +80,10 @@ export class SpaceInfoTool extends HfApiCall<SpaceInfoParams, SpaceReport> {
 	}
 
 	async getSpacesReport(targetUsername?: string): Promise<string> {
-		if (!this.authenticatedUsername && !targetUsername) {
-			throw new Error('Set a valid Hugging Face token, or go to hf.co/join to create an 🤗 account.');
-		}
+		// TODO -- think a bit more about this exact condition
+		if (!this.authenticatedUsername && !targetUsername) throw new Error(NO_TOKEN_INSTRUCTIONS);
 
-		const username = targetUsername || this.authenticatedUsername!;
+		const username = targetUsername || this.authenticatedUsername || 'error';
 		const spaces: SpaceEntry[] = [];
 		const spacesWithRuntime: SpaceDetails[] = [];
 
