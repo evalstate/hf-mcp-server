@@ -139,9 +139,21 @@ export class McpApiClient extends EventEmitter {
 		}
 
 		const toolStates: Record<string, boolean> = {};
-		for (const [toolId, toolSettings] of Object.entries(settings.tools)) {
-			toolStates[toolId] = toolSettings.enabled;
+		
+		// Empty array means all enabled
+		if (settings.builtInTools.length === 0) {
+			// Default all known tools to enabled
+			const allTools = ['space_search', 'model_search', 'model_detail', 'paper_search', 'dataset_search', 'dataset_detail', 'duplicate_space', 'space_info', 'space_files'];
+			for (const toolId of allTools) {
+				toolStates[toolId] = true;
+			}
+		} else {
+			// Only enable specified tools
+			for (const toolId of settings.builtInTools) {
+				toolStates[toolId] = true;
+			}
 		}
+		
 		return toolStates;
 	}
 
@@ -296,7 +308,14 @@ export class McpApiClient extends EventEmitter {
 	 * Get cached tool state synchronously (for use during server creation)
 	 */
 	getCachedToolState(toolId: string): boolean {
-		return this.cache.get(toolId) ?? true; // Default to enabled if not in cache
+		return this.cache.get(toolId) ?? false; // Default to disabled if not in cache
+	}
+
+	/**
+	 * Set cached tool state (for initialization before polling starts)
+	 */
+	setCachedToolState(toolId: string, enabled: boolean): void {
+		this.cache.set(toolId, enabled);
 	}
 
 	/**

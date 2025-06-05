@@ -78,9 +78,9 @@ class GlobalSettingsManager {
     this.isSetup = true;
 
     // Monkey patch the settings service to notify us of changes
-    const originalUpdateToolSettings = settingsService.updateToolSettings.bind(settingsService);
-    settingsService.updateToolSettings = (toolId: string, newSettings) => {
-      const result = originalUpdateToolSettings(toolId, newSettings);
+    const originalUpdateBuiltInTools = settingsService.updateBuiltInTools.bind(settingsService);
+    settingsService.updateBuiltInTools = (builtInTools: string[]) => {
+      const result = originalUpdateBuiltInTools(builtInTools);
       
       // Notify all clients of the update
       this.notifyClients();

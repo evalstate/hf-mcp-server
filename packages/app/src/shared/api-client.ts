@@ -43,13 +43,7 @@ export interface ApiClient {
  * Convert AppSettings to McpServerSettings format
  */
 export function appSettingsToMcpSettings(appSettings: AppSettings): McpServerSettings {
-  const enabledTools = new Set<string>();
-  
-  for (const [toolId, toolSettings] of Object.entries(appSettings.tools)) {
-    if (toolSettings.enabled) {
-      enabledTools.add(toolId);
-    }
-  }
+  const enabledTools = new Set<string>(appSettings.builtInTools);
 
   return {
     enabledTools,

@@ -228,6 +228,12 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 			logger.error({ error, sessionId }, 'Error closing transport');
 		}
 
+		try {
+			await session.server.close();
+		} catch (error) {
+			logger.error({ error, sessionId }, 'Error closing server');
+		}
+
 		// Track session cleanup for metrics
 		this.trackSessionCleaned(session);
 		this.sessions.delete(sessionId);

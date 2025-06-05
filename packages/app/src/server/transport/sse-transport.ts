@@ -191,6 +191,13 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 					logger.error({ error, sessionId }, 'Error closing transport');
 				}
 
+				// Close server
+				try {
+					await connection.server.close();
+				} catch (error) {
+					logger.error({ error, sessionId }, 'Error closing server');
+				}
+
 				// Remove from map and track cleanup
 				this.trackSessionCleaned(connection);
 				this.sessions.delete(sessionId);

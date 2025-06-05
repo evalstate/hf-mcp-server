@@ -3,7 +3,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Server } from 'node:http';
 import type { TransportInfo } from '../shared/transport-info.js';
-import type { ToolSettings } from '../shared/settings.js';
 import { settingsService } from '../shared/settings.js';
 import { logger } from './lib/logger.js';
 import type { BaseTransport } from './transport/base-transport.js';
@@ -214,18 +213,17 @@ export class WebServer {
 		});
 
 		// Update tool settings endpoint
-		this.app.post('/api/settings/tools/:toolId', express.json(), (req, res) => {
-			const { toolId } = req.params;
-			const settings = req.body as Partial<ToolSettings>;
-			const updatedSettings = settingsService.updateToolSettings(toolId, settings);
+		this.app.post('/api/settings', express.json(), (req, res) => {
+			const { builtInTools } = req.body as { builtInTools: string[] };
+			const updatedSettings = settingsService.updateBuiltInTools(builtInTools);
 
-			// Enable or disable the actual MCP tool if it exists
-			if (this.registeredTools[toolId]) {
-				if (settings.enabled) {
-					this.registeredTools[toolId].enable();
+			// Enable or disable the actual MCP tools based on the new list
+			for (const [toolId, tool] of Object.entries(this.registeredTools)) {
+				if (builtInTools.includes(toolId)) {
+					tool.enable();
 					logger.info(`Tool ${toolId} has been enabled via API`);
 				} else {
-					this.registeredTools[toolId].disable();
+					tool.disable();
 					logger.info(`Tool ${toolId} has been disabled via API`);
 				}
 			}

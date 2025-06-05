@@ -16,6 +16,8 @@ import {
 	DATASET_SEARCH_TOOL_CONFIG,
 	DATASET_DETAIL_TOOL_CONFIG,
 	DUPLICATE_SPACE_TOOL_CONFIG,
+	SPACE_INFO_TOOL_CONFIG,
+	SPACE_FILES_TOOL_CONFIG,
 } from '@hf-mcp/mcp';
 
 export interface ApplicationOptions {
@@ -102,18 +104,19 @@ export class Application {
 		// Configure API endpoints
 		this.webServerInstance.setupApiRoutes();
 
-		// Initialize transport
+		// Start web server FIRST
+		await this.startWebServer();
+
+		// Initialize transport (before static files to avoid route conflicts)
 		await this.initializeTransport();
 
-		// Setup static files (must be after transport routes in dev mode)
+		// Setup static files (must be AFTER transport routes to avoid catch-all conflicts)
 		await this.webServerInstance.setupStaticFiles(this.isDev);
-
-		// Start web server
-		await this.startWebServer();
 
 		// Start API client (global tool management)
 		await this.startToolManagement();
 	}
+
 
 	private setupToolManagement(): void {
 		// For web server tool management, create placeholder registered tools
@@ -127,16 +130,20 @@ export class Application {
 			DATASET_SEARCH_TOOL_CONFIG.name,
 			DATASET_DETAIL_TOOL_CONFIG.name,
 			DUPLICATE_SPACE_TOOL_CONFIG.name,
+			SPACE_INFO_TOOL_CONFIG.name,
+			SPACE_FILES_TOOL_CONFIG.name,
 		];
 
 		// Create placeholder registered tools for web server compatibility
 		toolNames.forEach((toolName) => {
 			registeredTools[toolName] = {
 				enable: () => {
-					/* Tools are enabled by default in each server instance */
+					// Emit tool state change event to update actual MCP tools
+					this.apiClient.emit('toolStateChange', toolName, true);
 				},
 				disable: () => {
-					/* Tools would need to be disabled per-server if needed */
+					// Emit tool state change event to update actual MCP tools
+					this.apiClient.emit('toolStateChange', toolName, false);
 				},
 			};
 		});

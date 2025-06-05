@@ -8,14 +8,8 @@ import { ConnectionFooter } from './components/ConnectionFooter';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './components/ui/tabs';
 import type { TransportInfo } from '../shared/transport-info.js';
 
-type ToolSettings = {
-	enabled: boolean;
-};
-
 type AppSettings = {
-	tools: {
-		[toolId: string]: ToolSettings;
-	};
+	builtInTools: string[];
 };
 
 // SWR fetcher function
@@ -54,25 +48,27 @@ function App() {
 	const handleToolToggle = async (toolId: string, checked: boolean) => {
 		try {
 			// Optimistic update - immediately update the UI
-			const currentSettings = settings || { tools: {} };
+			const currentSettings = settings || { builtInTools: [] };
+			const currentTools = currentSettings.builtInTools;
+			const newTools = checked 
+				? [...currentTools.filter(id => id !== toolId), toolId]
+				: currentTools.filter(id => id !== toolId);
+			
 			const optimisticSettings = {
 				...currentSettings,
-				tools: {
-					...currentSettings.tools,
-					[toolId]: { enabled: checked },
-				},
+				builtInTools: newTools,
 			};
 
 			// Update the cache optimistically
 			mutate('/api/settings', optimisticSettings, false);
 
 			// Make the API call
-			const response = await fetch(`/api/settings/tools/${toolId}`, {
+			const response = await fetch('/api/settings', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
 				},
-				body: JSON.stringify({ enabled: checked }),
+				body: JSON.stringify({ builtInTools: newTools }),
 			});
 
 			if (!response.ok) {
@@ -82,7 +78,7 @@ function App() {
 			// Revalidate to get fresh data from server
 			mutate('/api/settings');
 
-			console.error(`${toolId} is now ${checked ? 'enabled' : 'disabled'}`);
+			console.log(`${toolId} is now ${checked ? 'enabled' : 'disabled'}`);
 		} catch (err) {
 			console.error(`Error updating tool settings:`, err);
 			alert(`Error updating ${toolId}: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -161,38 +157,38 @@ function App() {
 			id: 'paper_search',
 			label: 'Papers Search',
 			description: 'Find Machine Learning Research Papers.',
-			settings: settings?.tools?.paper_search || { enabled: true },
+			settings: { enabled: settings?.builtInTools?.includes('paper_search') ?? true },
 		},
 		space_search: {
 			// Changed from space_semantic_search
 			id: 'space_search',
 			label: 'Space Search',
 			description: 'Find Gradio Hugging Face Spaces.',
-			settings: settings?.tools?.space_search || { enabled: true },
+			settings: { enabled: settings?.builtInTools?.includes('space_search') ?? true },
 		},
 		model_search: {
 			id: 'model_search',
 			label: 'Model Search',
 			description: 'Find models with filters for task, library, etc.',
-			settings: settings?.tools?.model_search || { enabled: true },
+			settings: { enabled: settings?.builtInTools?.includes('model_search') ?? true },
 		},
 		model_detail: {
 			id: 'model_detail',
 			label: 'Model Details',
 			description: 'Detailed information about a specific model.',
-			settings: settings?.tools?.model_detail || { enabled: true },
+			settings: { enabled: settings?.builtInTools?.includes('model_detail') ?? true },
 		},
 		dataset_search: {
 			id: 'dataset_search',
 			label: 'Dataset Search',
 			description: 'Find datasets with filters for author, tags, etc.',
-			settings: settings?.tools?.dataset_search || { enabled: true },
+			settings: { enabled: settings?.builtInTools?.includes('dataset_search') ?? true },
 		},
 		dataset_detail: {
 			id: 'dataset_detail',
 			label: 'Dataset Details',
 			description: 'Detailed information about a specific dataset.',
-			settings: settings?.tools?.dataset_detail || { enabled: true },
+			settings: { enabled: settings?.builtInTools?.includes('dataset_detail') ?? true },
 		},
 	};
 
@@ -201,19 +197,19 @@ function App() {
 			id: 'duplicate_space',
 			label: 'Duplicate Space',
 			description: 'Duplicate a Space to your account.',
-			settings: settings?.tools?.duplicate_space || { enabled: true },
+			settings: { enabled: settings?.builtInTools?.includes('duplicate_space') ?? true },
 		},
 		space_info: {
 			id: 'space_info',
 			label: 'Spaces Information',
 			description: 'Get detailed information about your Spaces.',
-			settings: settings?.tools?.space_info || { enabled: true },
+			settings: { enabled: settings?.builtInTools?.includes('space_info') ?? true },
 		},
 		space_files: {
 			id: 'space_files',
 			label: 'Space Files',
 			description: 'List all files in a static Space with download URLs.',
-			settings: settings?.tools?.space_files || { enabled: true },
+			settings: { enabled: settings?.builtInTools?.includes('space_files') ?? true },
 		},
 	};
 
