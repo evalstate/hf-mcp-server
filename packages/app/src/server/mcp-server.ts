@@ -252,8 +252,8 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				enabledToolsList = BOUQUETS[bouquet];
 				logger.debug({ bouquet, enabledToolsList }, 'Using bouquet for tool states');
 			} else {
-				// Fetch current tool states from API
-				const apiToolStates = await sharedApiClient.getToolStates();
+				// Fetch current tool states from API with the user's token
+				const apiToolStates = await sharedApiClient.getToolStates(hfToken);
 				if (apiToolStates) {
 					enabledToolsList = Object.keys(apiToolStates).filter(toolName => apiToolStates[toolName]);
 				}

@@ -73,12 +73,30 @@ export class Application {
 			},
 		];
 
-		const apiClientConfig: ApiClientConfig = options.apiClientConfig || {
-			type: 'polling',
-			baseUrl: `http://localhost:${String(this.webAppPort)}`,
-			pollInterval: 5000,
-			staticGradioEndpoints: defaultGradioEndpoints,
-		};
+		let apiClientConfig: ApiClientConfig;
+
+		// Check for USER_CONFIG_API environment variable
+		const userConfigApi = process.env.USER_CONFIG_API;
+
+		if (userConfigApi) {
+			// Use external mode with the user config API
+			apiClientConfig = {
+				type: 'external',
+				externalUrl: userConfigApi,
+				hfToken: process.env.HF_TOKEN || process.env.DEFAULT_HF_TOKEN,
+				staticGradioEndpoints: defaultGradioEndpoints,
+			};
+			logger.info(`Using external API client with user config API: ${userConfigApi}`);
+		} else {
+			// Default to polling mode
+			apiClientConfig = options.apiClientConfig || {
+				type: 'polling',
+				baseUrl: `http://localhost:${String(this.webAppPort)}`,
+				pollInterval: 5000,
+				staticGradioEndpoints: defaultGradioEndpoints,
+			};
+			logger.info(`Using internal API client with user config API: ${apiClientConfig.baseUrl}}`);
+		}
 		this.apiClient = new McpApiClient(apiClientConfig, transportInfo);
 
 		// Create the server factory
@@ -116,7 +134,6 @@ export class Application {
 		// Start API client (global tool management)
 		await this.startToolManagement();
 	}
-
 
 	private setupToolManagement(): void {
 		// For web server tool management, create placeholder registered tools

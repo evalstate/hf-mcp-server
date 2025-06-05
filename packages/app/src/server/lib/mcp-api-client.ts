@@ -19,6 +19,7 @@ export interface ApiClientConfig {
 	baseUrl?: string;
 	pollInterval?: number;
 	externalUrl?: string;
+	userConfigUrl?: string;
 	hfToken?: string;
 }
 
@@ -72,7 +73,7 @@ export class McpApiClient extends EventEmitter {
 		return this.transportInfo;
 	}
 
-	async getSettings(): Promise<AppSettings | null> {
+	async getSettings(overrideToken?: string): Promise<AppSettings | null> {
 		switch (this.config.type) {
 			case 'static':
 				// Return static settings - no network call needed
@@ -102,19 +103,31 @@ export class McpApiClient extends EventEmitter {
 				}
 				try {
 					const headers: Record<string, string> = {};
-					if (this.config.hfToken) {
-						headers['Authorization'] = `Bearer ${this.config.hfToken}`;
+					const token = overrideToken || this.config.hfToken;
+					if (token) {
+						headers['Authorization'] = `Bearer ${token}`;
 					}
 
-					const response = await fetch(this.config.externalUrl, { headers });
+					// Add 10 second timeout
+					const controller = new AbortController();
+					const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+					const response = await fetch(this.config.externalUrl, { 
+						headers,
+						signal: controller.signal 
+					});
+					
+					clearTimeout(timeoutId);
 					if (!response.ok) {
-						logger.error(`Failed to fetch external settings: ${response.status.toString()} ${response.statusText}`);
-						return null;
+						logger.warn(`Failed to fetch external settings: ${response.status.toString()} ${response.statusText} - defaulting to all tools enabled`);
+						// Return empty array to enable all tools
+						return { builtInTools: [] };
 					}
 					return (await response.json()) as AppSettings;
 				} catch (error) {
-					logger.error({ error }, 'Error fetching settings from external API');
-					return null;
+					logger.warn({ error }, 'Error fetching settings from external API - defaulting to all tools enabled');
+					// Return empty array to enable all tools
+					return { builtInTools: [] };
 				}
 
 			default:
@@ -123,7 +136,7 @@ export class McpApiClient extends EventEmitter {
 		}
 	}
 
-	async getToolStates(): Promise<Record<string, boolean> | null> {
+	async getToolStates(overrideToken?: string): Promise<Record<string, boolean> | null> {
 		if (this.config.type === 'static') {
 			// Return cached static settings
 			const toolStates: Record<string, boolean> = {};
@@ -133,17 +146,27 @@ export class McpApiClient extends EventEmitter {
 			return toolStates;
 		}
 
-		const settings = await this.getSettings();
+		const settings = await this.getSettings(overrideToken);
 		if (!settings) {
 			return null;
 		}
 
 		const toolStates: Record<string, boolean> = {};
-		
+
 		// Empty array means all enabled
 		if (settings.builtInTools.length === 0) {
 			// Default all known tools to enabled
-			const allTools = ['space_search', 'model_search', 'model_detail', 'paper_search', 'dataset_search', 'dataset_detail', 'duplicate_space', 'space_info', 'space_files'];
+			const allTools = [
+				'space_search',
+				'model_search',
+				'model_detail',
+				'paper_search',
+				'dataset_search',
+				'dataset_detail',
+				'duplicate_space',
+				'space_info',
+				'space_files',
+			];
 			for (const toolId of allTools) {
 				toolStates[toolId] = true;
 			}
@@ -153,7 +176,7 @@ export class McpApiClient extends EventEmitter {
 				toolStates[toolId] = true;
 			}
 		}
-		
+
 		return toolStates;
 	}
 
@@ -181,8 +204,9 @@ export class McpApiClient extends EventEmitter {
 			this.gradioEndpoints.push({ url: '', enabled: true });
 			this.gradioEndpointStates.set(this.gradioEndpoints.length - 1, true);
 		}
-		
-		if (index >= 0 && index < 3) { // Limit to 3 endpoints
+
+		if (index >= 0 && index < 3) {
+			// Limit to 3 endpoints
 			const endpoint = this.gradioEndpoints[index];
 			if (endpoint) {
 				endpoint.url = url;
@@ -205,6 +229,19 @@ export class McpApiClient extends EventEmitter {
 			// Send initial static states
 			for (const [toolId, enabled] of this.cache.entries()) {
 				onUpdate(toolId, enabled);
+			}
+			return;
+		}
+
+		// For external mode, fetch once but don't poll
+		if (this.config.type === 'external') {
+			logger.info('Using external user config API - fetching once, no polling');
+			const initialStates = await this.getToolStates();
+			if (initialStates) {
+				for (const [toolId, enabled] of Object.entries(initialStates)) {
+					this.cache.set(toolId, enabled);
+					onUpdate(toolId, enabled);
+				}
 			}
 			return;
 		}
