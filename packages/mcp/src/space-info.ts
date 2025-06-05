@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { HfApiCall } from './hf-api-call.js';
-import { listSpaces, spaceInfo } from '@huggingface/hub';
+import { listSpaces } from '@huggingface/hub';
 import type { SpaceEntry, SpaceRuntime, SpaceSdk } from '@huggingface/hub';
 import { formatDate, formatNumber, escapeMarkdown, NO_TOKEN_INSTRUCTIONS } from './utilities.js';
 
@@ -19,7 +19,7 @@ interface SpaceReport {
 interface SpaceDetails {
 	name: string;
 	url: string;
-	sdk: SpaceSdk | string;
+	sdk: SpaceSdk | 'unknown'; // Allow 'unknown' in our internal type
 	status: SpaceRuntime['stage'] | 'UNKNOWN';
 	statusEmoji: string;
 	hardware: string;
@@ -88,52 +88,30 @@ export class SpaceInfoTool extends HfApiCall<SpaceInfoParams, SpaceReport> {
 		const spacesWithRuntime: SpaceDetails[] = [];
 
 		try {
-			// Fetch all spaces for the user
+			// Fetch all spaces for the user with runtime info in a single request
 			for await (const space of listSpaces({
 				search: { owner: username },
-				additionalFields: ['runtime', 'subdomain'],
-				credentials: this.hfToken ? { accessToken: this.hfToken } : undefined,
+				additionalFields: ['runtime', 'subdomain'] as const,
+				accessToken: this.hfToken,
 			})) {
 				spaces.push(space);
 
-				// Get detailed runtime info for each space
-				try {
-					const detailedInfo = await spaceInfo({
-						name: space.name,
-						additionalFields: ['runtime'],
-						credentials: this.hfToken ? { accessToken: this.hfToken } : undefined,
-					});
+				// Use runtime data directly from listSpaces response
+				const runtime = space.runtime;
+				const hardware = runtime?.hardware?.current || 'cpu-basic';
 
-					const runtime = detailedInfo.runtime;
-					const hardware = runtime?.hardware?.current || 'cpu-basic';
-
-					spacesWithRuntime.push({
-						name: space.name.split('/')[1] || space.name,
-						url: `https://huggingface.co/spaces/${space.name}`,
-						sdk: space.sdk || 'unknown',
-						status: runtime?.stage || ('STOPPED' as SpaceRuntime['stage']),
-						statusEmoji: STATUS_EMOJI[runtime?.stage || 'STOPPED'] || '❓ Unknown',
-						hardware: hardware,
-						storage: runtime?.resources?.requests?.ephemeral || 'None',
-						visibility: space.private ? '🔒 Private' : '🌍 Public',
-						likes: space.likes,
-						lastModified: space.updatedAt ? formatDate(space.updatedAt) : 'Unknown',
-					});
-				} catch (error) {
-					// If we can't get detailed info, use basic info
-					spacesWithRuntime.push({
-						name: space.name.split('/')[1] || space.name,
-						url: `https://huggingface.co/spaces/${space.name}`,
-						sdk: space.sdk || 'unknown',
-						status: 'UNKNOWN',
-						statusEmoji: '❓ Unknown',
-						hardware: 'Unknown',
-						storage: 'Unknown',
-						visibility: space.private ? '🔒 Private' : '🌍 Public',
-						likes: space.likes,
-						lastModified: space.updatedAt ? formatDate(space.updatedAt) : 'Unknown',
-					});
-				}
+				spacesWithRuntime.push({
+					name: space.name.split('/')[1] || space.name,
+					url: `https://huggingface.co/spaces/${space.name}`,
+					sdk: space.sdk || 'unknown',
+					status: runtime?.stage || 'UNKNOWN',
+					statusEmoji: STATUS_EMOJI[runtime?.stage || 'STOPPED'] || '❓ Unknown',
+					hardware: hardware,
+					storage: runtime?.resources?.requests?.ephemeral || 'None',
+					visibility: space.private ? '🔒 Private' : '🌍 Public',
+					likes: space.likes,
+					lastModified: space.updatedAt ? formatDate(space.updatedAt) : 'Unknown',
+				});
 			}
 
 			// Calculate statistics

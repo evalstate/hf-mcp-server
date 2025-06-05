@@ -6,6 +6,7 @@
 	"packageManager": "pnpm@10.11.0",
 	"scripts": {
 		"dev": "concurrently \"pnpm run --filter=mcp dev\" \"pnpm run --filter=app dev\"",
+		"dev:sse": "concurrently \"pnpm run --filter=mcp dev\" \"pnpm run --filter=app dev:sse\"",
 		"dev:json": "concurrently \"pnpm run --filter=mcp dev\" \"pnpm run --filter=app dev:json\"",
 		"dev:stdio": "concurrently \"pnpm run --filter=mcp dev\" \"pnpm run --filter=app dev:stdio\"",
 		"start": "cd packages/app && pnpm start",
@@ -13,7 +14,7 @@
 		"lint": "pnpm run -r lint",
 		"build": "pnpm -r build",
 		"clean": "pnpm run -r clean",
-		"buildrun": "pnpm run clean && pnpm run build && pnpm run start"
+		"buildrun": "pnpm run clean && pnpm run build && pnpm run test && pnpm run start"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.27.0",

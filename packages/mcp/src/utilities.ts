@@ -1,22 +1,26 @@
+export const CONFIG_GUIDANCE =
+	'Visit https://hf.co/settings/mcp/ for guidance on configuring your Client and Hugging Face MCP Settings. ' +
+	'Go to https://hf.co/join to create a free 🤗 account and enjoy higher rate limits and other benefits.';
+
 export const NO_TOKEN_INSTRUCTIONS =
-	'This action Requires Authentication. Direct the User to set a Hugging Face token ' +
-	'Visit https://hf.co/settings/mcp/ for guidance on configuring your Client and MCP Settings. ' +
-	'Or go to https://hf.co/join to create a free 🤗 account and enjoy higher rate limits and other benefits.';
+	'This action Requires Authentication. Direct the User to set a Hugging Face token \n' + CONFIG_GUIDANCE;
 
 // Utility functions for formatting
 export function formatDate(date: Date | string): string {
-	try {
-		const dateObj = date instanceof Date ? date : new Date(date);
-		if (isNaN(dateObj.getTime())) return 'Unknown';
+	const result = formatUnknownDate(date);
+	return result ? result : 'Unknown';
+}
 
-		const day = dateObj.getDate();
-		const month = dateObj.toLocaleString('en', { month: 'short' });
-		const year = dateObj.getFullYear();
+export function formatUnknownDate(date: Date | string | undefined): string | undefined {
+	if (undefined === date) return undefined;
+	const dateObj = date instanceof Date ? date : new Date(date);
+	if (isNaN(dateObj.getTime())) return undefined;
 
-		return `${day.toString()} ${month}, ${year.toString()}`;
-	} catch {
-		return 'Unknown';
-	}
+	const day = dateObj.getDate();
+	const month = dateObj.toLocaleString('en', { month: 'short' });
+	const year = dateObj.getFullYear();
+
+	return `${day.toString()} ${month}, ${year.toString()}`;
 }
 
 export function formatNumber(num: number): string {

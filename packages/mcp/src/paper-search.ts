@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { HfApiCall } from './hf-api-call.js';
-import { formatDate } from './utilities.js';
+import { formatUnknownDate } from './utilities.js';
 
 // https://github.com/huggingface/huggingface_hub/blob/a26b93e8ba0b51ce76ce5c2044896587c47c6b60/src/huggingface_hub/hf_api.py#L1481-L1542
 // Raw JSON response for https://hf.co/api/papers/search?q=llama%203%20herd Llama Herd is ~50,000 tokens
@@ -112,6 +112,11 @@ export class PaperSearchTool extends HfApiCall<PaperSearchParams, PaperSearchRes
 	}
 }
 
+export function published(publishedDate: string | undefined): string {
+	const formatted = formatUnknownDate(publishedDate ?? '');
+	return formatted ? `Published on ${formatted}` : 'Publication date not available';
+}
+
 function formatSearchResults(
 	query: string,
 	papers: PaperSearchResult[],
@@ -133,7 +138,7 @@ function formatSearchResults(
 		r.push(`## ${title}`);
 		r.push('');
 		const publishedDate = result.paper.publishedAt
-			? `Published on ${formatDate(result.paper.publishedAt)}`
+			? `Published on ${published(result.paper.publishedAt)}`
 			: 'Publication date not available';
 		r.push(publishedDate);
 		r.push(authors(result.paper.authors));

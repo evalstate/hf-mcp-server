@@ -31,6 +31,7 @@ import {
 	SpaceFilesTool,
 	type SpaceFilesParams,
 	type SpaceInfoParams,
+	CONFIG_GUIDANCE,
 } from '@hf-mcp/mcp';
 
 import type { ServerFactory } from './transport/base-transport.js';
@@ -99,13 +100,10 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		const toolInstances: { [toolId: string]: Tool } = {};
 
 		const whoDescription = userDetails
-			? `Hugging Face tools are being used by authenticated user '${userDetails.name}'`
+			? `Hugging Face tools are being used by authenticated user '${username}'`
 			: 'Hugging Face tools are being used anonymously and may be rate limited. Call this tool for instructions on joining and authenticating.';
 
-		const response = userDetails
-			? `You are authenticated as ${userDetails.name}.`
-			: 'Visit https://hf.co/settings/mcp/ to configure your MCP Settings and guidance on configuring your Client. ' +
-				'Go to hf.co/join to create a new Hugging Face account and enjoy higher rate limits and other benefits.';
+		const response = userDetails ? `You are authenticated as ${username ?? 'unknown'}.` : CONFIG_GUIDANCE;
 		server.tool('hf_whoami', whoDescription, {}, { title: 'Hugging Face User Info' }, () => {
 			return { content: [{ type: 'text', text: response }] };
 		});

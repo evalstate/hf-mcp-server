@@ -4,7 +4,7 @@ import { Badge } from './ui/badge';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Separator } from './ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { AlertTriangle, Activity, Wifi, WifiOff, Clock, Hash, TrendingUp } from 'lucide-react';
+import { AlertTriangle, Activity, Wifi, WifiOff, Clock } from 'lucide-react';
 import type { TransportMetricsResponse } from '../../shared/transport-metrics.js';
 
 // SWR fetcher function
@@ -259,16 +259,6 @@ export function TransportMetricsCard() {
 							</TableRow>
 						</TableBody>
 					</Table>
-					{metrics.errors.lastError && (
-						<Alert variant="destructive" className="mt-3">
-							<AlertTriangle className="h-4 w-4" />
-							<AlertTitle>Last Error</AlertTitle>
-							<AlertDescription>
-								<p className="font-mono text-sm">{metrics.errors.lastError.type}: {metrics.errors.lastError.message}</p>
-								<p className="text-xs mt-1">{formatRelativeTime(metrics.errors.lastError.timestamp)}</p>
-							</AlertDescription>
-						</Alert>
-					)}
 				</div>
 
 				{/* Client Identities */}
@@ -330,6 +320,21 @@ export function TransportMetricsCard() {
 								</TableBody>
 							</Table>
 						</div>
+					</>
+				)}
+
+				{/* Last Error Display */}
+				{metrics.errors.lastError && (
+					<>
+						<Separator />
+						<Alert variant="destructive">
+							<AlertTriangle className="h-4 w-4" />
+							<AlertTitle>Last Error</AlertTitle>
+							<AlertDescription>
+								<p className="font-mono text-sm">{metrics.errors.lastError.type}: {metrics.errors.lastError.message}</p>
+								<p className="text-xs mt-1">{formatRelativeTime(metrics.errors.lastError.timestamp)}</p>
+							</AlertDescription>
+						</Alert>
 					</>
 				)}
 

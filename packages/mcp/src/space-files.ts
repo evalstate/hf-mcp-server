@@ -16,17 +16,73 @@ export interface FileWithUrl {
 	lfs: boolean;
 }
 
+// File type detection helpers
+const IMAGE_EXTENSIONS = new Set([
+	'.jpg',
+	'.jpeg',
+	'.png',
+	'.gif',
+	'.bmp',
+	'.tiff',
+	'.tif',
+	'.webp',
+	'.svg',
+	'.ico',
+	'.heic',
+	'.heif',
+]);
+
+const AUDIO_EXTENSIONS = new Set([
+	'.mp3',
+	'.wav',
+	'.flac',
+	'.aac',
+	'.ogg',
+	'.m4a',
+	'.wma',
+	'.opus',
+	'.aiff',
+	'.au',
+	'.ra',
+]);
+
+function getFileExtension(path: string): string {
+	const lastDot = path.lastIndexOf('.');
+	return lastDot === -1 ? '' : path.substring(lastDot).toLowerCase();
+}
+
+function isImageFile(path: string): boolean {
+	return IMAGE_EXTENSIONS.has(getFileExtension(path));
+}
+
+function isAudioFile(path: string): boolean {
+	return AUDIO_EXTENSIONS.has(getFileExtension(path));
+}
+
+function matchesFileType(file: FileWithUrl, fileType: 'all' | 'image' | 'audio'): boolean {
+	switch (fileType) {
+		case 'all':
+			return true;
+		case 'image':
+			return isImageFile(file.path);
+		case 'audio':
+			return isAudioFile(file.path);
+		default:
+			return true;
+	}
+}
+
 // Tool configuration
 export const SPACE_FILES_TOOL_CONFIG = {
 	name: 'space_files',
 	description: '', // This will be dynamically set with username
 	schema: z.object({
 		spaceName: z.string().optional().describe('Space identifier in format "username/spacename"'),
-		format: z
-			.enum(['detailed', 'simple'])
+		fileType: z
+			.enum(['all', 'image', 'audio'])
 			.optional()
-			.default('detailed')
-			.describe('Output format: detailed (grouped by directory) or simple (flat list)'),
+			.default('all')
+			.describe('Filter files by type: all (default), image, or audio files only'),
 	}),
 	annotations: {
 		title: 'Space Files List',
@@ -51,13 +107,13 @@ export class SpaceFilesTool {
 		this.username = username;
 	}
 
-	static createToolConfig(username?: string) {
+	static createToolConfig(username?: string): typeof SPACE_FILES_TOOL_CONFIG {
 		const description = username
-			? `List all files in a static Hugging Face Space. Use the direct download URL when specifying Files inputs for Gradio endpoints. Defaults to ${username}/filedrop.`
-			: `List all files in a static Hugging Face Space. Use the direct download URL when specifying Files inputs for Gradio endpoints.`;
+			? `Defaults to ${username}/filedrop. List files in a static Hugging Face Space. Use the URL for specifying Files inputs to Gradio endpoints or downloading files`
+			: `List all files in a static Hugging Face Space. Use the URL for specifying Files inputs to Gradio endpoints or downloading files.`;
 		return {
 			...SPACE_FILES_TOOL_CONFIG,
-			description,
+			description: description as '',
 		};
 	}
 
@@ -70,7 +126,7 @@ export class SpaceFilesTool {
 			const space = await spaceInfo({
 				name: spaceName,
 				additionalFields: ['subdomain'],
-				...(this.accessToken && { credentials: { accessToken: this.accessToken } }),
+				...(this.accessToken && { accessToken: this.accessToken }),
 			});
 
 			// Check if it's a static space
@@ -132,12 +188,26 @@ export class SpaceFilesTool {
 	/**
 	 * Generate detailed markdown report with files grouped by directory
 	 */
-	async generateDetailedMarkdown(spaceName: string): Promise<string> {
-		const files = await this.getSpaceFilesWithUrls(spaceName);
+	async generateDetailedMarkdown(spaceName: string, fileType: 'all' | 'image' | 'audio' = 'all'): Promise<string> {
+		const allFiles = await this.getSpaceFilesWithUrls(spaceName);
+		const files = allFiles.filter((file) => matchesFileType(file, fileType));
 
 		let markdown = `# Files in Space: ${spaceName}\n\n`;
+		if (fileType !== 'all') {
+			markdown += `**Filter**: ${fileType} files only\n`;
+		}
 		markdown += `**Total Files**: ${files.length}\n`;
 		markdown += `**Total Size**: ${formatBytes(files.reduce((sum, f) => sum + f.size, 0))}\n\n`;
+
+		// Handle empty results
+		if (files.length === 0) {
+			if (fileType !== 'all') {
+				markdown += `No ${fileType} files found in this space.\n`;
+			} else {
+				markdown += `No files found in this space.\n`;
+			}
+			return markdown;
+		}
 
 		// Group files by directory
 		const byDirectory = files.reduce(
@@ -180,10 +250,10 @@ export class SpaceFilesTool {
 		markdown += `\`\`\`bash\n`;
 
 		// Show a few example URLs
-		const examples = files.slice(0, 3);
+		const examples = files.slice(0, 2);
 		for (const file of examples) {
 			markdown += `# Download ${file.path}\n`;
-			markdown += `curl -O ${file.url}\n\n`;
+			markdown += `curl -L -O ${file.url}\n\n`;
 		}
 		markdown += `\`\`\`\n`;
 		markdown += '## Use the URL when specifying Files inputs for Gradio endpoints.\n\n';
@@ -194,10 +264,14 @@ export class SpaceFilesTool {
 	/**
 	 * Generate simple markdown table without grouping
 	 */
-	async generateSimpleMarkdown(spaceName: string): Promise<string> {
-		const files = await this.getSpaceFilesWithUrls(spaceName);
+	async generateSimpleMarkdown(spaceName: string, fileType: 'all' | 'image' | 'audio' = 'all'): Promise<string> {
+		const allFiles = await this.getSpaceFilesWithUrls(spaceName);
+		const files = allFiles.filter((file) => matchesFileType(file, fileType));
 
 		let markdown = `# Files in ${spaceName}\n\n`;
+		if (fileType !== 'all') {
+			markdown += `**Filter**: ${fileType} files only\n\n`;
+		}
 		markdown += `| File Name | Path | Size | URL |\n`;
 		markdown += `|-----------|------|------|-----|\n`;
 
@@ -214,15 +288,12 @@ export class SpaceFilesTool {
 	 * List files with the specified format
 	 */
 	async listFiles(params: SpaceFilesParams): Promise<string> {
-		const { format } = params;
+		const { fileType = 'all' } = params;
 
 		// Use provided spaceName or default to username/filedrop
 		const spaceName = params.spaceName || (this.username ? `${this.username}/filedrop` : 'filedrop');
 
-		if (format === 'simple') {
-			return this.generateSimpleMarkdown(spaceName);
-		}
-		return this.generateDetailedMarkdown(spaceName);
+		return this.generateDetailedMarkdown(spaceName, fileType);
 	}
 
 	/**

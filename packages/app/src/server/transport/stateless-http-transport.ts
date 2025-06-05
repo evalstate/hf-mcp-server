@@ -163,8 +163,7 @@ export class StatelessHttpTransport extends BaseTransport {
 	 * Get the number of active connections - returns STATELESS_MODE for stateless transport
 	 */
 	getActiveConnectionCount(): number {
-		// Set metrics active connection count to 'stateless'
-		this.metrics.connections.active = 'stateless';
+		// Stateless transports don't track active connections
 		return STATELESS_MODE;
 	}
 

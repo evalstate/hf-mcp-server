@@ -4,6 +4,7 @@ import { authors } from '../src/paper-search.js';
 import { published } from '../src/paper-search.js';
 import { readFileSync } from 'fs';
 import path from 'path';
+import { formatDate } from '../src/utilities.js';
 
 describe('PaperSearchService', () => {
 	let kazakh: PaperSearchResult[];

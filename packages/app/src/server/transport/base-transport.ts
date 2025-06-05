@@ -2,7 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Express } from 'express';
 import { logger } from '../lib/logger.js';
 import type { TransportMetrics } from '../../shared/transport-metrics.js';
-import { createEmptyMetrics, getClientKey } from '../../shared/transport-metrics.js';
+import { MetricsCounter } from '../../shared/transport-metrics.js';
 
 /**
  * Factory function to create server instances
@@ -53,12 +53,12 @@ export const STATELESS_MODE = -1;
 export abstract class BaseTransport {
 	protected serverFactory: ServerFactory;
 	protected app: Express;
-	protected metrics: TransportMetrics;
+	protected metrics: MetricsCounter;
 
 	constructor(serverFactory: ServerFactory, app: Express) {
 		this.serverFactory = serverFactory;
 		this.app = app;
-		this.metrics = createEmptyMetrics();
+		this.metrics = new MetricsCounter();
 	}
 
 	/**
@@ -93,7 +93,7 @@ export abstract class BaseTransport {
 	 * Get current transport metrics
 	 */
 	getMetrics(): TransportMetrics {
-		return this.metrics;
+		return this.metrics.getMetrics();
 	}
 
 	/**
@@ -107,105 +107,42 @@ export abstract class BaseTransport {
 	 * Track a new request received by the transport
 	 */
 	protected trackRequest(): void {
-		this.metrics.requests.total++;
-		this.updateRequestsPerMinute();
+		this.metrics.trackRequest();
 	}
 
 	/**
 	 * Track an error in the transport
 	 */
 	protected trackError(statusCode?: number, error?: Error): void {
-		if (statusCode && statusCode >= 400 && statusCode < 500) {
-			this.metrics.errors.expected++;
-		} else {
-			this.metrics.errors.unexpected++;
-		}
-
-		if (error) {
-			this.metrics.errors.lastError = {
-				type: error.constructor.name,
-				message: error.message,
-				timestamp: new Date(),
-			};
-		}
+		this.metrics.trackError(statusCode, error);
 	}
 
 	/**
 	 * Track a new connection established (global counter)
 	 */
 	protected trackNewConnection(): void {
-		this.metrics.connections.total++;
+		this.metrics.trackNewConnection();
 	}
 
 	/**
 	 * Associate a session with a client identity when client info becomes available
 	 */
 	protected associateSessionWithClient(clientInfo: { name: string; version: string }): void {
-		const clientKey = getClientKey(clientInfo.name, clientInfo.version);
-		let clientMetrics = this.metrics.clients.get(clientKey);
-
-		if (!clientMetrics) {
-			clientMetrics = {
-				name: clientInfo.name,
-				version: clientInfo.version,
-				requestCount: 0,
-				firstSeen: new Date(),
-				lastSeen: new Date(),
-				isConnected: true,
-				activeConnections: 1,
-				totalConnections: 1,
-			};
-			this.metrics.clients.set(clientKey, clientMetrics);
-		} else {
-			clientMetrics.lastSeen = new Date();
-			clientMetrics.isConnected = true;
-			clientMetrics.activeConnections++;
-			clientMetrics.totalConnections++;
-		}
+		this.metrics.associateSessionWithClient(clientInfo);
 	}
 
 	/**
 	 * Update client activity when a request is made
 	 */
 	protected updateClientActivity(clientInfo?: { name: string; version: string }): void {
-		if (!clientInfo) return;
-
-		const clientKey = getClientKey(clientInfo.name, clientInfo.version);
-		const clientMetrics = this.metrics.clients.get(clientKey);
-
-		if (clientMetrics) {
-			clientMetrics.requestCount++;
-			clientMetrics.lastSeen = new Date();
-		}
+		this.metrics.updateClientActivity(clientInfo);
 	}
 
 	/**
 	 * Mark a client connection as disconnected
 	 */
 	protected disconnectClient(clientInfo?: { name: string; version: string }): void {
-		if (!clientInfo) return;
-
-		const clientKey = getClientKey(clientInfo.name, clientInfo.version);
-		const clientMetrics = this.metrics.clients.get(clientKey);
-
-		if (clientMetrics && clientMetrics.activeConnections > 0) {
-			clientMetrics.activeConnections--;
-			if (clientMetrics.activeConnections === 0) {
-				clientMetrics.isConnected = false;
-			}
-		}
-	}
-
-	/**
-	 * Update requests per minute calculation
-	 */
-	private updateRequestsPerMinute(): void {
-		const now = Date.now();
-		const startupTime = this.metrics.startupTime.getTime();
-		const uptimeMinutes = (now - startupTime) / (1000 * 60);
-
-		this.metrics.requests.averagePerMinute =
-			uptimeMinutes > 0 ? Math.round((this.metrics.requests.total / uptimeMinutes) * 100) / 100 : 0;
+		this.metrics.disconnectClient(clientInfo);
 	}
 }
 
@@ -230,7 +167,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 		if (session) {
 			session.metadata.lastActivity = new Date();
 			// Update client activity metrics if client info is available
-			this.updateClientActivity(session.metadata.clientInfo);
+			this.metrics.updateClientActivity(session.metadata.clientInfo);
 		}
 	}
 
@@ -247,7 +184,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 				if (clientInfo) {
 					session.metadata.clientInfo = clientInfo;
 					// Associate session with client for metrics tracking
-					this.associateSessionWithClient(clientInfo);
+					this.metrics.associateSessionWithClient(clientInfo);
 				}
 
 				if (clientCapabilities) {
@@ -318,7 +255,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	 */
 	override getActiveConnectionCount(): number {
 		// Update metrics active connection count
-		this.metrics.connections.active = this.sessions.size;
+		this.metrics.updateActiveConnections(this.sessions.size);
 		return this.sessions.size;
 	}
 
@@ -355,22 +292,19 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	 */
 	protected trackSessionCreated(): void {
 		this.trackNewConnection();
-		this.metrics.connections.active = this.sessions.size;
+		this.metrics.updateActiveConnections(this.sessions.size);
 	}
 
 	/**
 	 * Track a session that was cleaned up/removed
 	 */
 	protected trackSessionCleaned(session?: TSession): void {
-		if (!this.metrics.connections.cleaned) {
-			this.metrics.connections.cleaned = 0;
-		}
-		this.metrics.connections.cleaned++;
-		this.metrics.connections.active = this.sessions.size;
+		this.metrics.trackSessionCleaned();
+		this.metrics.updateActiveConnections(this.sessions.size);
 
 		// Disconnect client if we have client info
 		if (session?.metadata.clientInfo) {
-			this.disconnectClient(session.metadata.clientInfo);
+			this.metrics.disconnectClient(session.metadata.clientInfo);
 		}
 	}
 

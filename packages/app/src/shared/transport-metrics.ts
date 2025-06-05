@@ -10,6 +10,9 @@ export interface TransportMetrics {
 	connections: {
 		active: number | 'stateless';
 		total: number;
+		authenticated: number;
+		denied: number;
+		anonymous: number;
 		cleaned?: number; // Only for stateful transports
 	};
 
@@ -142,6 +145,9 @@ export function createEmptyMetrics(): TransportMetrics {
 		connections: {
 			active: 0,
 			total: 0,
+			authenticated: 0,
+			denied: 0,
+			anonymous: 0,
 		},
 		requests: {
 			total: 0,
@@ -160,4 +166,144 @@ export function createEmptyMetrics(): TransportMetrics {
  */
 export function getClientKey(name: string, version: string): string {
 	return `${name} ${version}`;
+}
+
+/**
+ * Centralized metrics counter for transport operations
+ */
+export class MetricsCounter {
+	private metrics: TransportMetrics;
+
+	constructor() {
+		this.metrics = createEmptyMetrics();
+	}
+
+	/**
+	 * Get the underlying metrics data
+	 */
+	getMetrics(): TransportMetrics {
+		return this.metrics;
+	}
+
+	/**
+	 * Track a new request received by the transport
+	 */
+	trackRequest(): void {
+		this.metrics.requests.total++;
+		this.updateRequestsPerMinute();
+	}
+
+	/**
+	 * Track an error in the transport
+	 */
+	trackError(statusCode?: number, error?: Error): void {
+		if (statusCode && statusCode >= 400 && statusCode < 500) {
+			this.metrics.errors.expected++;
+		} else {
+			this.metrics.errors.unexpected++;
+		}
+
+		if (error) {
+			this.metrics.errors.lastError = {
+				type: error.constructor.name,
+				message: error.message,
+				timestamp: new Date(),
+			};
+		}
+	}
+
+	/**
+	 * Track a new connection established (global counter)
+	 */
+	trackNewConnection(): void {
+		this.metrics.connections.total++;
+	}
+
+	/**
+	 * Update active connection count
+	 */
+	updateActiveConnections(count: number): void {
+		this.metrics.connections.active = count;
+	}
+
+	/**
+	 * Track a session that was cleaned up/removed
+	 */
+	trackSessionCleaned(): void {
+		if (!this.metrics.connections.cleaned) {
+			this.metrics.connections.cleaned = 0;
+		}
+		this.metrics.connections.cleaned++;
+	}
+
+	/**
+	 * Associate a session with a client identity when client info becomes available
+	 */
+	associateSessionWithClient(clientInfo: { name: string; version: string }): void {
+		const clientKey = getClientKey(clientInfo.name, clientInfo.version);
+		let clientMetrics = this.metrics.clients.get(clientKey);
+
+		if (!clientMetrics) {
+			clientMetrics = {
+				name: clientInfo.name,
+				version: clientInfo.version,
+				requestCount: 0,
+				firstSeen: new Date(),
+				lastSeen: new Date(),
+				isConnected: true,
+				activeConnections: 1,
+				totalConnections: 1,
+			};
+			this.metrics.clients.set(clientKey, clientMetrics);
+		} else {
+			clientMetrics.lastSeen = new Date();
+			clientMetrics.isConnected = true;
+			clientMetrics.activeConnections++;
+			clientMetrics.totalConnections++;
+		}
+	}
+
+	/**
+	 * Update client activity when a request is made
+	 */
+	updateClientActivity(clientInfo?: { name: string; version: string }): void {
+		if (!clientInfo) return;
+
+		const clientKey = getClientKey(clientInfo.name, clientInfo.version);
+		const clientMetrics = this.metrics.clients.get(clientKey);
+
+		if (clientMetrics) {
+			clientMetrics.requestCount++;
+			clientMetrics.lastSeen = new Date();
+		}
+	}
+
+	/**
+	 * Mark a client connection as disconnected
+	 */
+	disconnectClient(clientInfo?: { name: string; version: string }): void {
+		if (!clientInfo) return;
+
+		const clientKey = getClientKey(clientInfo.name, clientInfo.version);
+		const clientMetrics = this.metrics.clients.get(clientKey);
+
+		if (clientMetrics && clientMetrics.activeConnections > 0) {
+			clientMetrics.activeConnections--;
+			if (clientMetrics.activeConnections === 0) {
+				clientMetrics.isConnected = false;
+			}
+		}
+	}
+
+	/**
+	 * Update requests per minute calculation
+	 */
+	private updateRequestsPerMinute(): void {
+		const now = Date.now();
+		const startupTime = this.metrics.startupTime.getTime();
+		const uptimeMinutes = (now - startupTime) / (1000 * 60);
+
+		this.metrics.requests.averagePerMinute =
+			uptimeMinutes > 0 ? Math.round((this.metrics.requests.total / uptimeMinutes) * 100) / 100 : 0;
+	}
 }

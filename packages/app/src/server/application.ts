@@ -62,7 +62,7 @@ export class Application {
 				enabled: true,
 			},
 			{
-				url: 'https://evalstate-csm-1b.hf.space/gradio_api/mcp/sse',
+				url: 'https://abidlabs-easyghibli.hf.space/gradio_api/mcp/sse',
 				enabled: true,
 			},
 			{

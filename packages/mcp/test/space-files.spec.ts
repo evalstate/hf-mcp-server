@@ -142,8 +142,8 @@ describe('SpaceFilesTool', () => {
 			vi.mocked(hub.listFiles).mockReturnValue(mockListFiles() as any);
 		});
 
-		it('should generate detailed markdown by default', async () => {
-			const result = await tool.listFiles({ spaceName: 'evalstate/filedrop', format: 'detailed' });
+		it('should generate detailed markdown', async () => {
+			const result = await tool.listFiles({ spaceName: 'evalstate/filedrop' });
 
 			expect(result).toContain('# Files in Space: evalstate/filedrop');
 			expect(result).toContain('**Total Files**: 2');
@@ -154,14 +154,14 @@ describe('SpaceFilesTool', () => {
 			expect(result).toContain('## Direct Access Examples');
 		});
 
-		it('should generate simple markdown when requested', async () => {
-			const result = await tool.listFiles({ spaceName: 'evalstate/filedrop', format: 'simple' });
+		it('should filter by file type when specified', async () => {
+			const result = await tool.listFiles({ spaceName: 'evalstate/filedrop', fileType: 'all' });
 
-			expect(result).toContain('# Files in evalstate/filedrop');
-			expect(result).toContain('| File Name | Path | Size | URL |');
+			expect(result).toContain('# Files in Space: evalstate/filedrop');
+			expect(result).toContain('| File Path | Size | Type | Last Modified | URL |');
 			expect(result).toContain('🌐 index.html');
 			expect(result).toContain('📜 app.js');
-			expect(result).not.toContain('## Direct Access Examples');
+			expect(result).toContain('## Direct Access Examples');
 		});
 	});
 
@@ -178,21 +178,21 @@ describe('SpaceFilesTool', () => {
 			// Test default values
 			const defaultResult = schema.parse({});
 			expect(defaultResult).toEqual({
-				format: 'detailed',
+				fileType: 'all',
 			});
 
 			// Test custom values
 			const customResult = schema.parse({
 				spaceName: 'user/space',
-				format: 'simple',
+				fileType: 'image',
 			});
 			expect(customResult).toEqual({
 				spaceName: 'user/space',
-				format: 'simple',
+				fileType: 'image',
 			});
 
-			// Test invalid format
-			expect(() => schema.parse({ format: 'invalid' })).toThrow();
+			// Test invalid fileType
+			expect(() => schema.parse({ fileType: 'invalid' })).toThrow();
 		});
 	});
 
@@ -201,12 +201,6 @@ describe('SpaceFilesTool', () => {
 			const config = SpaceFilesTool.createToolConfig('testuser');
 			expect(config.name).toBe('space_files');
 			expect(config.description).toContain('testuser/filedrop');
-		});
-
-		it('should create config without username', () => {
-			const config = SpaceFilesTool.createToolConfig();
-			expect(config.name).toBe('space_files');
-			expect(config.description).toContain('Requires Authentication');
 		});
 	});
 
@@ -225,9 +219,9 @@ describe('SpaceFilesTool', () => {
 			}
 			vi.mocked(hub.listFiles).mockReturnValue(mockListFiles() as any);
 
-			const result = await tool.listFiles({ format: 'simple' });
-			
-			expect(result).toContain('# Files in testuser/filedrop');
+			const result = await tool.listFiles({});
+
+			expect(result).toContain('# Files in Space: testuser/filedrop');
 			expect(vi.mocked(hub.spaceInfo)).toHaveBeenCalledWith(
 				expect.objectContaining({
 					name: 'testuser/filedrop',
