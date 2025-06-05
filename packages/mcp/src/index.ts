@@ -10,3 +10,4 @@ export * from './dataset-search.js';
 export * from './dataset-detail.js';
 export * from './duplicate-space.js';
 export * from './space-info.js';
+export * from './space-files.js';

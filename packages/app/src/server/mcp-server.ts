@@ -28,6 +28,8 @@ import {
 	type DuplicateSpaceParams,
 	SpaceInfoTool,
 	formatSpaceInfoResult,
+	SpaceFilesTool,
+	type SpaceFilesParams,
 	type SpaceInfoParams,
 } from '@hf-mcp/mcp';
 
@@ -44,7 +46,7 @@ interface Tool {
 
 // Define bouquet configurations
 const BOUQUETS: Record<string, string[]> = {
-	spaces: ['space_search', 'duplicate_space', 'space_info'],
+	spaces: ['space_search', 'duplicate_space', 'space_info', 'space_files'],
 	search: ['space_search', 'model_search', 'dataset_search', 'paper_search'],
 };
 
@@ -222,6 +224,21 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			async (params: SpaceInfoParams) => {
 				const spaceInfoTool = new SpaceInfoTool(hfToken, username);
 				const result = await formatSpaceInfoResult(spaceInfoTool, params);
+				return {
+					content: [{ type: 'text', text: result }],
+				};
+			}
+		);
+
+		const spaceFilesToolConfig = SpaceFilesTool.createToolConfig(username);
+		toolInstances[spaceFilesToolConfig.name] = server.tool(
+			spaceFilesToolConfig.name,
+			spaceFilesToolConfig.description,
+			spaceFilesToolConfig.schema.shape,
+			spaceFilesToolConfig.annotations,
+			async (params: SpaceFilesParams) => {
+				const spaceFilesTool = new SpaceFilesTool(hfToken, username);
+				const result = await spaceFilesTool.listFiles(params);
 				return {
 					content: [{ type: 'text', text: result }],
 				};

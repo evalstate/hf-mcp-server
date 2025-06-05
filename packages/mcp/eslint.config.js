@@ -34,8 +34,7 @@ export default tseslint.config(
       '@typescript-eslint/no-empty-interface': 'off',
       
       // General ESLint rules
-      'no-constant-condition': 'off',
-      ''
+      'no-constant-condition': 'off'
     }
   }
 )

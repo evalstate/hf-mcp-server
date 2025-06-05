@@ -209,6 +209,12 @@ function App() {
 			description: 'Get detailed information about your Spaces.',
 			settings: settings?.tools?.space_info || { enabled: true },
 		},
+		space_files: {
+			id: 'space_files',
+			label: 'Space Files',
+			description: 'List all files in a static Space with download URLs.',
+			settings: settings?.tools?.space_files || { enabled: true },
+		},
 	};
 
 	return (
