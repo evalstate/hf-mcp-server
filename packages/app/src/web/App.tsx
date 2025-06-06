@@ -7,6 +7,10 @@ import { GradioEndpointsCard } from './components/GradioEndpointsCard';
 import { TransportMetricsCard } from './components/TransportMetricsCard';
 import { ConnectionFooter } from './components/ConnectionFooter';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './components/ui/tabs';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './components/ui/card';
+import { Button } from './components/ui/button';
+import { Separator } from './components/ui/separator';
+import { Copy, Settings } from 'lucide-react';
 import type { TransportInfo } from '../shared/transport-info.js';
 
 type SpaceTool = {
@@ -186,6 +190,21 @@ function App() {
 		}
 	};
 
+	// Handler for copying MCP URL
+	const handleCopyMcpUrl = async () => {
+		const mcpUrl = `https://huggingface.co/mcp`;
+
+		try {
+			await navigator.clipboard.writeText(mcpUrl);
+		} catch (err) {
+			console.error('Failed to copy URL:', err);
+		}
+	};
+
+	// Handler for going to settings (switch to search tab)
+	const handleGoToSettings = () => {
+		window.open('https://huggingface.co/settings/mcp', '_blank');
+	};
 
 	/** should we use annotations / Title here? */
 	const searchTools = {
@@ -254,13 +273,53 @@ function App() {
 		<>
 			<div className="min-h-screen p-8">
 				<div className="max-w-2xl mx-auto">
-					<Tabs defaultValue="metrics" className="w-full">
+					<Tabs defaultValue="home" className="w-full">
 						<TabsList className="mb-6">
+							<TabsTrigger value="home">🏠 Home</TabsTrigger>
 							<TabsTrigger value="metrics">📊 Transport Metrics</TabsTrigger>
 							<TabsTrigger value="search">🔍 Search Tools</TabsTrigger>
 							<TabsTrigger value="spaces">🚀 Space Tools</TabsTrigger>
 							<TabsTrigger value="gradio">🚀 Gradio Spaces</TabsTrigger>
 						</TabsList>
+						<TabsContent value="home">
+							{/* HF MCP Server Card */}
+							<Card>
+								<CardHeader>
+									<CardTitle>🤗 HF MCP Server</CardTitle>
+									<CardDescription>Connect with AI assistants through the Model Context Protocol</CardDescription>
+								</CardHeader>
+								<CardContent className="space-y-6">
+									{/* What's MCP Section */}
+									<div>
+										<h3 className="text-sm font-semibold text-foreground mb-3">What's MCP?</h3>
+										<p className="text-sm text-muted-foreground leading-relaxed">
+											The Model Context Protocol (MCP) is an open standard that enables AI assistants to securely
+											connect to external data sources and tools. This HF MCP Server provides access to Hugging Face's
+											ecosystem of models, datasets, and Spaces, allowing AI assistants to search, analyze, and interact
+											with ML resources directly.
+										</p>
+									</div>
+
+									<Separator />
+
+									{/* Action Buttons */}
+									<div className="flex flex-col gap-4">
+										<Button
+											size="xl"
+											onClick={handleCopyMcpUrl}
+											className="w-full transition-all duration-200 active:bg-green-500 active:border-green-500"
+										>
+											<Copy className="mr-2 h-5 w-5" />
+											Copy MCP URL
+										</Button>
+										<Button size="xl" variant="outline" onClick={handleGoToSettings} className="w-full">
+											<Settings className="mr-2 h-5 w-5" />
+											Go to Settings to pick your tools
+										</Button>
+									</div>
+								</CardContent>
+							</Card>
+						</TabsContent>
 						<TabsContent value="metrics">
 							<TransportMetricsCard />
 						</TabsContent>
