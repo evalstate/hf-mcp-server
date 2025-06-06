@@ -32,42 +32,60 @@ export const createProxyServerFactory = (
 			return server;
 		}
 
-		// Get enabled Gradio endpoints from the API client
+		// Get Gradio endpoints from the API client
 		const gradioEndpoints = sharedApiClient.getGradioEndpoints();
+		
 		logger.debug(
 			{
-				gradioEndpoints: gradioEndpoints.map((ep, i) => ({
-					index: i,
-					url: ep.url,
-					enabled: ep.enabled,
-				})),
+				rawEndpoints: gradioEndpoints,
+				endpointCount: gradioEndpoints.length,
 			},
-			'All Gradio endpoints'
+			'Raw Gradio endpoints from API client'
 		);
 
-		const enabledEndpoints = gradioEndpoints.filter((ep) => ep.enabled !== false);
+		// Filter out endpoints with empty subdomain and construct URLs
+		const validEndpoints = gradioEndpoints
+			.filter((ep) => {
+				const isValid = ep.subdomain && ep.subdomain.trim() !== '';
+				if (!isValid) {
+					logger.debug(
+						{
+							endpoint: ep,
+							reason: !ep.subdomain ? 'missing subdomain' : 'empty subdomain'
+						},
+						'Filtering out invalid endpoint'
+					);
+				}
+				return isValid;
+			})
+			.map((ep) => ({
+				...ep,
+				url: `https://${ep.subdomain}.hf.space/gradio_api/mcp/sse`,
+			}));
+		
 		logger.debug(
 			{
-				enabledCount: enabledEndpoints.length,
-				enabledUrls: enabledEndpoints.map((ep) => ep.url),
+				totalCount: gradioEndpoints.length,
+				validCount: validEndpoints.length,
+				validEndpoints: validEndpoints.map((ep) => ({ name: ep.name, subdomain: ep.subdomain, url: ep.url })),
 			},
-			'Filtered enabled endpoints'
+			'Gradio endpoints after filtering and URL construction'
 		);
 
-		if (enabledEndpoints.length === 0) {
-			logger.debug('No enabled Gradio endpoints, using local tools only');
+		if (validEndpoints.length === 0) {
+			logger.debug('No valid Gradio endpoints, using local tools only');
 			return server;
 		}
 
-		// Connect to all enabled endpoints in parallel with timeout
-		const connections = await connectToGradioEndpoints(gradioEndpoints, hfToken);
+		// Connect to all valid endpoints in parallel with timeout
+		const connections = await connectToGradioEndpoints(validEndpoints, hfToken);
 
 		// Register tools from successful connections
 		for (const result of connections) {
 			if (!result.success) continue;
 
-			const { endpointId, originalIndex, client, tool } = result.connection;
-			registerRemoteTool(server, endpointId, originalIndex, client, tool);
+			const { endpointId, originalIndex, client, tool, name, emoji } = result.connection;
+			registerRemoteTool(server, endpointId, originalIndex, client, tool, name, emoji);
 		}
 
 		logger.debug('Server ready with local and remote tools');

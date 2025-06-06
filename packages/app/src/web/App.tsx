@@ -48,9 +48,30 @@ function App() {
 	const { data: settings } = useSWR<AppSettings>('/api/settings', fetcher);
 
 	// Simple state: 3 text boxes, 3 checkboxes
-	const [spaceNames, setSpaceNames] = useState<string[]>(['evalstate/flux1_schnell', 'abidlabs/EasyGhibli', '']);
-	const [spaceSubdomains, setSpaceSubdomains] = useState<string[]>(['evalstate-flux1-schnell', 'abidlabs-easyghibli', '']);
-	const [enabledSpaces, setEnabledSpaces] = useState<boolean[]>([true, true, false]);
+	const [spaceNames, setSpaceNames] = useState<string[]>(['', '', '']);
+	const [spaceSubdomains, setSpaceSubdomains] = useState<string[]>(['', '', '']);
+	const [enabledSpaces, setEnabledSpaces] = useState<boolean[]>([false, false, false]);
+
+	// Load space tools from API settings
+	useEffect(() => {
+		if (settings?.spaceTools) {
+			const names = ['', '', ''];
+			const subdomains = ['', '', ''];
+			const enabled = [false, false, false];
+			
+			settings.spaceTools.forEach((tool, index) => {
+				if (index < 3) {
+					names[index] = tool.name;
+					subdomains[index] = tool.subdomain;
+					enabled[index] = true;
+				}
+			});
+			
+			setSpaceNames(names);
+			setSpaceSubdomains(subdomains);
+			setEnabledSpaces(enabled);
+		}
+	}, [settings]);
 
 
 	const isLoading = !transportInfo && !transportError;

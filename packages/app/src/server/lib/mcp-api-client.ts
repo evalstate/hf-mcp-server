@@ -8,8 +8,10 @@ export interface ToolStateChangeCallback {
 }
 
 export interface GradioEndpoint {
-	url: string;
-	enabled?: boolean;
+	name: string;
+	subdomain: string;
+	id?: string;
+	emoji?: string;
 }
 
 export interface ApiClientConfig {
@@ -46,26 +48,10 @@ export class McpApiClient extends EventEmitter {
 			}
 			if (config.staticGradioEndpoints) {
 				this.gradioEndpoints = [...config.staticGradioEndpoints];
-				// Ensure we always have 3 endpoints
-				while (this.gradioEndpoints.length < 3) {
-					this.gradioEndpoints.push({ url: '', enabled: true });
-				}
-				// Initialize all endpoints as enabled by default
-				this.gradioEndpoints.forEach((endpoint, index) => {
-					this.gradioEndpointStates.set(index, endpoint.enabled !== false);
-				});
 			}
 		} else if (config.type === 'polling' && config.staticGradioEndpoints) {
 			// Also support default Gradio endpoints in polling mode
 			this.gradioEndpoints = [...config.staticGradioEndpoints];
-			// Ensure we always have 3 endpoints
-			while (this.gradioEndpoints.length < 3) {
-				this.gradioEndpoints.push({ url: '', enabled: true });
-			}
-			// Initialize all endpoints as enabled by default
-			this.gradioEndpoints.forEach((endpoint, index) => {
-				this.gradioEndpointStates.set(index, endpoint.enabled !== false);
-			});
 		}
 	}
 
@@ -185,11 +171,7 @@ export class McpApiClient extends EventEmitter {
 	}
 
 	getGradioEndpoints(): GradioEndpoint[] {
-		// Return endpoints with their enabled state
-		return this.gradioEndpoints.map((endpoint, index) => ({
-			...endpoint,
-			enabled: this.gradioEndpointStates.get(index) ?? true,
-		}));
+		return this.gradioEndpoints;
 	}
 
 	updateGradioEndpointState(index: number, enabled: boolean): void {
@@ -202,20 +184,10 @@ export class McpApiClient extends EventEmitter {
 		}
 	}
 
-	updateGradioEndpointUrl(index: number, url: string): void {
-		// Ensure we have at least index + 1 endpoints
-		while (this.gradioEndpoints.length <= index) {
-			this.gradioEndpoints.push({ url: '', enabled: true });
-			this.gradioEndpointStates.set(this.gradioEndpoints.length - 1, true);
-		}
-
-		if (index >= 0 && index < 3) {
-			// Limit to 3 endpoints
-			const endpoint = this.gradioEndpoints[index];
-			if (endpoint) {
-				endpoint.url = url;
-				logger.info(`Gradio endpoint ${(index + 1).toString()} URL updated to ${url}`);
-			}
+	updateGradioEndpoint(index: number, endpoint: GradioEndpoint): void {
+		if (index >= 0 && index < this.gradioEndpoints.length) {
+			this.gradioEndpoints[index] = endpoint;
+			logger.info(`Gradio endpoint ${(index + 1).toString()} updated to ${endpoint.name}`);
 		}
 	}
 

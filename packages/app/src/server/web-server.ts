@@ -278,10 +278,10 @@ export class WebServer {
 			res.json(updatedEndpoint);
 		});
 
-		// Update Gradio endpoint URL
+		// Update Gradio endpoint
 		this.app.put('/api/gradio-endpoints/:index', express.json(), (req, res) => {
 			const index = parseInt(req.params.index);
-			const { url } = req.body as { url: string };
+			const { name, subdomain, id, emoji } = req.body as { name: string; subdomain: string; id?: string; emoji?: string };
 			
 			if (!this.apiClient) {
 				res.status(500).json({ error: 'API client not initialized' });
@@ -294,20 +294,15 @@ export class WebServer {
 				return;
 			}
 
-			// Validate URL
-			try {
-				new URL(url);
-			} catch {
-				res.status(400).json({ error: 'Invalid URL format' });
+			// Validate required fields
+			if (!name || !subdomain) {
+				res.status(400).json({ error: 'Name and subdomain are required' });
 				return;
 			}
 
-			// Update the URL in the API client
-			this.apiClient.updateGradioEndpointUrl(index, url);
-			
-			// Get the updated endpoint
-			const updatedEndpoints = this.apiClient.getGradioEndpoints();
-			const updatedEndpoint = updatedEndpoints[index];
+			// Update the endpoint in the API client
+			const updatedEndpoint = { name, subdomain, id, emoji };
+			this.apiClient.updateGradioEndpoint(index, updatedEndpoint);
 			
 			res.json(updatedEndpoint);
 		});

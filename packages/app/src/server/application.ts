@@ -7,7 +7,7 @@ import type { WebServer } from './web-server.js';
 import { logger } from './lib/logger.js';
 import { createServerFactory } from './mcp-server.js';
 import { createProxyServerFactory } from './mcp-proxy.js';
-import { McpApiClient, type ApiClientConfig } from './lib/mcp-api-client.js';
+import { McpApiClient, type ApiClientConfig, type GradioEndpoint } from './lib/mcp-api-client.js';
 import type { SpaceTool } from '../shared/settings.js';
 import {
 	SEMANTIC_SEARCH_TOOL_CONFIG,
@@ -60,18 +60,13 @@ export class Application {
 
 		// Configure API client with transport info
 		// Convert spaceTools to GradioEndpoints format for backward compatibility
-		const convertSpaceToolsToGradioEndpoints = (spaceTools: SpaceTool[]): { url: string; enabled: boolean }[] => {
-			const gradioEndpoints = spaceTools.map(spaceTool => ({
-				url: `https://${spaceTool.subdomain}.hf.space/gradio_api/mcp/sse`,
-				enabled: true,
+		const convertSpaceToolsToGradioEndpoints = (spaceTools: SpaceTool[]): GradioEndpoint[] => {
+			return spaceTools.map(spaceTool => ({
+				name: spaceTool.name,
+				subdomain: spaceTool.subdomain,
+				id: spaceTool._id,
+				emoji: spaceTool.emoji,
 			}));
-			
-			// Ensure we always have 3 endpoints (pad with empty ones)
-			while (gradioEndpoints.length < 3) {
-				gradioEndpoints.push({ url: '', enabled: true });
-			}
-			
-			return gradioEndpoints;
 		};
 
 		// Default space tools (will be used if no external API is configured)
@@ -103,7 +98,6 @@ export class Application {
 				type: 'external',
 				externalUrl: userConfigApi,
 				hfToken: process.env.HF_TOKEN || process.env.DEFAULT_HF_TOKEN,
-				staticGradioEndpoints: defaultGradioEndpoints,
 			};
 			logger.info(`Using external API client with user config API: ${userConfigApi}`);
 		} else {
