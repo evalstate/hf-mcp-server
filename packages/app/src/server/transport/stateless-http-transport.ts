@@ -25,6 +25,7 @@ export class StatelessHttpTransport extends BaseTransport {
 			res
 				.status(405)
 				.json(JsonRpcErrors.methodNotAllowed(null, 'Method not allowed. Use POST for stateless JSON-RPC requests.'));
+			//	res.send('<html><h1>HELLO, WORLD!</h1></html>');
 		});
 
 		// Explicitly reject DELETE requests

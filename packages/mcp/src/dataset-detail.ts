@@ -4,7 +4,7 @@ import { formatDate, formatNumber } from './utilities.js';
 
 // Dataset Detail Tool Configuration
 export const DATASET_DETAIL_TOOL_CONFIG = {
-	name: 'dataset_detail',
+	name: 'dataset_details',
 	description: 'Get detailed information about a specific dataset on Hugging Face Hub.',
 	schema: z.object({
 		dataset_id: z.string().min(1, 'Dataset ID is required').describe('Dataset ID (e.g., squad, glue, imdb)'),

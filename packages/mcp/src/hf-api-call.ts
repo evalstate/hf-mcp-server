@@ -72,11 +72,14 @@ export class HfApiError extends Error {
 export class HfApiCall<TParams = Record<string, string | undefined>, TResponse = unknown> {
 	protected readonly apiUrl: string;
 	protected readonly hfToken: string | undefined;
+	protected readonly apiTimeout: number;
 
 	/** nb reversed order from superclasses on basis that hfToken is more likely to be configured */
 	constructor(apiUrl: string, hfToken?: string) {
 		this.apiUrl = apiUrl;
 		this.hfToken = hfToken;
+		// Default to 12.5 seconds if HF_API_TIMEOUT is not set
+		this.apiTimeout = process.env.HF_API_TIMEOUT ? parseInt(process.env.HF_API_TIMEOUT, 10) : 12500;
 	}
 
 	/**
@@ -90,17 +93,24 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 	protected async fetchFromApi<T = TResponse>(url: URL | string, options?: globalThis.RequestInit): Promise<T> {
 		try {
 			const headers: Record<string, string> = {
-				'Content-Type': 'application/json',
+				'Accept': 'application/json',
 				...(options?.headers as Record<string, string> || {}),
 			};
 			if (this.hfToken) {
 				headers['Authorization'] = `Bearer ${this.hfToken}`;
 			}
 
+			// Add timeout using AbortController
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), this.apiTimeout);
+
 			const response = await fetch(url.toString(), {
 				...options,
 				headers,
+				signal: controller.signal,
 			});
+
+			clearTimeout(timeoutId);
 
 			if (!response.ok) {
 				// Try to get error details from response body
@@ -124,6 +134,10 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 			// Re-throw HfApiError as-is to preserve status information
 			if (error instanceof HfApiError) {
 				throw error;
+			}
+			// Handle timeout errors
+			if (error instanceof Error && error.name === 'AbortError') {
+				throw new Error(`API request timed out after ${this.apiTimeout}ms`);
 			}
 			// Wrap other errors
 			if (error instanceof Error) {

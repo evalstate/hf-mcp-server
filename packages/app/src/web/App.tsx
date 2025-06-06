@@ -209,11 +209,11 @@ function App() {
 			description: 'Find models with filters for task, library, etc.',
 			settings: { enabled: settings?.builtInTools?.includes('model_search') ?? true },
 		},
-		model_detail: {
-			id: 'model_detail',
+		model_details: {
+			id: 'model_details',
 			label: 'Model Details',
 			description: 'Detailed information about a specific model.',
-			settings: { enabled: settings?.builtInTools?.includes('model_detail') ?? true },
+			settings: { enabled: settings?.builtInTools?.includes('model_details') ?? true },
 		},
 		dataset_search: {
 			id: 'dataset_search',
@@ -221,11 +221,11 @@ function App() {
 			description: 'Find datasets with filters for author, tags, etc.',
 			settings: { enabled: settings?.builtInTools?.includes('dataset_search') ?? true },
 		},
-		dataset_detail: {
-			id: 'dataset_detail',
+		dataset_details: {
+			id: 'dataset_details',
 			label: 'Dataset Details',
 			description: 'Detailed information about a specific dataset.',
-			settings: { enabled: settings?.builtInTools?.includes('dataset_detail') ?? true },
+			settings: { enabled: settings?.builtInTools?.includes('dataset_details') ?? true },
 		},
 	};
 

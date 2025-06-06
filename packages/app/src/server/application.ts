@@ -8,18 +8,8 @@ import { logger } from './lib/logger.js';
 import { createServerFactory } from './mcp-server.js';
 import { createProxyServerFactory } from './mcp-proxy.js';
 import { McpApiClient, type ApiClientConfig, type GradioEndpoint } from './lib/mcp-api-client.js';
-import type { SpaceTool } from '../shared/settings.js';
-import {
-	SEMANTIC_SEARCH_TOOL_CONFIG,
-	MODEL_SEARCH_TOOL_CONFIG,
-	MODEL_DETAIL_TOOL_CONFIG,
-	PAPER_SEARCH_TOOL_CONFIG,
-	DATASET_SEARCH_TOOL_CONFIG,
-	DATASET_DETAIL_TOOL_CONFIG,
-	DUPLICATE_SPACE_TOOL_CONFIG,
-	SPACE_INFO_TOOL_CONFIG,
-	SPACE_FILES_TOOL_CONFIG,
-} from '@hf-mcp/mcp';
+import { DEFAULT_SPACE_TOOLS, type SpaceTool } from '../shared/settings.js';
+import { ALL_BUILTIN_TOOL_IDS } from '@hf-mcp/mcp';
 
 export interface ApplicationOptions {
 	transportType: TransportType;
@@ -61,7 +51,7 @@ export class Application {
 		// Configure API client with transport info
 		// Convert spaceTools to GradioEndpoints format for backward compatibility
 		const convertSpaceToolsToGradioEndpoints = (spaceTools: SpaceTool[]): GradioEndpoint[] => {
-			return spaceTools.map(spaceTool => ({
+			return spaceTools.map((spaceTool) => ({
 				name: spaceTool.name,
 				subdomain: spaceTool.subdomain,
 				id: spaceTool._id,
@@ -69,29 +59,13 @@ export class Application {
 			}));
 		};
 
-		// Default space tools (will be used if no external API is configured)
-		const defaultSpaceTools = [
-			{
-				_id: "6755d0d9e0ea01e11fa2a38a",
-				name: "evalstate/flux1_schnell",
-				subdomain: "evalstate-flux1-schnell",
-				emoji: "🏎️💨"
-			},
-			{
-				_id: "680be03dc38b7fa7d6855910",
-				name: "abidlabs/EasyGhibli",
-				subdomain: "abidlabs-easyghibli",
-				emoji: "🦀"
-			}
-		];
-
-		const defaultGradioEndpoints = convertSpaceToolsToGradioEndpoints(defaultSpaceTools);
+		// Use shared default space tools 
+		const defaultGradioEndpoints = convertSpaceToolsToGradioEndpoints(DEFAULT_SPACE_TOOLS);
 
 		let apiClientConfig: ApiClientConfig;
 
 		// Check for USER_CONFIG_API environment variable
 		const userConfigApi = process.env.USER_CONFIG_API;
-
 		if (userConfigApi) {
 			// Use external mode with the user config API
 			apiClientConfig = {
@@ -152,20 +126,9 @@ export class Application {
 		// For web server tool management, create placeholder registered tools
 		// In a full implementation, tool enable/disable would be managed differently
 		const registeredTools: { [toolId: string]: { enable: () => void; disable: () => void } } = {};
-		const toolNames = [
-			SEMANTIC_SEARCH_TOOL_CONFIG.name,
-			MODEL_SEARCH_TOOL_CONFIG.name,
-			MODEL_DETAIL_TOOL_CONFIG.name,
-			PAPER_SEARCH_TOOL_CONFIG.name,
-			DATASET_SEARCH_TOOL_CONFIG.name,
-			DATASET_DETAIL_TOOL_CONFIG.name,
-			DUPLICATE_SPACE_TOOL_CONFIG.name,
-			SPACE_INFO_TOOL_CONFIG.name,
-			SPACE_FILES_TOOL_CONFIG.name,
-		];
 
 		// Create placeholder registered tools for web server compatibility
-		toolNames.forEach((toolName) => {
+		ALL_BUILTIN_TOOL_IDS.forEach((toolName) => {
 			registeredTools[toolName] = {
 				enable: () => {
 					// Emit tool state change event to update actual MCP tools
