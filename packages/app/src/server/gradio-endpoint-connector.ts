@@ -4,6 +4,7 @@ import { ListToolsResultSchema, CallToolResultSchema, type Tool } from '@modelco
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { logger } from './lib/logger.js';
 import { z } from 'zod';
+import type { GradioEndpoint } from './lib/mcp-api-client.js';
 
 // Define types for JSON Schema
 interface JsonSchemaProperty {
@@ -20,16 +21,14 @@ interface JsonSchema {
 	[key: string]: unknown;
 }
 
-interface GradioEndpoint {
-	url: string;
-	enabled?: boolean;
-}
 
 interface EndpointConnection {
 	endpointId: string;
 	originalIndex: number;
 	client: Client;
 	tool: Tool;
+	name?: string;
+	emoji?: string;
 }
 
 type EndpointConnectionResult =
@@ -66,7 +65,7 @@ async function connectToSingleEndpoint(
 	hfToken: string | undefined
 ): Promise<EndpointConnection> {
 	const endpointId = `endpoint${(originalIndex + 1).toString()}`;
-	const remoteUrl = new URL(endpoint.url);
+	const remoteUrl = new URL(`https://${endpoint.subdomain}.hf.space/gradio_api/mcp/sse`);
 
 	logger.debug({ url: remoteUrl.toString(), endpointId }, 'Connecting to remote SSE endpoint');
 
@@ -156,6 +155,8 @@ async function connectToSingleEndpoint(
 		originalIndex,
 		client: remoteClient,
 		tool: selectedTool,
+		name: endpoint.name,
+		emoji: endpoint.emoji,
 	};
 }
 
@@ -169,18 +170,18 @@ export async function connectToGradioEndpoints(
 	gradioEndpoints: GradioEndpoint[],
 	hfToken: string | undefined
 ): Promise<EndpointConnectionResult[]> {
-	// Filter and map enabled endpoints with their indices
-	const enabledWithIndex = gradioEndpoints
+	// Filter and map valid endpoints with their indices
+	const validWithIndex = gradioEndpoints
 		.map((ep, index) => ({ endpoint: ep, originalIndex: index }))
-		.filter((item) => item.endpoint.enabled !== false && item.endpoint.url);
+		.filter((item) => item.endpoint.subdomain && item.endpoint.subdomain.trim() !== '');
 
-	if (enabledWithIndex.length === 0) {
-		logger.debug('No enabled Gradio endpoints to connect');
+	if (validWithIndex.length === 0) {
+		logger.debug('No valid Gradio endpoints to connect');
 		return [];
 	}
 
 	// Create connection tasks with timeout
-	const connectionTasks = enabledWithIndex.map(({ endpoint, originalIndex }) => {
+	const connectionTasks = validWithIndex.map(({ endpoint, originalIndex }) => {
 		const endpointId = `endpoint${(originalIndex + 1).toString()}`;
 
 		return Promise.race([
@@ -234,10 +235,14 @@ export function registerRemoteTool(
 	endpointId: string,
 	originalIndex: number,
 	client: Client,
-	tool: Tool
+	tool: Tool,
+	name?: string,
+	emoji?: string
 ): void {
-	// Use endpoint ID as prefix to avoid conflicts
-	const remoteName = `${endpointId}_${tool.name}`;
+	// Use new naming convention: gr<index>_<sanitized_name>
+	// Convert "evalstate/flux1_schnell" to "evalstate_flux1_schnell"
+	const sanitizedName = name ? name.replace(/[/\-\s]+/g, '_').toLowerCase() : 'unknown';
+	const remoteName = `gr${(originalIndex + 1).toString()}_${sanitizedName}`;
 	logger.debug(
 		{
 			endpointId,
@@ -280,11 +285,21 @@ export function registerRemoteTool(
 		}
 	}
 
+	// Create user-friendly title and description
+	const displayName = name || 'Unknown Space';
+	const toolTitle = `${displayName} - ${tool.name}${emoji ? ` ${emoji}` : ''}`;
+	const toolDescription = tool.description 
+		? `${tool.description} (from ${displayName})`
+		: `${tool.name} tool from ${displayName}`;
+
 	server.tool(
 		remoteName,
-		`[Endpoint ${(originalIndex + 1).toString()}] ${tool.description || tool.name}`,
-		schemaShape, // Now using Zod schemas
-		{ openWorldHint: true }, // annotations parameter
+		toolDescription,
+		schemaShape,
+		{ 
+			openWorldHint: true,
+			title: toolTitle 
+		}, // annotations parameter
 		async (params: Record<string, unknown>) => {
 			logger.info({ tool: tool.name, params }, 'Calling remote tool');
 			try {

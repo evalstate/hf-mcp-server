@@ -4,43 +4,45 @@
  */
 
 // Define the settings types
-export interface ToolSettings {
-  enabled: boolean;
-  // Additional properties can be added for each tool as needed
+export interface SpaceTool {
+  _id: string;
+  name: string;
+  subdomain: string;
+  emoji: string;
 }
 
 export interface AppSettings {
-  tools: {
-    [toolId: string]: ToolSettings;
-  };
-  // Future setting categories can be added here
+  builtInTools: string[];
+  spaceTools: SpaceTool[];
 }
 
 // Default settings
 const defaultSettings: AppSettings = {
-  tools: {
-    space_search: { // Changed from space_semantic_search to match SEMANTIC_SEARCH_TOOL_CONFIG.name
-      enabled: true,
+  builtInTools: [
+    'space_search',
+    'model_search', 
+    'model_detail',
+    'paper_search',
+    'dataset_search',
+    'dataset_detail',
+    'duplicate_space',
+    'space_info',
+    'space_files',
+  ],
+  spaceTools: [
+    {
+      _id: "6755d0d9e0ea01e11fa2a38a",
+      name: "evalstate/flux1_schnell",
+      subdomain: "evalstate-flux1-schnell",
+      emoji: "🏎️💨"
     },
-    model_search: {
-      enabled: true,
-    },
-    model_detail: {
-      enabled: true,
-    },
-    paper_search: { // Changed from paper_semantic_search to match PAPER_SEARCH_TOOL_CONFIG.name
-      enabled: true,
-    },
-    dataset_search: {
-      enabled: true,
-    },
-    dataset_detail: {
-      enabled: true,
-    },
-    duplicate_space: {
-      enabled: true,
-    },
-  },
+    {
+      _id: "680be03dc38b7fa7d6855910",
+      name: "abidlabs/EasyGhibli",
+      subdomain: "abidlabs-easyghibli",
+      emoji: "🦀"
+    }
+  ],
 };
 
 // In-memory settings store (could be replaced with persistence later)
@@ -55,31 +57,25 @@ export const settingsService = {
   },
 
   /**
-   * Get settings for a specific tool
+   * Update built-in tools array
    */
-  getToolSettings(toolId: string): ToolSettings | undefined {
-    return settings.tools[toolId] ? { ...settings.tools[toolId] } : undefined;
+  updateBuiltInTools(builtInTools: string[]): AppSettings {
+    settings = {
+      ...settings,
+      builtInTools: [...builtInTools],
+    };
+    return { ...settings };
   },
 
   /**
-   * Update settings for a specific tool
+   * Update space tools array
    */
-  updateToolSettings(
-    toolId: string,
-    newSettings: Partial<ToolSettings>
-  ): ToolSettings {
-    // Create tool settings if they don't exist
-    if (!settings.tools[toolId]) {
-      settings.tools[toolId] = { enabled: false };
-    }
-
-    // Update settings
-    settings.tools[toolId] = {
-      ...settings.tools[toolId],
-      ...newSettings,
+  updateSpaceTools(spaceTools: SpaceTool[]): AppSettings {
+    settings = {
+      ...settings,
+      spaceTools: [...spaceTools],
     };
-
-    return { ...settings.tools[toolId] };
+    return { ...settings };
   },
 
   /**
@@ -94,6 +90,6 @@ export const settingsService = {
    * Check if a tool is enabled
    */
   isToolEnabled(toolId: string): boolean {
-    return !!settings.tools[toolId]?.enabled;
+    return settings.builtInTools.includes(toolId);
   },
 };

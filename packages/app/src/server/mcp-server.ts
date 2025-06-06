@@ -40,11 +40,6 @@ import type { WebServer } from './web-server.js';
 import { logger } from './lib/logger.js';
 import { extractAuthAndBouquet } from './utils/auth-utils.js';
 
-interface Tool {
-	enable(): void;
-	disable(): void;
-}
-
 // Define bouquet configurations
 const BOUQUETS: Record<string, string[]> = {
 	spaces: ['space_search', 'duplicate_space', 'space_info', 'space_files'],
@@ -96,8 +91,21 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			}
 		);
 
+		interface Tool {
+			enable(): void;
+			disable(): void;
+		}
+
 		// Always register all tools and store instances for dynamic control
-		const toolInstances: { [toolId: string]: Tool } = {};
+		const toolInstances: { [name: string]: Tool } = {};
+		const currentToolStates: { [name: string]: boolean } = {};
+
+		// Initialize currentToolStates to match MCP SDK defaults (all tools start enabled)
+		const initializeToolStates = () => {
+			for (const toolName of Object.keys(toolInstances)) {
+				currentToolStates[toolName] = true; // MCP SDK default
+			}
+		};
 
 		const whoDescription = userDetails
 			? `Hugging Face tools are being used by authenticated user '${username}'`
@@ -130,7 +138,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			MODEL_SEARCH_TOOL_CONFIG.schema.shape,
 			MODEL_SEARCH_TOOL_CONFIG.annotations,
 			async (params: ModelSearchParams) => {
-				const modelSearch = new ModelSearchTool(hfToken, undefined);
+				const modelSearch = new ModelSearchTool(hfToken);
 				const results = await modelSearch.searchWithParams(params);
 				return {
 					content: [{ type: 'text', text: results }],
@@ -175,7 +183,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			DATASET_SEARCH_TOOL_CONFIG.schema.shape,
 			DATASET_SEARCH_TOOL_CONFIG.annotations,
 			async (params: DatasetSearchParams) => {
-				const datasetSearch = new DatasetSearchTool(hfToken, undefined);
+				const datasetSearch = new DatasetSearchTool(hfToken);
 				const results = await datasetSearch.searchWithParams(params);
 				return {
 					content: [{ type: 'text', text: results }],
@@ -242,21 +250,52 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			}
 		);
 
-		// Apply initial tool states based on current settings and bouquet
-		for (const [toolName, toolInstance] of Object.entries(toolInstances)) {
-			let isEnabled = sharedApiClient.getCachedToolState(toolName);
+		// Helper function to apply tool states
+		const applyToolStates = async () => {
+			let enabledToolsList: string[] = [];
 
-			// If a bouquet is specified, override the settings
+			// If a bouquet is specified, use it directly (takes precedence)
 			if (bouquet && BOUQUETS[bouquet]) {
-				const allowedTools = BOUQUETS[bouquet];
-				isEnabled = allowedTools.includes(toolName);
-				logger.debug({ toolName, bouquet, isEnabled }, 'Tool state set by bouquet');
+				enabledToolsList = BOUQUETS[bouquet];
+				logger.debug({ bouquet, enabledToolsList }, 'Using bouquet for tool states');
+			} else {
+				// Fetch current tool states from API with the user's token
+				const apiToolStates = await sharedApiClient.getToolStates(hfToken);
+				if (apiToolStates) {
+					enabledToolsList = Object.keys(apiToolStates).filter((toolName) => apiToolStates[toolName]);
+				}
+				logger.debug({ enabledToolsList }, 'Using API for tool states');
 			}
 
-			if (!isEnabled) {
-				toolInstance.disable();
+			for (const [toolName, toolInstance] of Object.entries(toolInstances)) {
+				const isEnabled = enabledToolsList.includes(toolName);
+
+				// Only change state if different from current state
+				const currentState = currentToolStates[toolName];
+				if (currentState !== isEnabled) {
+					logger.info({ toolName, isEnabled, previousState: currentState }, 'Tool state changing');
+
+					if (!isEnabled) {
+						toolInstance.disable();
+						logger.debug({ toolName }, 'Tool disabled');
+					} else {
+						toolInstance.enable();
+						logger.debug({ toolName }, 'Tool enabled');
+					}
+
+					// Update tracked state
+					currentToolStates[toolName] = isEnabled;
+				} else {
+					logger.debug({ toolName, isEnabled }, 'Tool state unchanged, skipping');
+				}
 			}
-		}
+		};
+
+		// Initialize tool states to match MCP SDK defaults before applying API states
+		initializeToolStates();
+
+		// Apply initial tool states (fetch from API)
+		void applyToolStates();
 
 		const transportInfo = sharedApiClient.getTransportInfo();
 		server.server.registerCapabilities({
@@ -267,20 +306,19 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 
 		if (!transportInfo?.jsonResponseEnabled) {
 			// Set up event listener for dynamic tool state changes
-			sharedApiClient.on('toolStateChange', (toolId: string, enabled: boolean) => {
-				const toolInstance = toolInstances[toolId];
-				if (toolInstance) {
-					if (enabled) {
-						toolInstance.enable();
-						logger.info({ toolId }, 'Tool enabled via API event');
-					} else {
-						toolInstance.disable();
-						logger.info({ toolId }, 'Tool disabled via API event');
-					}
-				} else {
-					logger.warn({ toolId }, 'Received tool state change for unknown tool');
-				}
-			});
+			const toolStateChangeHandler = (toolId: string, enabled: boolean) => {
+				logger.info({ toolId, enabled }, 'Tool state change event received - reapplying all tool states');
+				// Re-apply all tool states when any change occurs
+				void applyToolStates();
+			};
+
+			sharedApiClient.on('toolStateChange', toolStateChangeHandler);
+
+			// Clean up event listener when server closes
+			server.server.onclose = () => {
+				sharedApiClient.removeListener('toolStateChange', toolStateChangeHandler);
+				logger.debug('Removed toolStateChange listener for closed server');
+			};
 		}
 
 		return server;

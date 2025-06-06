@@ -3,8 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Server } from 'node:http';
 import type { TransportInfo } from '../shared/transport-info.js';
-import type { ToolSettings } from '../shared/settings.js';
-import { settingsService } from '../shared/settings.js';
+import { settingsService, type SpaceTool } from '../shared/settings.js';
 import { logger } from './lib/logger.js';
 import type { BaseTransport } from './transport/base-transport.js';
 import type { McpApiClient } from './lib/mcp-api-client.js';
@@ -214,19 +213,30 @@ export class WebServer {
 		});
 
 		// Update tool settings endpoint
-		this.app.post('/api/settings/tools/:toolId', express.json(), (req, res) => {
-			const { toolId } = req.params;
-			const settings = req.body as Partial<ToolSettings>;
-			const updatedSettings = settingsService.updateToolSettings(toolId, settings);
+		this.app.post('/api/settings', express.json(), (req, res) => {
+			const { builtInTools, spaceTools } = req.body as { builtInTools?: string[], spaceTools?: SpaceTool[] };
+			
+			let updatedSettings = settingsService.getSettings();
+			
+			if (builtInTools !== undefined) {
+				updatedSettings = settingsService.updateBuiltInTools(builtInTools);
+			}
+			
+			if (spaceTools !== undefined) {
+				updatedSettings = settingsService.updateSpaceTools(spaceTools);
+			}
 
-			// Enable or disable the actual MCP tool if it exists
-			if (this.registeredTools[toolId]) {
-				if (settings.enabled) {
-					this.registeredTools[toolId].enable();
-					logger.info(`Tool ${toolId} has been enabled via API`);
-				} else {
-					this.registeredTools[toolId].disable();
-					logger.info(`Tool ${toolId} has been disabled via API`);
+			// Enable or disable the actual MCP tools based on the new list
+			if (builtInTools !== undefined) {
+				for (const toolId in this.registeredTools) {
+					const tool = this.registeredTools[toolId];
+					if (tool && builtInTools.includes(toolId)) {
+						tool.enable();
+						logger.info(`Tool ${toolId} has been enabled via API`);
+					} else if (tool) {
+						tool.disable();
+						logger.info(`Tool ${toolId} has been disabled via API`);
+					}
 				}
 			}
 
@@ -268,10 +278,10 @@ export class WebServer {
 			res.json(updatedEndpoint);
 		});
 
-		// Update Gradio endpoint URL
+		// Update Gradio endpoint
 		this.app.put('/api/gradio-endpoints/:index', express.json(), (req, res) => {
 			const index = parseInt(req.params.index);
-			const { url } = req.body as { url: string };
+			const { name, subdomain, id, emoji } = req.body as { name: string; subdomain: string; id?: string; emoji?: string };
 			
 			if (!this.apiClient) {
 				res.status(500).json({ error: 'API client not initialized' });
@@ -284,20 +294,15 @@ export class WebServer {
 				return;
 			}
 
-			// Validate URL
-			try {
-				new URL(url);
-			} catch {
-				res.status(400).json({ error: 'Invalid URL format' });
+			// Validate required fields
+			if (!name || !subdomain) {
+				res.status(400).json({ error: 'Name and subdomain are required' });
 				return;
 			}
 
-			// Update the URL in the API client
-			this.apiClient.updateGradioEndpointUrl(index, url);
-			
-			// Get the updated endpoint
-			const updatedEndpoints = this.apiClient.getGradioEndpoints();
-			const updatedEndpoint = updatedEndpoints[index];
+			// Update the endpoint in the API client
+			const updatedEndpoint = { name, subdomain, id, emoji };
+			this.apiClient.updateGradioEndpoint(index, updatedEndpoint);
 			
 			res.json(updatedEndpoint);
 		});

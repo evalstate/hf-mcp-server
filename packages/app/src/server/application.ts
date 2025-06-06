@@ -7,7 +7,8 @@ import type { WebServer } from './web-server.js';
 import { logger } from './lib/logger.js';
 import { createServerFactory } from './mcp-server.js';
 import { createProxyServerFactory } from './mcp-proxy.js';
-import { McpApiClient, type ApiClientConfig } from './lib/mcp-api-client.js';
+import { McpApiClient, type ApiClientConfig, type GradioEndpoint } from './lib/mcp-api-client.js';
+import type { SpaceTool } from '../shared/settings.js';
 import {
 	SEMANTIC_SEARCH_TOOL_CONFIG,
 	MODEL_SEARCH_TOOL_CONFIG,
@@ -16,6 +17,8 @@ import {
 	DATASET_SEARCH_TOOL_CONFIG,
 	DATASET_DETAIL_TOOL_CONFIG,
 	DUPLICATE_SPACE_TOOL_CONFIG,
+	SPACE_INFO_TOOL_CONFIG,
+	SPACE_FILES_TOOL_CONFIG,
 } from '@hf-mcp/mcp';
 
 export interface ApplicationOptions {
@@ -56,27 +59,57 @@ export class Application {
 		};
 
 		// Configure API client with transport info
-		const defaultGradioEndpoints = [
+		// Convert spaceTools to GradioEndpoints format for backward compatibility
+		const convertSpaceToolsToGradioEndpoints = (spaceTools: SpaceTool[]): GradioEndpoint[] => {
+			return spaceTools.map(spaceTool => ({
+				name: spaceTool.name,
+				subdomain: spaceTool.subdomain,
+				id: spaceTool._id,
+				emoji: spaceTool.emoji,
+			}));
+		};
+
+		// Default space tools (will be used if no external API is configured)
+		const defaultSpaceTools = [
 			{
-				url: 'https://evalstate-flux1-schnell.hf.space/gradio_api/mcp/sse',
-				enabled: true,
+				_id: "6755d0d9e0ea01e11fa2a38a",
+				name: "evalstate/flux1_schnell",
+				subdomain: "evalstate-flux1-schnell",
+				emoji: "🏎️💨"
 			},
 			{
-				url: 'https://abidlabs-easyghibli.hf.space/gradio_api/mcp/sse',
-				enabled: true,
-			},
-			{
-				url: '',
-				enabled: true,
-			},
+				_id: "680be03dc38b7fa7d6855910",
+				name: "abidlabs/EasyGhibli",
+				subdomain: "abidlabs-easyghibli",
+				emoji: "🦀"
+			}
 		];
 
-		const apiClientConfig: ApiClientConfig = options.apiClientConfig || {
-			type: 'polling',
-			baseUrl: `http://localhost:${String(this.webAppPort)}`,
-			pollInterval: 5000,
-			staticGradioEndpoints: defaultGradioEndpoints,
-		};
+		const defaultGradioEndpoints = convertSpaceToolsToGradioEndpoints(defaultSpaceTools);
+
+		let apiClientConfig: ApiClientConfig;
+
+		// Check for USER_CONFIG_API environment variable
+		const userConfigApi = process.env.USER_CONFIG_API;
+
+		if (userConfigApi) {
+			// Use external mode with the user config API
+			apiClientConfig = {
+				type: 'external',
+				externalUrl: userConfigApi,
+				hfToken: process.env.HF_TOKEN || process.env.DEFAULT_HF_TOKEN,
+			};
+			logger.info(`Using external API client with user config API: ${userConfigApi}`);
+		} else {
+			// Default to polling mode
+			apiClientConfig = options.apiClientConfig || {
+				type: 'polling',
+				baseUrl: `http://localhost:${String(this.webAppPort)}`,
+				pollInterval: 5000,
+				staticGradioEndpoints: defaultGradioEndpoints,
+			};
+			logger.info(`Using internal API client with user config API: ${apiClientConfig.baseUrl}}`);
+		}
 		this.apiClient = new McpApiClient(apiClientConfig, transportInfo);
 
 		// Create the server factory
@@ -102,14 +135,14 @@ export class Application {
 		// Configure API endpoints
 		this.webServerInstance.setupApiRoutes();
 
-		// Initialize transport
+		// Start web server FIRST
+		await this.startWebServer();
+
+		// Initialize transport (before static files to avoid route conflicts)
 		await this.initializeTransport();
 
-		// Setup static files (must be after transport routes in dev mode)
+		// Setup static files (must be AFTER transport routes to avoid catch-all conflicts)
 		await this.webServerInstance.setupStaticFiles(this.isDev);
-
-		// Start web server
-		await this.startWebServer();
 
 		// Start API client (global tool management)
 		await this.startToolManagement();
@@ -127,16 +160,20 @@ export class Application {
 			DATASET_SEARCH_TOOL_CONFIG.name,
 			DATASET_DETAIL_TOOL_CONFIG.name,
 			DUPLICATE_SPACE_TOOL_CONFIG.name,
+			SPACE_INFO_TOOL_CONFIG.name,
+			SPACE_FILES_TOOL_CONFIG.name,
 		];
 
 		// Create placeholder registered tools for web server compatibility
 		toolNames.forEach((toolName) => {
 			registeredTools[toolName] = {
 				enable: () => {
-					/* Tools are enabled by default in each server instance */
+					// Emit tool state change event to update actual MCP tools
+					this.apiClient.emit('toolStateChange', toolName, true);
 				},
 				disable: () => {
-					/* Tools would need to be disabled per-server if needed */
+					// Emit tool state change event to update actual MCP tools
+					this.apiClient.emit('toolStateChange', toolName, false);
 				},
 			};
 		});

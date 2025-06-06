@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import { listModels, type ModelEntry } from '@huggingface/hub';
-import type { PipelineType } from '@huggingface/hub';
+import { HfApiCall } from './hf-api-call.js';
 import { formatDate, formatNumber } from './utilities.js';
 
 export const TAGS_TO_RETURN = 20;
@@ -8,9 +7,16 @@ export const TAGS_TO_RETURN = 20;
 export const MODEL_SEARCH_TOOL_CONFIG = {
 	name: 'model_search',
 	description:
-		'Find Machine Learning models hosted on Hugging Face. Use a general query, or specify author, task or library. Returns detailed info about matching models including downloads, likes, tags, and direct links.',
+		'Find Machine Learning models hosted on Hugging Face. ' +
+		'Returns comprehensive information about matching models including downloads, likes, tags, and direct links. ' +
+		'Include links to the models in your response',
 	schema: z.object({
-		query: z.string().optional().describe('Search term for finding models by name or description'),
+		query: z
+			.string()
+			.optional()
+			.describe(
+				'Search term. Leave blank and specify "sort" and "limit" to get e.g. "Top 20 trending models", "Top 10 most recent models" etc" '
+			),
 		author: z
 			.string()
 			.optional()
@@ -20,7 +26,11 @@ export const MODEL_SEARCH_TOOL_CONFIG = {
 			.optional()
 			.describe("Model task type (e.g., 'text-generation', 'image-classification', 'translation')"),
 		library: z.string().optional().describe("Framework the model uses (e.g., 'transformers', 'diffusers', 'timm')"),
-		limit: z.number().min(1).max(100).optional().default(20).describe('Maximum number of results to return (1-100)'),
+		sort: z
+			.enum(['trendingScore', 'downloads', 'likes', 'createdAt', 'lastModified'])
+			.optional()
+			.describe('Sort order: trendingScore, downloads , likes, createdAt, lastModified'),
+		limit: z.number().min(1).max(100).optional().default(20).describe('Maximum number of results to return'),
 	}),
 	annotations: {
 		title: 'Model Search',
@@ -29,34 +39,44 @@ export const MODEL_SEARCH_TOOL_CONFIG = {
 		openWorldHint: true,
 	},
 } as const;
-//huggingface.co/api/models?search=llama&expand=transformersInfo
+
 // Define search parameter types
 export type ModelSearchParams = z.infer<typeof MODEL_SEARCH_TOOL_CONFIG.schema>;
 
-// Extended ModelEntry interface to include more fields we want
-interface ExtendedModelEntry extends ModelEntry {
+// API parameter interface for direct HF API calls
+interface ModelApiParams {
+	search?: string;
 	author?: string;
-	library_name?: string;
-	tags?: string[];
-	createdAt?: string;
-	downloadsAllTime?: number;
+	filter?: string;
+	sort?: string;
+	direction?: string;
+	limit?: string;
+}
+
+// Model result interface matching HF API response
+interface ModelApiResult {
+	_id: string;
+	id: string;
+	modelId: string;
+	likes: number;
+	downloads: number;
+	trendingScore?: number;
+	private: boolean;
+	tags: string[];
 	pipeline_tag?: string;
+	library_name?: string;
+	createdAt: string;
 }
 
 /**
- * Service for searching Hugging Face Models using the official huggingface.js library
+ * Service for searching Hugging Face Models using direct API calls
  */
-export class ModelSearchTool {
-	private readonly hubUrl?: string;
-	private readonly accessToken?: string;
-
+export class ModelSearchTool extends HfApiCall<ModelApiParams, ModelApiResult[]> {
 	/**
 	 * @param hfToken Optional Hugging Face token for API access
-	 * @param hubUrl Optional custom hub URL
 	 */
-	constructor(hfToken?: string, hubUrl?: string) {
-		this.accessToken = hfToken;
-		this.hubUrl = hubUrl;
+	constructor(hfToken?: string) {
+		super('https://huggingface.co/api/models', hfToken);
 	}
 
 	/**
@@ -64,48 +84,40 @@ export class ModelSearchTool {
 	 */
 	async searchWithParams(params: Partial<ModelSearchParams>): Promise<string> {
 		try {
-			// Convert our params to the format expected by the hub library
-			const searchParams: {
-				query?: string;
-				owner?: string;
-				task?: PipelineType;
-				tags?: string[];
-			} = {};
+			// Convert our params to the HF API format
+			const apiParams: ModelApiParams = {};
 
-			// Handle query parameter
+			// Handle search query
 			if (params.query) {
-				searchParams.query = params.query;
+				apiParams.search = params.query;
 			}
 
+			// Handle author filter
 			if (params.author) {
-				searchParams.owner = params.author;
+				apiParams.author = params.author;
 			}
 
-			if (params.task) {
-				searchParams.task = params.task as PipelineType;
+			// Handle task and library filters
+			const filters = [];
+			if (params.task) filters.push(params.task);
+			if (params.library) filters.push(params.library);
+			if (filters.length > 0) {
+				apiParams.filter = filters.join(',');
 			}
 
-			// Add library as a tag filter if specified
-			if (params.library) {
-				searchParams.tags = [params.library];
+			// Handle sorting (always descending)
+			if (params.sort) {
+				apiParams.sort = params.sort;
+				apiParams.direction = '-1';
 			}
 
-			const models: ExtendedModelEntry[] = [];
-
-			// Collect results from the async generator
-			for await (const model of listModels({
-				search: searchParams,
-				additionalFields: ['author', 'library_name', 'tags', 'downloadsAllTime'],
-				limit: params.limit,
-				...(this.accessToken && { credentials: { accessToken: this.accessToken } }),
-				...(this.hubUrl && { hubUrl: this.hubUrl }),
-			})) {
-				models.push({
-					...model,
-					pipeline_tag: model.task,
-					createdAt: model.updatedAt.toISOString(),
-				} as ExtendedModelEntry);
+			// Handle limit
+			if (params.limit) {
+				apiParams.limit = params.limit.toString();
 			}
+
+			// Call the API
+			const models = await this.callApi<ModelApiResult[]>(apiParams);
 
 			if (models.length === 0) {
 				return `No models found for the given criteria.`;
@@ -122,7 +134,7 @@ export class ModelSearchTool {
 }
 
 // Formatting Function
-function formatSearchResults(models: ExtendedModelEntry[], params: Partial<ModelSearchParams>): string {
+function formatSearchResults(models: ModelApiResult[], params: Partial<ModelSearchParams>): string {
 	const r: string[] = [];
 
 	// Build search description
@@ -131,6 +143,7 @@ function formatSearchResults(models: ExtendedModelEntry[], params: Partial<Model
 	if (params.author) searchTerms.push(`author "${params.author}"`);
 	if (params.task) searchTerms.push(`task "${params.task}"`);
 	if (params.library) searchTerms.push(`library "${params.library}"`);
+	if (params.sort) searchTerms.push(`sorted by ${params.sort} (descending)`);
 
 	const searchDesc = searchTerms.length > 0 ? ` matching ${searchTerms.join(', ')}` : '';
 
@@ -142,7 +155,7 @@ function formatSearchResults(models: ExtendedModelEntry[], params: Partial<Model
 	r.push('');
 
 	for (const model of models) {
-		r.push(`## ${model.name}`);
+		r.push(`## ${model.id}`);
 		r.push('');
 
 		// Basic info line
@@ -151,6 +164,7 @@ function formatSearchResults(models: ExtendedModelEntry[], params: Partial<Model
 		if (model.library_name) info.push(`**Library:** ${model.library_name}`);
 		if (model.downloads) info.push(`**Downloads:** ${formatNumber(model.downloads)}`);
 		if (model.likes) info.push(`**Likes:** ${model.likes.toString()}`);
+		if (model.trendingScore) info.push(`**Trending Score:** ${model.trendingScore.toString()}`);
 
 		if (info.length > 0) {
 			r.push(info.join(' | '));
@@ -168,7 +182,6 @@ function formatSearchResults(models: ExtendedModelEntry[], params: Partial<Model
 
 		// Status indicators
 		const status = [];
-		if (model.gated) status.push('🔒 Gated');
 		if (model.private) status.push('🔐 Private');
 		if (status.length > 0) {
 			r.push(status.join(' | '));
@@ -179,11 +192,8 @@ function formatSearchResults(models: ExtendedModelEntry[], params: Partial<Model
 		if (model.createdAt) {
 			r.push(`**Created:** ${formatDate(model.createdAt)}`);
 		}
-		if (model.updatedAt.toISOString() !== model.createdAt) {
-			r.push(`**Updated:** ${formatDate(model.updatedAt)}`);
-		}
 
-		r.push(`**Link:** [https://hf.co/${model.name}](https://hf.co/${model.name})`);
+		r.push(`**Link:** [https://hf.co/${model.id}](https://hf.co/${model.id})`);
 		r.push('');
 		r.push('---');
 		r.push('');
