@@ -40,13 +40,19 @@ import type { ServerFactory } from './transport/base-transport.js';
 import type { McpApiClient } from './lib/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
 import { logger } from './lib/logger.js';
-import type { AppSettings } from '../shared/settings.js';
+import { DEFAULT_SPACE_TOOLS, type AppSettings } from '../shared/settings.js';
 import { extractAuthAndBouquet } from './utils/auth-utils.js';
 
 // Fallback settings when API fails (enables all tools)
 export const BOUQUET_FALLBACK: AppSettings = {
-	builtInTools: [],
+	builtInTools: [...TOOL_ID_GROUPS.hf_api],
 	spaceTools: [],
+};
+
+// Default tools for unauthenticated users when using external settings API
+export const BOUQUET_ANON_DEFAULT: AppSettings = {
+	builtInTools: [...TOOL_ID_GROUPS.hf_api],
+	spaceTools: DEFAULT_SPACE_TOOLS,
 };
 
 // Define bouquet configurations

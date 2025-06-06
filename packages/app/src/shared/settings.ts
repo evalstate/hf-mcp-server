@@ -18,23 +18,26 @@ export interface AppSettings {
   spaceTools: SpaceTool[];
 }
 
+// Default space tools (exported for reuse)
+export const DEFAULT_SPACE_TOOLS: SpaceTool[] = [
+  {
+    _id: "6755d0d9e0ea01e11fa2a38a",
+    name: "evalstate/flux1_schnell",
+    subdomain: "evalstate-flux1-schnell",
+    emoji: "🏎️💨"
+  },
+  {
+    _id: "680be03dc38b7fa7d6855910",
+    name: "abidlabs/EasyGhibli",
+    subdomain: "abidlabs-easyghibli",
+    emoji: "🦀"
+  }
+];
+
 // Default settings
 const defaultSettings: AppSettings = {
   builtInTools: [...ALL_BUILTIN_TOOL_IDS],
-  spaceTools: [
-    {
-      _id: "6755d0d9e0ea01e11fa2a38a",
-      name: "evalstate/flux1_schnell",
-      subdomain: "evalstate-flux1-schnell",
-      emoji: "🏎️💨"
-    },
-    {
-      _id: "680be03dc38b7fa7d6855910",
-      name: "abidlabs/EasyGhibli",
-      subdomain: "abidlabs-easyghibli",
-      emoji: "🦀"
-    }
-  ],
+  spaceTools: [...DEFAULT_SPACE_TOOLS],
 };
 
 // In-memory settings store (could be replaced with persistence later)

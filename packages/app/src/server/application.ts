@@ -8,7 +8,7 @@ import { logger } from './lib/logger.js';
 import { createServerFactory } from './mcp-server.js';
 import { createProxyServerFactory } from './mcp-proxy.js';
 import { McpApiClient, type ApiClientConfig, type GradioEndpoint } from './lib/mcp-api-client.js';
-import type { SpaceTool } from '../shared/settings.js';
+import { DEFAULT_SPACE_TOOLS, type SpaceTool } from '../shared/settings.js';
 import { ALL_BUILTIN_TOOL_IDS } from '@hf-mcp/mcp';
 
 export interface ApplicationOptions {
@@ -59,23 +59,8 @@ export class Application {
 			}));
 		};
 
-		// Default space tools (will be used if no external API is configured)
-		const defaultSpaceTools = [
-			{
-				_id: '6755d0d9e0ea01e11fa2a38a',
-				name: 'evalstate/flux1_schnell',
-				subdomain: 'evalstate-flux1-schnell',
-				emoji: '🏎️💨',
-			},
-			{
-				_id: '680be03dc38b7fa7d6855910',
-				name: 'abidlabs/EasyGhibli',
-				subdomain: 'abidlabs-easyghibli',
-				emoji: '🦀',
-			},
-		];
-
-		const defaultGradioEndpoints = convertSpaceToolsToGradioEndpoints(defaultSpaceTools);
+		// Use shared default space tools 
+		const defaultGradioEndpoints = convertSpaceToolsToGradioEndpoints(DEFAULT_SPACE_TOOLS);
 
 		let apiClientConfig: ApiClientConfig;
 

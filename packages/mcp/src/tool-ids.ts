@@ -44,6 +44,15 @@ export const TOOL_ID_GROUPS = {
 	search: [SPACE_SEARCH_TOOL_ID, MODEL_SEARCH_TOOL_ID, DATASET_SEARCH_TOOL_ID, PAPER_SEARCH_TOOL_ID] as const,
 	spaces: [SPACE_SEARCH_TOOL_ID, DUPLICATE_SPACE_TOOL_ID, SPACE_INFO_TOOL_ID, SPACE_FILES_TOOL_ID] as const,
 	detail: [MODEL_DETAIL_TOOL_ID, DATASET_DETAIL_TOOL_ID] as const,
+	hf_api: [
+		SPACE_SEARCH_TOOL_ID,
+		MODEL_SEARCH_TOOL_ID,
+		DATASET_SEARCH_TOOL_ID,
+		PAPER_SEARCH_TOOL_ID,
+		MODEL_DETAIL_TOOL_ID,
+		DATASET_DETAIL_TOOL_ID,
+	],
+	all: [...ALL_BUILTIN_TOOL_IDS] as const,
 } as const;
 
 // TypeScript type for built-in tool IDs
@@ -67,6 +76,6 @@ export function getToolDescription(toolId: BuiltinToolId): string {
 		[SPACE_INFO_TOOL_ID]: SPACE_INFO_TOOL_CONFIG,
 		[SPACE_FILES_TOOL_ID]: SPACE_FILES_TOOL_CONFIG,
 	} as const;
-	
+
 	return configs[toolId]?.description || `Tool: ${toolId}`;
 }
