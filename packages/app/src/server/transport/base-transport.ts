@@ -3,12 +3,16 @@ import type { Express } from 'express';
 import { logger } from '../lib/logger.js';
 import type { TransportMetrics } from '../../shared/transport-metrics.js';
 import { MetricsCounter } from '../../shared/transport-metrics.js';
+import type { AppSettings } from '../../shared/settings.js';
 
 /**
  * Factory function to create server instances
  * This should be provided during transport construction to enable per-connection server instances
  */
-export type ServerFactory = (headers: Record<string, string> | null) => Promise<McpServer>;
+export type ServerFactory = (
+	headers: Record<string, string> | null,
+	userSettings?: AppSettings
+) => Promise<McpServer>;
 
 export interface TransportOptions {
 	port?: number;

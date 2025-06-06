@@ -5,7 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
 
 // https://vite.dev/config/
-export default defineConfig(({ command, mode }) => {
+export default defineConfig(() => {
   // Conditionally apply singlefile plugin only to mcp-welcome build
   const plugins = [react(), tailwindcss()];
   

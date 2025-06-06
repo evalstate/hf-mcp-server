@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ServerFactory } from './transport/base-transport.js';
 import type { McpApiClient } from './lib/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
+import type { AppSettings } from '../shared/settings.js';
 import { logger } from './lib/logger.js';
 import { extractAuthAndBouquet } from './utils/auth-utils.js';
 import { connectToGradioEndpoints, registerRemoteTool } from './gradio-endpoint-connector.js';
@@ -14,17 +15,21 @@ export const createProxyServerFactory = (
 	sharedApiClient: McpApiClient,
 	originalServerFactory: ServerFactory
 ): ServerFactory => {
-	return async (headers: Record<string, string> | null): Promise<McpServer> => {
-		logger.info('=== PROXY FACTORY CALLED ===');
+	return async (headers: Record<string, string> | null, userSettings?: AppSettings): Promise<McpServer> => {
+		logger.debug('=== PROXY FACTORY CALLED ===');
 
-		// Create the original server instance with all local tools
-		const server = await originalServerFactory(headers);
-
-		// Extract auth and bouquet using shared utility (for consistency)
+		// Extract auth and bouquet using shared utility
 		const { hfToken, bouquet } = extractAuthAndBouquet(headers);
-		if (bouquet) {
-			logger.debug({ bouquet }, 'Bouquet parameter will be handled by original server factory');
+
+		// If no userSettings provided, fetch them (external mode)
+		let settings = userSettings;
+		if (!settings && !bouquet) {
+			settings = await sharedApiClient.getSettings(hfToken);
+			logger.debug({ hasSettings: !!settings }, 'Fetched user settings for proxy');
 		}
+
+		// Create the original server instance with user settings
+		const server = await originalServerFactory(headers, settings);
 
 		// Skip Gradio endpoints if bouquet is "search"
 		if (bouquet === 'search') {
@@ -32,8 +37,14 @@ export const createProxyServerFactory = (
 			return server;
 		}
 
-		// Get Gradio endpoints from the API client
-		const gradioEndpoints = sharedApiClient.getGradioEndpoints();
+		// Get Gradio endpoints from settings
+		const gradioEndpoints =
+			settings?.spaceTools?.map((spaceTool) => ({
+				name: spaceTool.name,
+				subdomain: spaceTool.subdomain,
+				id: spaceTool._id,
+				emoji: spaceTool.emoji,
+			})) || [];
 
 		logger.debug(
 			{

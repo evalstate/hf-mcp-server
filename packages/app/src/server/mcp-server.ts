@@ -46,7 +46,7 @@ import { extractAuthAndBouquet } from './utils/auth-utils.js';
 // Fallback settings when API fails (enables all tools)
 export const BOUQUET_FALLBACK: AppSettings = {
 	builtInTools: [...TOOL_ID_GROUPS.hf_api],
-	spaceTools: [],
+	spaceTools: DEFAULT_SPACE_TOOLS,
 };
 
 // Default tools for unauthenticated users when using external settings API
@@ -79,7 +79,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 	const require = createRequire(import.meta.url);
 	const { version } = require('../../package.json') as { version: string };
 
-	return async (headers: Record<string, string> | null): Promise<McpServer> => {
+	return async (headers: Record<string, string> | null, userSettings?: AppSettings): Promise<McpServer> => {
 		logger.debug('=== CREATING NEW MCP SERVER INSTANCE ===');
 		// Extract auth and bouquet using shared utility
 		const { hfToken, bouquet } = extractAuthAndBouquet(headers);
@@ -124,14 +124,6 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 
 		// Always register all tools and store instances for dynamic control
 		const toolInstances: { [name: string]: Tool } = {};
-		const currentToolStates: { [name: string]: boolean } = {};
-
-		// Initialize currentToolStates to match MCP SDK defaults (all tools start enabled)
-		const initializeToolStates = () => {
-			for (const toolName of Object.keys(toolInstances)) {
-				currentToolStates[toolName] = true; // MCP SDK default
-			}
-		};
 
 		const whoDescription = userDetails
 			? `Hugging Face tools are being used by authenticated user '${username}'`
@@ -276,77 +268,48 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			}
 		);
 
-		// Helper function to apply tool states
+		// Apply tool states based on external API or bouquet configuration
 		const applyToolStates = async () => {
-			let enabledToolsList: string[] = [];
+			// Get the list of tools that should be enabled
+			let enabledToolIds: string[];
 
-			logger.debug({ bouquet, hasBouquet: !!bouquet, availableBouquets: Object.keys(BOUQUETS) }, 'Tool state debug');
-
-			// If a bouquet is specified, use it directly (takes precedence)
 			if (bouquet && BOUQUETS[bouquet]) {
-				const settings = BOUQUETS[bouquet];
-				logger.debug({ bouquet, settings }, 'Using bouquet settings (OVERRIDING external API)');
-
-				// Process builtInTools - empty array means all tools enabled
-				if (settings.builtInTools.length === 0) {
-					// Default all known tools to enabled using canonical list
-					enabledToolsList = [...ALL_BUILTIN_TOOL_IDS];
-				} else {
-					enabledToolsList = settings.builtInTools;
-				}
+				// Bouquet override (takes precedence over everything)
+				enabledToolIds = BOUQUETS[bouquet].builtInTools;
+				logger.debug({ bouquet, enabledToolIds }, 'Using bouquet configuration');
+			} else if (userSettings) {
+				// Use provided user settings (from proxy)
+				enabledToolIds = userSettings.builtInTools.length === 0 
+					? [...ALL_BUILTIN_TOOL_IDS] 
+					: userSettings.builtInTools;
+				logger.debug({ enabledToolIds }, 'Using provided user settings');
 			} else {
-				// Fetch current tool states from API with the user's token
+				// Fetch from shared API client
 				const toolStates = await sharedApiClient.getToolStates(hfToken);
 				if (toolStates) {
-					enabledToolsList = Object.keys(toolStates).filter((toolId) => toolStates[toolId]);
-					logger.debug({ enabledToolsList }, 'Calculated enabled tools from external API');
+					enabledToolIds = Object.keys(toolStates).filter((id) => toolStates[id]);
+					logger.debug({ enabledToolIds }, 'Using shared API client configuration');
 				} else {
-					// Fallback to all tools enabled
-					logger.info('API tool states unavailable, using fallback (all tools enabled)');
-					enabledToolsList = [...ALL_BUILTIN_TOOL_IDS];
+					// Fallback: all tools enabled
+					enabledToolIds = [...ALL_BUILTIN_TOOL_IDS];
+					logger.debug('API unavailable, using fallback (all tools enabled)');
 				}
 			}
 
-			// Track changes for summary logging
-			const enabledTools: string[] = [];
-			const disabledTools: string[] = [];
-			const unchangedTools: string[] = [];
-
+			// Apply the desired state to each tool (tools start enabled by default)
 			for (const [toolName, toolInstance] of Object.entries(toolInstances)) {
-				const isEnabled = enabledToolsList.includes(toolName);
-				const currentState = currentToolStates[toolName];
-
-				if (currentState !== isEnabled) {
-					if (isEnabled) {
-						toolInstance.enable();
-						enabledTools.push(toolName);
-					} else {
-						toolInstance.disable();
-						disabledTools.push(toolName);
-					}
-					currentToolStates[toolName] = isEnabled;
+				if (enabledToolIds.includes(toolName)) {
+					toolInstance.enable();
 				} else {
-					unchangedTools.push(toolName);
+					toolInstance.disable();
 				}
 			}
 
-			// Single summary log instead of per-tool spam
-			if (enabledTools.length > 0 || disabledTools.length > 0) {
-				logger.debug(
-					{
-						enabled: enabledTools,
-						disabled: disabledTools,
-						unchanged: unchangedTools.length,
-					},
-					'Tool states updated'
-				);
-			} else {
-				logger.debug({ unchanged: unchangedTools.length }, 'No tool state changes');
-			}
+			logger.debug(
+				{ enabledCount: enabledToolIds.length, totalTools: Object.keys(toolInstances).length },
+				'Applied tool states'
+			);
 		};
-
-		// Initialize tool states to match MCP SDK defaults before applying API states
-		initializeToolStates();
 
 		// Apply initial tool states (fetch from API)
 		void applyToolStates();
@@ -358,12 +321,18 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			},
 		});
 
-		if (!transportInfo?.jsonResponseEnabled) {
+		if (!transportInfo?.jsonResponseEnabled && !transportInfo?.externalApiMode) {
 			// Set up event listener for dynamic tool state changes
 			const toolStateChangeHandler = (toolId: string, enabled: boolean) => {
-				logger.info({ toolId, enabled }, 'Tool state change event received - reapplying all tool states');
-				// Re-apply all tool states when any change occurs
-				void applyToolStates();
+				const toolInstance = toolInstances[toolId];
+				if (toolInstance) {
+					if (enabled) {
+						toolInstance.enable();
+					} else {
+						toolInstance.disable();
+					}
+					logger.debug({ toolId, enabled }, 'Applied single tool state change');
+				}
 			};
 
 			sharedApiClient.on('toolStateChange', toolStateChangeHandler);

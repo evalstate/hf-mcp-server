@@ -17,14 +17,13 @@ export interface GradioEndpoint {
 }
 
 export interface ApiClientConfig {
-	type: 'static' | 'polling' | 'external';
-	staticSettings?: Record<string, boolean>;
-	staticGradioEndpoints?: GradioEndpoint[];
+	type: 'polling' | 'external';
 	baseUrl?: string;
 	pollInterval?: number;
 	externalUrl?: string;
 	userConfigUrl?: string;
 	hfToken?: string;
+	staticGradioEndpoints?: GradioEndpoint[];
 }
 
 export class McpApiClient extends EventEmitter {
@@ -40,19 +39,9 @@ export class McpApiClient extends EventEmitter {
 		super();
 		this.config = config;
 		this.transportInfo = transportInfo || null;
-
-		// Initialize static data if provided
-		if (config.type === 'static') {
-			if (config.staticSettings) {
-				for (const [toolId, enabled] of Object.entries(config.staticSettings)) {
-					this.cache.set(toolId, enabled);
-				}
-			}
-			if (config.staticGradioEndpoints) {
-				this.gradioEndpoints = [...config.staticGradioEndpoints];
-			}
-		} else if (config.type === 'polling' && config.staticGradioEndpoints) {
-			// Also support default Gradio endpoints in polling mode
+		
+		// Initialize gradio endpoints from config if provided
+		if (config.staticGradioEndpoints) {
 			this.gradioEndpoints = [...config.staticGradioEndpoints];
 		}
 	}
@@ -61,33 +50,29 @@ export class McpApiClient extends EventEmitter {
 		return this.transportInfo;
 	}
 
-	async getSettings(overrideToken?: string): Promise<AppSettings | null> {
+	async getSettings(overrideToken?: string): Promise<AppSettings> {
 		switch (this.config.type) {
-			case 'static':
-				// Return static settings - no network call needed
-				return null; // Static mode doesn't use AppSettings format
-
 			case 'polling':
 				if (!this.config.baseUrl) {
 					logger.error('baseUrl required for polling mode');
-					return null;
+					return BOUQUET_FALLBACK;
 				}
 				try {
 					const response = await fetch(`${this.config.baseUrl}/api/settings`);
 					if (!response.ok) {
 						logger.error(`Failed to fetch settings: ${response.status.toString()} ${response.statusText}`);
-						return null;
+						return BOUQUET_FALLBACK;
 					}
 					return (await response.json()) as AppSettings;
 				} catch (error) {
 					logger.error({ error }, 'Error fetching settings from local API');
-					return null;
+					return BOUQUET_FALLBACK;
 				}
 
 			case 'external':
 				if (!this.config.externalUrl) {
 					logger.error('externalUrl required for external mode');
-					return null;
+					return BOUQUET_FALLBACK;
 				}
 				try {
 					const headers: Record<string, string> = {};
@@ -111,7 +96,7 @@ export class McpApiClient extends EventEmitter {
 					clearTimeout(timeoutId);
 					if (!response.ok) {
 						logger.warn(
-							`Failed to fetch external settings: ${response.status.toString()} ${response.statusText} - defaulting to all tools enabled`
+							`Failed to fetch external settings: ${response.status.toString()} ${response.statusText} - using fallback bouquet`
 						);
 						return BOUQUET_FALLBACK;
 					}
@@ -123,19 +108,11 @@ export class McpApiClient extends EventEmitter {
 
 			default:
 				logger.error(`Unknown API client type: ${String(this.config.type)}`);
-				return null;
+				return BOUQUET_FALLBACK;
 		}
 	}
 
 	async getToolStates(overrideToken?: string): Promise<Record<string, boolean> | null> {
-		if (this.config.type === 'static') {
-			// Return cached static settings
-			const toolStates: Record<string, boolean> = {};
-			for (const [toolId, enabled] of this.cache.entries()) {
-				toolStates[toolId] = enabled;
-			}
-			return toolStates;
-		}
 
 		const settings = await this.getSettings(overrideToken);
 		if (!settings) {
@@ -154,18 +131,12 @@ export class McpApiClient extends EventEmitter {
 			logger.debug({ gradioEndpoints: this.gradioEndpoints }, 'Updated gradio endpoints from external API');
 		}
 
-		// Simple set operations: empty array = all enabled, otherwise only specified tools
-		const enabledTools =
-			settings.builtInTools.length === 0
-				? ALL_BUILTIN_TOOL_IDS
-				: settings.builtInTools.filter((toolId) => ALL_BUILTIN_TOOL_IDS.includes(toolId as any));
-
 		// Create tool states: enabled tools = true, rest = false
 		const toolStates: Record<string, boolean> = {};
 		for (const toolId of ALL_BUILTIN_TOOL_IDS) {
-			toolStates[toolId] = enabledTools.includes(toolId);
+			toolStates[toolId] = settings.builtInTools.includes(toolId);
 		}
-
+		console.debug({ toolStates: toolStates }, 'Generated tool states from settings');
 		return toolStates;
 	}
 
@@ -199,14 +170,6 @@ export class McpApiClient extends EventEmitter {
 		this.isPolling = true;
 
 		// Handle different modes
-		if (this.config.type === 'static') {
-			logger.info('Using static tool settings - no polling needed');
-			// Send initial static states
-			for (const [toolId, enabled] of this.cache.entries()) {
-				onUpdate(toolId, enabled);
-			}
-			return;
-		}
 
 		// For external mode, don't fetch on startup - wait for user access
 		if (this.config.type === 'external') {
@@ -243,8 +206,10 @@ export class McpApiClient extends EventEmitter {
 						logger.info(`Tool ${toolId} state changed: ${String(cachedState)} -> ${String(enabled)}`);
 						this.cache.set(toolId, enabled);
 						onUpdate(toolId, enabled);
-						// Emit event for any listening servers
-						this.emit('toolStateChange', toolId, enabled);
+						// Only emit events in external mode - in polling mode, web server handles immediate events
+						if (this.config.type === 'external') {
+							this.emit('toolStateChange', toolId, enabled);
+						}
 					}
 				}
 
@@ -266,31 +231,6 @@ export class McpApiClient extends EventEmitter {
 			this.isPolling = false;
 			logger.info('Stopped API polling');
 		}
-	}
-
-	/**
-	 * Get cached tool state synchronously (for use during server creation)
-	 */
-	getCachedToolState(toolId: string): boolean {
-		return this.cache.get(toolId) ?? false; // Default to disabled if not in cache
-	}
-
-	/**
-	 * Set cached tool state (for initialization before polling starts)
-	 */
-	setCachedToolState(toolId: string, enabled: boolean): void {
-		this.cache.set(toolId, enabled);
-	}
-
-	/**
-	 * Get all cached tool states synchronously
-	 */
-	getCachedToolStates(): Record<string, boolean> {
-		const states: Record<string, boolean> = {};
-		for (const [toolId, enabled] of this.cache.entries()) {
-			states[toolId] = enabled;
-		}
-		return states;
 	}
 
 	destroy(): void {

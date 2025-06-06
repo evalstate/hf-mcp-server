@@ -56,9 +56,10 @@ function App() {
 	const [spaceSubdomains, setSpaceSubdomains] = useState<string[]>(['', '', '']);
 	const [enabledSpaces, setEnabledSpaces] = useState<boolean[]>([false, false, false]);
 
-	// Load space tools from API settings
+	// Load space tools from API settings only on initial load
+	const [initialLoadDone, setInitialLoadDone] = useState(false);
 	useEffect(() => {
-		if (settings?.spaceTools) {
+		if (settings?.spaceTools && !initialLoadDone) {
 			const names = ['', '', ''];
 			const subdomains = ['', '', ''];
 			const enabled = [false, false, false];
@@ -74,8 +75,9 @@ function App() {
 			setSpaceNames(names);
 			setSpaceSubdomains(subdomains);
 			setEnabledSpaces(enabled);
+			setInitialLoadDone(true);
 		}
-	}, [settings]);
+	}, [settings, initialLoadDone]);
 
 	const isLoading = !transportInfo && !transportError;
 	const error = transportError ? transportError.message : null;
@@ -326,6 +328,49 @@ function App() {
 											ecosystem of models, datasets, and Spaces, allowing AI assistants to search, analyze, and interact
 											with ML resources directly.
 										</p>
+									</div>
+
+									<Separator />
+
+									{/* Tool Management Scope Information */}
+									<div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+										<div className="flex items-start space-x-3">
+											<div className="flex-shrink-0 mt-0.5">
+												<svg
+													className="h-5 w-5 text-blue-600 dark:text-blue-400"
+													fill="currentColor"
+													viewBox="0 0 20 20"
+												>
+													<path
+														fillRule="evenodd"
+														d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+														clipRule="evenodd"
+													/>
+												</svg>
+											</div>
+											<div>
+												<h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+													Tool Management Scope
+												</h3>
+												{(transportInfo?.externalApiMode || (transportInfo?.transport !== 'stdio' && !transportInfo?.externalApiMode)) && (
+													<p className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed">
+														{transportInfo?.externalApiMode ? (
+															<>
+																<strong>External API Mode:</strong> Tool toggles in this interface only affect the{' '}
+																<strong>web interface display</strong> and have no effect on the actual MCP server configuration.
+																Configure tools on the external API endpoint.
+															</>
+														) : (
+															<>
+																<strong>Shared Mode:</strong> Tool toggles in this interface affect{' '}
+																<strong>all connected MCP server instances</strong> and control actual tool availability
+																for all users and connected AI assistants.
+															</>
+														)}
+													</p>
+												)}
+											</div>
+										</div>
 									</div>
 
 									<Separator />

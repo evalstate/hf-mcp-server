@@ -8,14 +8,11 @@ import { logger } from './lib/logger.js';
 import type { BaseTransport } from './transport/base-transport.js';
 import type { McpApiClient } from './lib/mcp-api-client.js';
 import { formatMetricsForAPI } from '../shared/transport-metrics.js';
+import { ALL_BUILTIN_TOOL_IDS } from '@hf-mcp/mcp';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export interface RegisteredTool {
-	enable: () => void;
-	disable: () => void;
-}
 
 export class WebServer {
 	private app: Express;
@@ -23,9 +20,10 @@ export class WebServer {
 	private transportInfo: TransportInfo = {
 		transport: 'unknown',
 		defaultHfTokenSet: false,
+		externalApiMode: false,
 		stdioClient: null,
 	};
-	private registeredTools: { [toolId: string]: RegisteredTool } = {};
+	private localSharedToolStates: Map<string, boolean> = new Map();
 	private transport?: BaseTransport;
 	private apiClient?: McpApiClient;
 
@@ -50,8 +48,13 @@ export class WebServer {
 		this.transportInfo.stdioClient = clientInfo;
 	}
 
-	public setRegisteredTools(tools: { [toolId: string]: RegisteredTool }): void {
-		this.registeredTools = tools;
+	public initializeToolStates(): void {
+		// Initialize local shared tool states based on current settings to prevent initial event burst
+		const currentSettings = settingsService.getSettings();
+		for (const toolId of ALL_BUILTIN_TOOL_IDS) {
+			const isEnabled = currentSettings.builtInTools.includes(toolId);
+			this.localSharedToolStates.set(toolId, isEnabled);
+		}
 	}
 
 	public setTransport(transport: BaseTransport): void {
@@ -226,16 +229,20 @@ export class WebServer {
 				updatedSettings = settingsService.updateSpaceTools(spaceTools);
 			}
 
-			// Enable or disable the actual MCP tools based on the new list
+			// Enable or disable only the tools that actually changed state
 			if (builtInTools !== undefined) {
-				for (const toolId in this.registeredTools) {
-					const tool = this.registeredTools[toolId];
-					if (tool && builtInTools.includes(toolId)) {
-						tool.enable();
-						logger.info(`Tool ${toolId} has been enabled via API`);
-					} else if (tool) {
-						tool.disable();
-						logger.info(`Tool ${toolId} has been disabled via API`);
+				for (const toolId of ALL_BUILTIN_TOOL_IDS) {
+					const shouldBeEnabled = builtInTools.includes(toolId);
+					const currentlyEnabled = this.localSharedToolStates.get(toolId) ?? false;
+					
+					// Only update state and emit events if state actually changed
+					if (currentlyEnabled !== shouldBeEnabled) {
+						this.localSharedToolStates.set(toolId, shouldBeEnabled);
+						// Emit event for MCP server instances
+						if (this.apiClient) {
+							this.apiClient.emit('toolStateChange', toolId, shouldBeEnabled);
+						}
+						logger.info(`Tool ${toolId} has been ${shouldBeEnabled ? 'enabled' : 'disabled'} via API`);
 					}
 				}
 			}
@@ -271,9 +278,15 @@ export class WebServer {
 			// Update the state in the API client
 			this.apiClient.updateGradioEndpointState(index, enabled);
 			
+			// Emit tool state change event for Gradio endpoint
+			const endpoint = endpoints[index];
+			if (endpoint) {
+				const toolId = `gradio_${endpoint.subdomain}`;
+				this.apiClient.emit('toolStateChange', toolId, enabled);
+			}
+			
 			// Get the updated endpoint
-			const updatedEndpoints = this.apiClient.getGradioEndpoints();
-			const updatedEndpoint = updatedEndpoints[index];
+			const updatedEndpoint = endpoints[index];
 			
 			res.json(updatedEndpoint);
 		});
