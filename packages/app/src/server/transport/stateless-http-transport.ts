@@ -24,8 +24,6 @@ export class StatelessHttpTransport extends BaseTransport {
 
 		// Serve the MCP welcome page on GET requests (or 405 if strict compliance is enabled)
 		this.app.get('/mcp', (_req: Request, res: Response) => {
-			this.trackRequest();
-			
 			// Check for strict compliance mode
 			if (process.env.MCP_STRICT_COMPLIANCE === 'true') {
 				this.trackError(405);
@@ -35,7 +33,7 @@ export class StatelessHttpTransport extends BaseTransport {
 					.json(JsonRpcErrors.methodNotAllowed(null, 'Method not allowed. Use POST for stateless JSON-RPC requests.'));
 				return;
 			}
-			
+
 			// Serve the MCP welcome page (always serve the self-contained version)
 			const mcpWelcomePath = path.join(__dirname, '..', '..', 'web', 'mcp-welcome.html');
 			res.sendFile(mcpWelcomePath);
