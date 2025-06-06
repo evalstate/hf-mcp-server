@@ -36,15 +36,9 @@ export class StatelessHttpTransport extends BaseTransport {
 				return;
 			}
 			
-			// Serve the MCP welcome page
-			if (process.env.NODE_ENV === 'development') {
-				// The Vite dev server will serve the page
-				res.redirect('/mcp-welcome.html');
-			} else {
-				// In production, serve the built file
-				const mcpWelcomePath = path.join(__dirname, '..', '..', 'web', 'mcp-welcome.html');
-				res.sendFile(mcpWelcomePath);
-			}
+			// Serve the MCP welcome page (always serve the self-contained version)
+			const mcpWelcomePath = path.join(__dirname, '..', '..', 'web', 'mcp-welcome.html');
+			res.sendFile(mcpWelcomePath);
 		});
 
 		// Explicitly reject DELETE requests
