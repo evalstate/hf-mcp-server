@@ -279,9 +279,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				logger.debug({ bouquet, enabledToolIds }, 'Using bouquet configuration');
 			} else if (userSettings) {
 				// Use provided user settings (from proxy)
-				enabledToolIds = userSettings.builtInTools.length === 0 
-					? [...ALL_BUILTIN_TOOL_IDS] 
-					: userSettings.builtInTools;
+				enabledToolIds = userSettings.builtInTools;
 				logger.debug({ enabledToolIds }, 'Using provided user settings');
 			} else {
 				// Fetch from shared API client
