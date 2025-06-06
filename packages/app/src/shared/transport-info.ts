@@ -9,6 +9,7 @@ export interface TransportInfo {
 	defaultHfTokenSet: boolean;
 	hfTokenMasked?: string;
 	jsonResponseEnabled?: boolean;
+	externalApiMode?: boolean;
 	stdioClient?: {
 		name: string;
 		version: string;

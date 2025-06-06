@@ -9,7 +9,6 @@ import { createServerFactory } from './mcp-server.js';
 import { createProxyServerFactory } from './mcp-proxy.js';
 import { McpApiClient, type ApiClientConfig, type GradioEndpoint } from './lib/mcp-api-client.js';
 import { DEFAULT_SPACE_TOOLS, type SpaceTool } from '../shared/settings.js';
-import { ALL_BUILTIN_TOOL_IDS } from '@hf-mcp/mcp';
 
 export interface ApplicationOptions {
 	transportType: TransportType;
@@ -59,7 +58,7 @@ export class Application {
 			}));
 		};
 
-		// Use shared default space tools 
+		// Use shared default space tools
 		const defaultGradioEndpoints = convertSpaceToolsToGradioEndpoints(DEFAULT_SPACE_TOOLS);
 
 		let apiClientConfig: ApiClientConfig;
@@ -123,28 +122,10 @@ export class Application {
 	}
 
 	private setupToolManagement(): void {
-		// For web server tool management, create placeholder registered tools
-		// In a full implementation, tool enable/disable would be managed differently
-		const registeredTools: { [toolId: string]: { enable: () => void; disable: () => void } } = {};
+		// Web server manages tool state directly - no registered tools needed
 
-		// Create placeholder registered tools for web server compatibility
-		ALL_BUILTIN_TOOL_IDS.forEach((toolName) => {
-			registeredTools[toolName] = {
-				enable: () => {
-					// Emit tool state change event to update actual MCP tools
-					this.apiClient.emit('toolStateChange', toolName, true);
-				},
-				disable: () => {
-					// Emit tool state change event to update actual MCP tools
-					this.apiClient.emit('toolStateChange', toolName, false);
-				},
-			};
-		});
-
-		// Pass registered tools to WebServer
-		this.webServerInstance.setRegisteredTools(registeredTools);
-
-		// Pass API client to WebServer for Gradio endpoints
+		// Initialize tool states and pass API client to WebServer
+		this.webServerInstance.initializeToolStates();
 		this.webServerInstance.setApiClient(this.apiClient);
 	}
 

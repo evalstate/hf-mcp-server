@@ -38,7 +38,6 @@ export const ALL_BUILTIN_TOOL_IDS = [
 	SPACE_INFO_TOOL_ID,
 	SPACE_FILES_TOOL_ID,
 ] as const;
-
 // Grouped tool IDs for bouquet configurations
 export const TOOL_ID_GROUPS = {
 	search: [SPACE_SEARCH_TOOL_ID, MODEL_SEARCH_TOOL_ID, DATASET_SEARCH_TOOL_ID, PAPER_SEARCH_TOOL_ID] as const,
@@ -51,7 +50,7 @@ export const TOOL_ID_GROUPS = {
 		PAPER_SEARCH_TOOL_ID,
 		MODEL_DETAIL_TOOL_ID,
 		DATASET_DETAIL_TOOL_ID,
-	],
+	] as const,
 	all: [...ALL_BUILTIN_TOOL_IDS] as const,
 } as const;
 
