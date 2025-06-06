@@ -154,23 +154,11 @@ export class McpApiClient extends EventEmitter {
 			logger.debug({ gradioEndpoints: this.gradioEndpoints }, 'Updated gradio endpoints from external API');
 		}
 
-		// Fix tool name mismatches (API returns plural, we use singular)
-		const normalizedToolNames = settings.builtInTools.map((toolId) => {
-			switch (toolId) {
-				case 'model_details':
-					return 'model_detail';
-				case 'dataset_details':
-					return 'dataset_detail';
-				default:
-					return toolId;
-			}
-		});
-
 		// Simple set operations: empty array = all enabled, otherwise only specified tools
 		const enabledTools =
 			settings.builtInTools.length === 0
 				? ALL_BUILTIN_TOOL_IDS
-				: normalizedToolNames.filter((toolId) => ALL_BUILTIN_TOOL_IDS.includes(toolId as any));
+				: settings.builtInTools.filter((toolId) => ALL_BUILTIN_TOOL_IDS.includes(toolId as any));
 
 		// Create tool states: enabled tools = true, rest = false
 		const toolStates: Record<string, boolean> = {};
