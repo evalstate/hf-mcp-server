@@ -28,13 +28,13 @@ export const createProxyServerFactory = (
 
 		// Skip Gradio endpoints if bouquet is "search"
 		if (bouquet === 'search') {
-			logger.debug('Bouquet is "search", skipping Gradio endpoints');
+			logger.debug({ bouquet }, 'Bouquet is "search", skipping all Gradio endpoints');
 			return server;
 		}
 
 		// Get Gradio endpoints from the API client
 		const gradioEndpoints = sharedApiClient.getGradioEndpoints();
-		
+
 		logger.debug(
 			{
 				rawEndpoints: gradioEndpoints,
@@ -51,7 +51,7 @@ export const createProxyServerFactory = (
 					logger.debug(
 						{
 							endpoint: ep,
-							reason: !ep.subdomain ? 'missing subdomain' : 'empty subdomain'
+							reason: !ep.subdomain ? 'missing subdomain' : 'empty subdomain',
 						},
 						'Filtering out invalid endpoint'
 					);
@@ -62,7 +62,7 @@ export const createProxyServerFactory = (
 				...ep,
 				url: `https://${ep.subdomain}.hf.space/gradio_api/mcp/sse`,
 			}));
-		
+
 		logger.debug(
 			{
 				totalCount: gradioEndpoints.length,

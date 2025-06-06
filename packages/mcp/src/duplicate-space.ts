@@ -61,7 +61,7 @@ export const DUPLICATE_SPACE_TOOL_CONFIG = {
 		readOnlyHint: false,
 		openWorldHint: true,
 	},
-};
+} as const;
 
 // Hardware mapping constants
 const HARDWARE_MAP = {
@@ -79,7 +79,9 @@ export class DuplicateSpaceTool extends HfApiCall<DuplicateSpaceParams, Duplicat
 		this.username = username;
 	}
 
-	static createToolConfig(username?: string): typeof DUPLICATE_SPACE_TOOL_CONFIG {
+	static createToolConfig(
+		username?: string
+	): Omit<typeof DUPLICATE_SPACE_TOOL_CONFIG, 'description'> & { description: string } {
 		const description = username
 			? `Duplicate a Hugging Face Space. Target space will be created as ${username}/<new-space-name>.`
 			: NO_TOKEN_INSTRUCTIONS;

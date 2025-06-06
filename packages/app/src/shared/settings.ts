@@ -3,6 +3,8 @@
  * Manages application settings like enabled search tools
  */
 
+import { ALL_BUILTIN_TOOL_IDS } from '@hf-mcp/mcp';
+
 // Define the settings types
 export interface SpaceTool {
   _id: string;
@@ -18,17 +20,7 @@ export interface AppSettings {
 
 // Default settings
 const defaultSettings: AppSettings = {
-  builtInTools: [
-    'space_search',
-    'model_search', 
-    'model_detail',
-    'paper_search',
-    'dataset_search',
-    'dataset_detail',
-    'duplicate_space',
-    'space_info',
-    'space_files',
-  ],
+  builtInTools: [...ALL_BUILTIN_TOOL_IDS],
   spaceTools: [
     {
       _id: "6755d0d9e0ea01e11fa2a38a",

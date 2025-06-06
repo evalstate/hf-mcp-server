@@ -32,18 +32,33 @@ import {
 	type SpaceFilesParams,
 	type SpaceInfoParams,
 	CONFIG_GUIDANCE,
+	ALL_BUILTIN_TOOL_IDS,
+	TOOL_ID_GROUPS,
 } from '@hf-mcp/mcp';
 
 import type { ServerFactory } from './transport/base-transport.js';
 import type { McpApiClient } from './lib/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
 import { logger } from './lib/logger.js';
+import type { AppSettings } from '../shared/settings.js';
 import { extractAuthAndBouquet } from './utils/auth-utils.js';
 
+// Fallback settings when API fails (enables all tools)
+export const BOUQUET_FALLBACK: AppSettings = {
+	builtInTools: [],
+	spaceTools: [],
+};
+
 // Define bouquet configurations
-const BOUQUETS: Record<string, string[]> = {
-	spaces: ['space_search', 'duplicate_space', 'space_info', 'space_files'],
-	search: ['space_search', 'model_search', 'dataset_search', 'paper_search'],
+const BOUQUETS: Record<string, AppSettings> = {
+	spaces: {
+		builtInTools: [...TOOL_ID_GROUPS.spaces],
+		spaceTools: [],
+	},
+	search: {
+		builtInTools: [...TOOL_ID_GROUPS.search],
+		spaceTools: [],
+	},
 };
 
 /**
@@ -55,6 +70,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 	const { version } = require('../../package.json') as { version: string };
 
 	return async (headers: Record<string, string> | null): Promise<McpServer> => {
+		logger.debug('=== CREATING NEW MCP SERVER INSTANCE ===');
 		// Extract auth and bouquet using shared utility
 		const { hfToken, bouquet } = extractAuthAndBouquet(headers);
 		let userInfo: string =
@@ -254,40 +270,68 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		const applyToolStates = async () => {
 			let enabledToolsList: string[] = [];
 
+			logger.debug({ bouquet, hasBouquet: !!bouquet, availableBouquets: Object.keys(BOUQUETS) }, 'Tool state debug');
+
 			// If a bouquet is specified, use it directly (takes precedence)
 			if (bouquet && BOUQUETS[bouquet]) {
-				enabledToolsList = BOUQUETS[bouquet];
-				logger.debug({ bouquet, enabledToolsList }, 'Using bouquet for tool states');
+				const settings = BOUQUETS[bouquet];
+				logger.debug({ bouquet, settings }, 'Using bouquet settings (OVERRIDING external API)');
+
+				// Process builtInTools - empty array means all tools enabled
+				if (settings.builtInTools.length === 0) {
+					// Default all known tools to enabled using canonical list
+					enabledToolsList = [...ALL_BUILTIN_TOOL_IDS];
+				} else {
+					enabledToolsList = settings.builtInTools;
+				}
 			} else {
 				// Fetch current tool states from API with the user's token
-				const apiToolStates = await sharedApiClient.getToolStates(hfToken);
-				if (apiToolStates) {
-					enabledToolsList = Object.keys(apiToolStates).filter((toolName) => apiToolStates[toolName]);
+				const toolStates = await sharedApiClient.getToolStates(hfToken);
+				if (toolStates) {
+					enabledToolsList = Object.keys(toolStates).filter((toolId) => toolStates[toolId]);
+					logger.debug({ enabledToolsList }, 'Calculated enabled tools from external API');
+				} else {
+					// Fallback to all tools enabled
+					logger.info('API tool states unavailable, using fallback (all tools enabled)');
+					enabledToolsList = [...ALL_BUILTIN_TOOL_IDS];
 				}
-				logger.debug({ enabledToolsList }, 'Using API for tool states');
 			}
+
+			// Track changes for summary logging
+			const enabledTools: string[] = [];
+			const disabledTools: string[] = [];
+			const unchangedTools: string[] = [];
 
 			for (const [toolName, toolInstance] of Object.entries(toolInstances)) {
 				const isEnabled = enabledToolsList.includes(toolName);
-
-				// Only change state if different from current state
 				const currentState = currentToolStates[toolName];
+
 				if (currentState !== isEnabled) {
-					logger.info({ toolName, isEnabled, previousState: currentState }, 'Tool state changing');
-
-					if (!isEnabled) {
-						toolInstance.disable();
-						logger.debug({ toolName }, 'Tool disabled');
-					} else {
+					if (isEnabled) {
 						toolInstance.enable();
-						logger.debug({ toolName }, 'Tool enabled');
+						enabledTools.push(toolName);
+					} else {
+						toolInstance.disable();
+						disabledTools.push(toolName);
 					}
-
-					// Update tracked state
 					currentToolStates[toolName] = isEnabled;
 				} else {
-					logger.debug({ toolName, isEnabled }, 'Tool state unchanged, skipping');
+					unchangedTools.push(toolName);
 				}
+			}
+
+			// Single summary log instead of per-tool spam
+			if (enabledTools.length > 0 || disabledTools.length > 0) {
+				logger.debug(
+					{
+						enabled: enabledTools,
+						disabled: disabledTools,
+						unchanged: unchangedTools.length,
+					},
+					'Tool states updated'
+				);
+			} else {
+				logger.debug({ unchanged: unchangedTools.length }, 'No tool state changes');
 			}
 		};
 

@@ -1,0 +1,72 @@
+/**
+ * Canonical tool IDs exported from their respective tool configurations
+ * This ensures single source of truth for all tool identifiers
+ */
+
+import {
+	SEMANTIC_SEARCH_TOOL_CONFIG,
+	MODEL_SEARCH_TOOL_CONFIG,
+	MODEL_DETAIL_TOOL_CONFIG,
+	PAPER_SEARCH_TOOL_CONFIG,
+	DATASET_SEARCH_TOOL_CONFIG,
+	DATASET_DETAIL_TOOL_CONFIG,
+	DUPLICATE_SPACE_TOOL_CONFIG,
+	SPACE_INFO_TOOL_CONFIG,
+	SPACE_FILES_TOOL_CONFIG,
+} from './index.js';
+
+// Extract tool IDs from their configs (single source of truth)
+export const SPACE_SEARCH_TOOL_ID = SEMANTIC_SEARCH_TOOL_CONFIG.name;
+export const MODEL_SEARCH_TOOL_ID = MODEL_SEARCH_TOOL_CONFIG.name;
+export const MODEL_DETAIL_TOOL_ID = MODEL_DETAIL_TOOL_CONFIG.name;
+export const PAPER_SEARCH_TOOL_ID = PAPER_SEARCH_TOOL_CONFIG.name;
+export const DATASET_SEARCH_TOOL_ID = DATASET_SEARCH_TOOL_CONFIG.name;
+export const DATASET_DETAIL_TOOL_ID = DATASET_DETAIL_TOOL_CONFIG.name;
+export const DUPLICATE_SPACE_TOOL_ID = DUPLICATE_SPACE_TOOL_CONFIG.name;
+export const SPACE_INFO_TOOL_ID = SPACE_INFO_TOOL_CONFIG.name;
+export const SPACE_FILES_TOOL_ID = SPACE_FILES_TOOL_CONFIG.name;
+
+// Complete list of all built-in tool IDs
+export const ALL_BUILTIN_TOOL_IDS = [
+	SPACE_SEARCH_TOOL_ID,
+	MODEL_SEARCH_TOOL_ID,
+	MODEL_DETAIL_TOOL_ID,
+	PAPER_SEARCH_TOOL_ID,
+	DATASET_SEARCH_TOOL_ID,
+	DATASET_DETAIL_TOOL_ID,
+	DUPLICATE_SPACE_TOOL_ID,
+	SPACE_INFO_TOOL_ID,
+	SPACE_FILES_TOOL_ID,
+] as const;
+
+// Grouped tool IDs for bouquet configurations
+export const TOOL_ID_GROUPS = {
+	search: [SPACE_SEARCH_TOOL_ID, MODEL_SEARCH_TOOL_ID, DATASET_SEARCH_TOOL_ID, PAPER_SEARCH_TOOL_ID] as const,
+	spaces: [SPACE_SEARCH_TOOL_ID, DUPLICATE_SPACE_TOOL_ID, SPACE_INFO_TOOL_ID, SPACE_FILES_TOOL_ID] as const,
+	detail: [MODEL_DETAIL_TOOL_ID, DATASET_DETAIL_TOOL_ID] as const,
+} as const;
+
+// TypeScript type for built-in tool IDs
+export type BuiltinToolId = (typeof ALL_BUILTIN_TOOL_IDS)[number];
+
+// Type guard function
+export function isValidBuiltinToolId(toolId: string): toolId is BuiltinToolId {
+	return (ALL_BUILTIN_TOOL_IDS as readonly string[]).includes(toolId);
+}
+
+// Helper to get tool description from configs
+export function getToolDescription(toolId: BuiltinToolId): string {
+	const configs = {
+		[SPACE_SEARCH_TOOL_ID]: SEMANTIC_SEARCH_TOOL_CONFIG,
+		[MODEL_SEARCH_TOOL_ID]: MODEL_SEARCH_TOOL_CONFIG,
+		[MODEL_DETAIL_TOOL_ID]: MODEL_DETAIL_TOOL_CONFIG,
+		[PAPER_SEARCH_TOOL_ID]: PAPER_SEARCH_TOOL_CONFIG,
+		[DATASET_SEARCH_TOOL_ID]: DATASET_SEARCH_TOOL_CONFIG,
+		[DATASET_DETAIL_TOOL_ID]: DATASET_DETAIL_TOOL_CONFIG,
+		[DUPLICATE_SPACE_TOOL_ID]: DUPLICATE_SPACE_TOOL_CONFIG,
+		[SPACE_INFO_TOOL_ID]: SPACE_INFO_TOOL_CONFIG,
+		[SPACE_FILES_TOOL_ID]: SPACE_FILES_TOOL_CONFIG,
+	} as const;
+	
+	return configs[toolId]?.description || `Tool: ${toolId}`;
+}

@@ -2,6 +2,8 @@ import { EventEmitter } from 'events';
 import { logger } from './logger.js';
 import type { AppSettings } from '../../shared/settings.js';
 import type { TransportInfo } from '../../shared/transport-info.js';
+import { BOUQUET_FALLBACK } from '../mcp-server.js';
+import { ALL_BUILTIN_TOOL_IDS } from '@hf-mcp/mcp';
 
 export interface ToolStateChangeCallback {
 	(toolId: string, enabled: boolean): void;
@@ -95,29 +97,28 @@ export class McpApiClient extends EventEmitter {
 						headers['Authorization'] = `Bearer ${token}`;
 					}
 
-					// Add 10 second timeout
-					headers['Accept'] = 'application/json';
+					// Add timeout using HF_API_TIMEOUT or default to 12.5 seconds
+					headers['accept'] = 'application/json';
+					headers['cache-control'] = 'no-cache';
 					const controller = new AbortController();
-					const timeoutId = setTimeout(() => controller.abort(), 10000);
-
+					const apiTimeout = process.env.HF_API_TIMEOUT ? parseInt(process.env.HF_API_TIMEOUT, 10) : 12500;
+					const timeoutId = setTimeout(() => controller.abort(), apiTimeout);
+					logger.debug(`Fetching external settings from ${this.config.externalUrl} with timeout ${apiTimeout}ms`);
 					const response = await fetch(this.config.externalUrl, {
 						headers,
 						signal: controller.signal,
 					});
-
 					clearTimeout(timeoutId);
 					if (!response.ok) {
 						logger.warn(
 							`Failed to fetch external settings: ${response.status.toString()} ${response.statusText} - defaulting to all tools enabled`
 						);
-						// Return empty array to enable all tools
-						return { builtInTools: [], spaceTools: [] };
+						return BOUQUET_FALLBACK;
 					}
 					return (await response.json()) as AppSettings;
 				} catch (error) {
-					logger.warn({ error }, 'Error fetching settings from external API - defaulting to all tools enabled');
-					// Return empty array to enable all tools
-					return { builtInTools: [], spaceTools: [] };
+					logger.warn({ error }, 'Error fetching settings from external API - defaulting to fallback bouquet');
+					return BOUQUET_FALLBACK;
 				}
 
 			default:
@@ -140,31 +141,41 @@ export class McpApiClient extends EventEmitter {
 		if (!settings) {
 			return null;
 		}
+		logger.debug({ settings: settings }, 'Fetched tool settings from API');
 
+		// Update gradio endpoints from external API
+		if (settings.spaceTools && settings.spaceTools.length > 0) {
+			this.gradioEndpoints = settings.spaceTools.map((spaceTool) => ({
+				name: spaceTool.name,
+				subdomain: spaceTool.subdomain,
+				id: spaceTool._id,
+				emoji: spaceTool.emoji,
+			}));
+			logger.debug({ gradioEndpoints: this.gradioEndpoints }, 'Updated gradio endpoints from external API');
+		}
+
+		// Fix tool name mismatches (API returns plural, we use singular)
+		const normalizedToolNames = settings.builtInTools.map((toolId) => {
+			switch (toolId) {
+				case 'model_details':
+					return 'model_detail';
+				case 'dataset_details':
+					return 'dataset_detail';
+				default:
+					return toolId;
+			}
+		});
+
+		// Simple set operations: empty array = all enabled, otherwise only specified tools
+		const enabledTools =
+			settings.builtInTools.length === 0
+				? ALL_BUILTIN_TOOL_IDS
+				: normalizedToolNames.filter((toolId) => ALL_BUILTIN_TOOL_IDS.includes(toolId as any));
+
+		// Create tool states: enabled tools = true, rest = false
 		const toolStates: Record<string, boolean> = {};
-
-		// Empty array means all enabled
-		if (settings.builtInTools.length === 0) {
-			// Default all known tools to enabled
-			const allTools = [
-				'space_search',
-				'model_search',
-				'model_detail',
-				'paper_search',
-				'dataset_search',
-				'dataset_detail',
-				'duplicate_space',
-				'space_info',
-				'space_files',
-			];
-			for (const toolId of allTools) {
-				toolStates[toolId] = true;
-			}
-		} else {
-			// Only enable specified tools
-			for (const toolId of settings.builtInTools) {
-				toolStates[toolId] = true;
-			}
+		for (const toolId of ALL_BUILTIN_TOOL_IDS) {
+			toolStates[toolId] = enabledTools.includes(toolId);
 		}
 
 		return toolStates;
@@ -209,16 +220,9 @@ export class McpApiClient extends EventEmitter {
 			return;
 		}
 
-		// For external mode, fetch once but don't poll
+		// For external mode, don't fetch on startup - wait for user access
 		if (this.config.type === 'external') {
-			logger.info('Using external user config API - fetching once, no polling');
-			const initialStates = await this.getToolStates();
-			if (initialStates) {
-				for (const [toolId, enabled] of Object.entries(initialStates)) {
-					this.cache.set(toolId, enabled);
-					onUpdate(toolId, enabled);
-				}
-			}
+			logger.debug('Using external user config API - no startup fetching, will fetch on first user request');
 			return;
 		}
 
