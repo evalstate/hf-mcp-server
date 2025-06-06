@@ -17,7 +17,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, "./src/web/index.html"),
-        settingsCopy: path.resolve(__dirname, "./src/web/settings-copy.html"),
+        mcpWelcome: path.resolve(__dirname, "./src/web/mcp-welcome.html"),
       },
     },
   },

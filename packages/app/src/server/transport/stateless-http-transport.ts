@@ -5,6 +5,10 @@ import type { Request, Response } from 'express';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Stateless HTTP JSON transport implementation
@@ -18,16 +22,28 @@ export class StatelessHttpTransport extends BaseTransport {
 			void this.handleJsonRpcRequest(req, res);
 		});
 
-		// Serve the settings copy page on GET requests
+		// Serve the MCP welcome page on GET requests (or 405 if strict compliance is enabled)
 		this.app.get('/mcp', (_req: Request, res: Response) => {
-			// In development, Vite middleware will handle this
+			this.trackRequest();
+			
+			// Check for strict compliance mode
+			if (process.env.MCP_STRICT_COMPLIANCE === 'true') {
+				this.trackError(405);
+				logger.debug('Rejected GET request to /mcp in strict compliance mode');
+				res
+					.status(405)
+					.json(JsonRpcErrors.methodNotAllowed(null, 'Method not allowed. Use POST for stateless JSON-RPC requests.'));
+				return;
+			}
+			
+			// Serve the MCP welcome page
 			if (process.env.NODE_ENV === 'development') {
 				// The Vite dev server will serve the page
-				res.redirect('/settings-copy.html');
+				res.redirect('/mcp-welcome.html');
 			} else {
 				// In production, serve the built file
-				const settingsPagePath = path.join(__dirname, '..', 'web', 'settings-copy.html');
-				res.sendFile(settingsPagePath);
+				const mcpWelcomePath = path.join(__dirname, '..', '..', 'web', 'mcp-welcome.html');
+				res.sendFile(mcpWelcomePath);
 			}
 		});
 
