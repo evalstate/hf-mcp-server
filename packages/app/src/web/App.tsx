@@ -304,7 +304,11 @@ function App() {
 
 									{/* Action Buttons */}
 									<div className="flex flex-col gap-4">
-										<Button size="xl" onClick={handleCopyMcpUrl} className="w-full">
+										<Button
+											size="xl"
+											onClick={handleCopyMcpUrl}
+											className="w-full transition-all duration-200 active:bg-green-500 active:border-green-500"
+										>
 											<Copy className="mr-2 h-5 w-5" />
 											Copy MCP URL
 										</Button>
