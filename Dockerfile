@@ -25,11 +25,14 @@ RUN echo "=== Starting build process ===" && \
     pnpm run build && \
     echo "=== Build completed, checking structure ==="
 
-# Try building web separately to catch any errors
+# Ensure the self-contained mcp-welcome page is built last
 RUN cd packages/app && \
-    echo "=== Building web separately ===" && \
-    pnpm run build:web && \
-    echo "=== Web build completed ==="
+    echo "=== Rebuilding self-contained mcp-welcome page ===" && \
+    pnpm run build:mcp-welcome && \
+    echo "=== Self-contained mcp-welcome build completed ===" && \
+    echo "=== Verifying mcp-welcome.html file size ===" && \
+    wc -c dist/web/mcp-welcome.html && \
+    echo "=== File should be ~252KB if self-contained ==="
 
 # Debug: List what was actually built
 RUN echo "=== Full package structure ===" && \

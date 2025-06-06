@@ -4,6 +4,11 @@ import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Stateless HTTP JSON transport implementation
@@ -17,15 +22,23 @@ export class StatelessHttpTransport extends BaseTransport {
 			void this.handleJsonRpcRequest(req, res);
 		});
 
-		// Explicitly reject GET requests
+		// Serve the MCP welcome page on GET requests (or 405 if strict compliance is enabled)
 		this.app.get('/mcp', (_req: Request, res: Response) => {
 			this.trackRequest();
-			this.trackError(405);
-			logger.debug('Rejected GET request to /mcp in stateless mode');
-			res
-				.status(405)
-				.json(JsonRpcErrors.methodNotAllowed(null, 'Method not allowed. Use POST for stateless JSON-RPC requests.'));
-			//	res.send('<html><h1>HELLO, WORLD!</h1></html>');
+			
+			// Check for strict compliance mode
+			if (process.env.MCP_STRICT_COMPLIANCE === 'true') {
+				this.trackError(405);
+				logger.debug('Rejected GET request to /mcp in strict compliance mode');
+				res
+					.status(405)
+					.json(JsonRpcErrors.methodNotAllowed(null, 'Method not allowed. Use POST for stateless JSON-RPC requests.'));
+				return;
+			}
+			
+			// Serve the MCP welcome page (always serve the self-contained version)
+			const mcpWelcomePath = path.join(__dirname, '..', '..', 'web', 'mcp-welcome.html');
+			res.sendFile(mcpWelcomePath);
 		});
 
 		// Explicitly reject DELETE requests

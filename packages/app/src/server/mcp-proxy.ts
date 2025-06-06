@@ -15,7 +15,7 @@ export const createProxyServerFactory = (
 	originalServerFactory: ServerFactory
 ): ServerFactory => {
 	return async (headers: Record<string, string> | null): Promise<McpServer> => {
-		logger.info('Creating server with remote tool support');
+		logger.info('=== PROXY FACTORY CALLED ===');
 
 		// Create the original server instance with all local tools
 		const server = await originalServerFactory(headers);

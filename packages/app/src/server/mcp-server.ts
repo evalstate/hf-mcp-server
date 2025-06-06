@@ -57,6 +57,10 @@ export const BOUQUET_ANON_DEFAULT: AppSettings = {
 
 // Define bouquet configurations
 const BOUQUETS: Record<string, AppSettings> = {
+	hf_api: {
+		builtInTools: [...TOOL_ID_GROUPS.hf_api],
+		spaceTools: [],
+	},
 	spaces: {
 		builtInTools: [...TOOL_ID_GROUPS.spaces],
 		spaceTools: [],

@@ -62,7 +62,7 @@ function App() {
 			const names = ['', '', ''];
 			const subdomains = ['', '', ''];
 			const enabled = [false, false, false];
-			
+
 			settings.spaceTools.forEach((tool, index) => {
 				if (index < 3) {
 					names[index] = tool.name;
@@ -70,13 +70,12 @@ function App() {
 					enabled[index] = true;
 				}
 			});
-			
+
 			setSpaceNames(names);
 			setSpaceSubdomains(subdomains);
 			setEnabledSpaces(enabled);
 		}
 	}, [settings]);
-
 
 	const isLoading = !transportInfo && !transportError;
 	const error = transportError ? transportError.message : null;
@@ -87,10 +86,10 @@ function App() {
 			// Optimistic update - immediately update the UI
 			const currentSettings = settings || { builtInTools: [] };
 			const currentTools = currentSettings.builtInTools;
-			const newTools = checked 
-				? [...currentTools.filter(id => id !== toolId), toolId]
-				: currentTools.filter(id => id !== toolId);
-			
+			const newTools = checked
+				? [...currentTools.filter((id) => id !== toolId), toolId]
+				: currentTools.filter((id) => id !== toolId);
+
 			const optimisticSettings = {
 				...currentSettings,
 				builtInTools: newTools,
@@ -130,7 +129,7 @@ function App() {
 		const newEnabled = [...enabledSpaces];
 		newEnabled[index] = enabled;
 		setEnabledSpaces(newEnabled);
-		
+
 		// Send only checked items to API
 		await updateSpaceToolsAPI(newEnabled);
 	};
@@ -140,7 +139,7 @@ function App() {
 		const newNames = [...spaceNames];
 		newNames[index] = name;
 		setSpaceNames(newNames);
-		
+
 		// Send to API if this one is checked
 		if (enabledSpaces[index]) {
 			await updateSpaceToolsAPI(enabledSpaces);
@@ -152,18 +151,18 @@ function App() {
 		const newSubdomains = [...spaceSubdomains];
 		newSubdomains[index] = subdomain;
 		setSpaceSubdomains(newSubdomains);
-		
+
 		// Send to API if this one is checked
 		if (enabledSpaces[index]) {
 			await updateSpaceToolsAPI(enabledSpaces);
 		}
 	};
-	
+
 	// Simple helper to send current state to API
 	const updateSpaceToolsAPI = async (enabledArray: boolean[]) => {
 		try {
 			const spaceTools: SpaceTool[] = [];
-			
+
 			// Only include checked items
 			for (let i = 0; i < 3; i++) {
 				if (enabledArray[i] && spaceNames[i] && spaceSubdomains[i]) {
@@ -171,11 +170,11 @@ function App() {
 						_id: `space-${i}`,
 						name: spaceNames[i],
 						subdomain: spaceSubdomains[i],
-						emoji: '🔧'
+						emoji: '🔧',
 					});
 				}
 			}
-			
+
 			const response = await fetch('/api/settings', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -273,14 +272,43 @@ function App() {
 		<>
 			<div className="min-h-screen p-8">
 				<div className="max-w-2xl mx-auto">
-					<Tabs defaultValue="home" className="w-full">
+					<Tabs defaultValue="metrics" className="w-full">
 						<TabsList className="mb-6">
-							<TabsTrigger value="home">🏠 Home</TabsTrigger>
 							<TabsTrigger value="metrics">📊 Transport Metrics</TabsTrigger>
 							<TabsTrigger value="search">🔍 Search Tools</TabsTrigger>
 							<TabsTrigger value="spaces">🚀 Space Tools</TabsTrigger>
 							<TabsTrigger value="gradio">🚀 Gradio Spaces</TabsTrigger>
+							<TabsTrigger value="home">🏠 Welcome Page</TabsTrigger>
 						</TabsList>
+						<TabsContent value="metrics">
+							<TransportMetricsCard />
+						</TabsContent>
+						<TabsContent value="search">
+							<ToolsCard
+								title="🤗 Hugging Face Search Tools (MCP)"
+								description="Find and use Hugging Face and Community content."
+								tools={searchTools}
+								onToolToggle={handleToolToggle}
+							/>
+						</TabsContent>
+						<TabsContent value="spaces">
+							<ToolsCard
+								title="🤗 Hugging Face Space Tools (MCP)"
+								description="Manage and duplicate Hugging Face Spaces."
+								tools={spaceTools}
+								onToolToggle={handleToolToggle}
+							/>
+						</TabsContent>
+						<TabsContent value="gradio">
+							<GradioEndpointsCard
+								spaceNames={spaceNames}
+								spaceSubdomains={spaceSubdomains}
+								enabledSpaces={enabledSpaces}
+								onSpaceToolToggle={handleSpaceToolToggle}
+								onSpaceToolNameChange={handleSpaceToolNameChange}
+								onSpaceToolSubdomainChange={handleSpaceToolSubdomainChange}
+							/>
+						</TabsContent>
 						<TabsContent value="home">
 							{/* HF MCP Server Card */}
 							<Card>
@@ -319,35 +347,6 @@ function App() {
 									</div>
 								</CardContent>
 							</Card>
-						</TabsContent>
-						<TabsContent value="metrics">
-							<TransportMetricsCard />
-						</TabsContent>
-						<TabsContent value="search">
-							<ToolsCard
-								title="🤗 Hugging Face Search Tools (MCP)"
-								description="Find and use Hugging Face and Community content."
-								tools={searchTools}
-								onToolToggle={handleToolToggle}
-							/>
-						</TabsContent>
-						<TabsContent value="spaces">
-							<ToolsCard
-								title="🤗 Hugging Face Space Tools (MCP)"
-								description="Manage and duplicate Hugging Face Spaces."
-								tools={spaceTools}
-								onToolToggle={handleToolToggle}
-							/>
-						</TabsContent>
-						<TabsContent value="gradio">
-							<GradioEndpointsCard
-								spaceNames={spaceNames}
-								spaceSubdomains={spaceSubdomains}
-								enabledSpaces={enabledSpaces}
-								onSpaceToolToggle={handleSpaceToolToggle}
-								onSpaceToolNameChange={handleSpaceToolNameChange}
-								onSpaceToolSubdomainChange={handleSpaceToolSubdomainChange}
-							/>
 						</TabsContent>
 					</Tabs>
 				</div>
