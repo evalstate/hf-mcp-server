@@ -5,6 +5,7 @@ import type { Request, Response } from 'express';
 import { logger } from '../lib/logger.js';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { extractQueryParamsToHeaders } from '../utils/query-params.js';
 
 type Session = BaseSession<StreamableHTTPServerTransport>;
 
@@ -103,10 +104,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 			} else if (!sessionId && isInitializeRequest(req.body)) {
 				// Create new session only for initialization requests
 				const headers = req.headers as Record<string, string>;
-				const bouquet = req.query.bouquet as string | undefined;
-				if (bouquet) {
-					headers['x-mcp-bouquet'] = bouquet;
-				}
+				extractQueryParamsToHeaders(req, headers);
 				transport = await this.createSession(headers);
 			} else if (!sessionId) {
 				// No session ID and not an initialization request

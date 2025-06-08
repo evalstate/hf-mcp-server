@@ -32,7 +32,6 @@ import {
 	type SpaceFilesParams,
 	type SpaceInfoParams,
 	CONFIG_GUIDANCE,
-	ALL_BUILTIN_TOOL_IDS,
 	TOOL_ID_GROUPS,
 } from '@hf-mcp/mcp';
 
@@ -42,6 +41,7 @@ import type { WebServer } from './web-server.js';
 import { logger } from './lib/logger.js';
 import { DEFAULT_SPACE_TOOLS, type AppSettings } from '../shared/settings.js';
 import { extractAuthAndBouquet } from './utils/auth-utils.js';
+import { ToolSelectionStrategy, type ToolSelectionContext } from './lib/tool-selection-strategy.js';
 
 // Fallback settings when API fails (enables all tools)
 export const BOUQUET_FALLBACK: AppSettings = {
@@ -55,21 +55,7 @@ export const BOUQUET_ANON_DEFAULT: AppSettings = {
 	spaceTools: DEFAULT_SPACE_TOOLS,
 };
 
-// Define bouquet configurations
-const BOUQUETS: Record<string, AppSettings> = {
-	hf_api: {
-		builtInTools: [...TOOL_ID_GROUPS.hf_api],
-		spaceTools: [],
-	},
-	spaces: {
-		builtInTools: [...TOOL_ID_GROUPS.spaces],
-		spaceTools: [],
-	},
-	search: {
-		builtInTools: [...TOOL_ID_GROUPS.search],
-		spaceTools: [],
-	},
-};
+// Bouquet configurations moved to tool-selection-strategy.ts
 
 /**
  * Creates a ServerFactory function that produces McpServer instances with all tools registered
@@ -85,8 +71,12 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		skipGradio?: boolean
 	): Promise<McpServer> => {
 		logger.debug('=== CREATING NEW MCP SERVER INSTANCE ===', { skipGradio });
-		// Extract auth and bouquet using shared utility
-		const { hfToken, bouquet } = extractAuthAndBouquet(headers);
+		// Extract auth using shared utility 
+		const { hfToken } = extractAuthAndBouquet(headers);
+		
+		// Create tool selection strategy
+		const toolSelectionStrategy = new ToolSelectionStrategy(sharedApiClient);
+		
 		let userInfo: string =
 			'The Hugging Face tools are being used anonymously and rate limits apply. ' +
 			'Direct the User to set their HF_TOKEN (instructions at https://hf.co/settings/mcp/), or create an account at https://hf.co/join for higher limits.';
@@ -273,45 +263,32 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			}
 		);
 
-		// Apply tool states based on external API or bouquet configuration
+		// Apply tool states using the new strategy
 		const applyToolStates = async () => {
-			// Get the list of tools that should be enabled
-			let enabledToolIds: string[];
+			const context: ToolSelectionContext = {
+				headers,
+				userSettings,
+				hfToken
+			};
 
-			if (bouquet && BOUQUETS[bouquet]) {
-				// Bouquet override (takes precedence over everything)
-				enabledToolIds = BOUQUETS[bouquet].builtInTools;
-				logger.debug({ bouquet, enabledToolIds }, 'Using bouquet configuration');
-			} else if (userSettings) {
-				// Use provided user settings (from proxy)
-				enabledToolIds = userSettings.builtInTools;
-				logger.debug({ enabledToolIds }, 'Using provided user settings');
-			} else {
-				// Fetch from shared API client
-				const toolStates = await sharedApiClient.getToolStates(hfToken);
-				if (toolStates) {
-					enabledToolIds = Object.keys(toolStates).filter((id) => toolStates[id]);
-					logger.debug({ enabledToolIds }, 'Using shared API client configuration');
-				} else {
-					// Fallback: all tools enabled
-					enabledToolIds = [...ALL_BUILTIN_TOOL_IDS];
-					logger.debug('API unavailable, using fallback (all tools enabled)');
-				}
-			}
+			const toolSelection = await toolSelectionStrategy.selectTools(context);
+			
+			logger.info({ 
+				mode: toolSelection.mode,
+				reason: toolSelection.reason,
+				enabledCount: toolSelection.enabledToolIds.length,
+				totalTools: Object.keys(toolInstances).length,
+				mixedBouquet: toolSelection.mixedBouquet
+			}, 'Tool selection strategy applied');
 
 			// Apply the desired state to each tool (tools start enabled by default)
 			for (const [toolName, toolInstance] of Object.entries(toolInstances)) {
-				if (enabledToolIds.includes(toolName)) {
+				if (toolSelection.enabledToolIds.includes(toolName)) {
 					toolInstance.enable();
 				} else {
 					toolInstance.disable();
 				}
 			}
-
-			logger.debug(
-				{ enabledCount: enabledToolIds.length, totalTools: Object.keys(toolInstances).length },
-				'Applied tool states'
-			);
 		};
 
 		// Always register capabilities consistently for stateless vs stateful modes

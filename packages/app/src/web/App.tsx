@@ -273,24 +273,24 @@ function App() {
 
 	return (
 		<>
-			<div className="min-h-screen p-8">
+			<div className="min-h-screen p-4 sm:p-8 pb-20">
 				<div className="max-w-4xl mx-auto">
 					<Tabs defaultValue="metrics" className="w-full">
-						<TabsList className="mb-6 w-full">
-							<TabsTrigger value="metrics">📊 Transport Metrics</TabsTrigger>
-							<TabsTrigger value="mcp">🔧 MCP</TabsTrigger>
-							<TabsTrigger value="search">🔍 Search Tools</TabsTrigger>
-							<TabsTrigger value="spaces">🚀 Space Tools</TabsTrigger>
-							<TabsTrigger value="gradio">🚀 Gradio Spaces</TabsTrigger>
-							<TabsTrigger value="home">🏠 Welcome</TabsTrigger>
+						<TabsList className="mb-6 w-full overflow-x-auto flex-nowrap">
+							<TabsTrigger value="metrics" className="whitespace-nowrap">📊 Metrics</TabsTrigger>
+							<TabsTrigger value="mcp" className="whitespace-nowrap">🔧 MCP</TabsTrigger>
+							<TabsTrigger value="search" className="whitespace-nowrap">🔍 Search</TabsTrigger>
+							<TabsTrigger value="spaces" className="whitespace-nowrap">🚀 Spaces</TabsTrigger>
+							<TabsTrigger value="gradio" className="whitespace-nowrap">🚀 Gradio</TabsTrigger>
+							<TabsTrigger value="home" className="whitespace-nowrap">🏠 Home</TabsTrigger>
 						</TabsList>
-						<TabsContent value="metrics">
+						<TabsContent value="metrics" className="mt-0">
 							<TransportMetricsCard />
 						</TabsContent>
-						<TabsContent value="mcp">
+						<TabsContent value="mcp" className="mt-0">
 							<McpMethodsCard />
 						</TabsContent>
-						<TabsContent value="search">
+						<TabsContent value="search" className="mt-0">
 							<ToolsCard
 								title="🤗 Hugging Face Search Tools (MCP)"
 								description="Find and use Hugging Face and Community content."
@@ -298,7 +298,7 @@ function App() {
 								onToolToggle={handleToolToggle}
 							/>
 						</TabsContent>
-						<TabsContent value="spaces">
+						<TabsContent value="spaces" className="mt-0">
 							<ToolsCard
 								title="🤗 Hugging Face Space Tools (MCP)"
 								description="Manage and duplicate Hugging Face Spaces."
@@ -306,7 +306,7 @@ function App() {
 								onToolToggle={handleToolToggle}
 							/>
 						</TabsContent>
-						<TabsContent value="gradio">
+						<TabsContent value="gradio" className="mt-0">
 							<GradioEndpointsCard
 								spaceNames={spaceNames}
 								spaceSubdomains={spaceSubdomains}
@@ -316,7 +316,7 @@ function App() {
 								onSpaceToolSubdomainChange={handleSpaceToolSubdomainChange}
 							/>
 						</TabsContent>
-						<TabsContent value="home">
+						<TabsContent value="home" className="mt-0">
 							{/* HF MCP Server Card */}
 							<Card>
 								<CardHeader>
@@ -386,14 +386,14 @@ function App() {
 										<Button
 											size="xl"
 											onClick={handleCopyMcpUrl}
-											className="w-full transition-all duration-200 active:bg-green-500 active:border-green-500"
+											className="w-full transition-all duration-200 active:bg-green-500 active:border-green-500 touch-manipulation"
 										>
 											<Copy className="mr-2 h-5 w-5" />
 											Copy MCP URL
 										</Button>
-										<Button size="xl" variant="outline" onClick={handleGoToSettings} className="w-full">
+										<Button size="xl" variant="outline" onClick={handleGoToSettings} className="w-full touch-manipulation">
 											<Settings className="mr-2 h-5 w-5" />
-											Go to Settings to pick your tools
+											Go to Settings
 										</Button>
 									</div>
 								</CardContent>

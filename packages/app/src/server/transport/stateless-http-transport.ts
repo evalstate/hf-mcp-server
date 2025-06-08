@@ -7,6 +7,7 @@ import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { isJSONRPCNotification } from '@modelcontextprotocol/sdk/types.js';
+import { extractQueryParamsToHeaders } from '../utils/query-params.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -122,10 +123,7 @@ export class StatelessHttpTransport extends BaseTransport {
 				// Create new server instance using factory with request headers and bouquet
 				logger.debug({ headerCount: Object.keys(req.headers).length }, 'Request received');
 				const headers = req.headers as Record<string, string>;
-				const bouquet = req.query.bouquet as string | undefined;
-				if (bouquet) {
-					headers['x-mcp-bouquet'] = bouquet;
-				}
+				extractQueryParamsToHeaders(req, headers);
 
 				// Skip Gradio endpoints for initialize requests or non-Gradio tool calls
 				const skipGradio = this.shouldSkipGradio(requestBody);
