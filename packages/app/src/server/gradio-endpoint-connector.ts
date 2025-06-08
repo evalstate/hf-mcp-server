@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport, type SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js';
-import { ListToolsResultSchema, CallToolResultSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolResultSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { logger } from './lib/logger.js';
 import { z } from 'zod';
@@ -25,10 +25,11 @@ interface JsonSchema {
 interface EndpointConnection {
 	endpointId: string;
 	originalIndex: number;
-	client: Client;
+	client: Client | null; // Will be null when using schema-only approach
 	tool: Tool;
 	name?: string;
 	emoji?: string;
+	sseUrl?: string; // Store the SSE URL for lazy connection during tool calls
 }
 
 type EndpointConnectionResult =
@@ -57,17 +58,198 @@ function createTimeout(ms: number): Promise<never> {
 }
 
 /**
- * Connects to a single Gradio endpoint and retrieves its tools
+ * Fetches schema from a single Gradio endpoint without establishing SSE connection
  */
-async function connectToSingleEndpoint(
+async function fetchEndpointSchema(
 	endpoint: GradioEndpoint,
 	originalIndex: number,
 	hfToken: string | undefined
 ): Promise<EndpointConnection> {
 	const endpointId = `endpoint${(originalIndex + 1).toString()}`;
-	const remoteUrl = new URL(`https://${endpoint.subdomain}.hf.space/gradio_api/mcp/sse`);
+	const schemaUrl = `https://${endpoint.subdomain}.hf.space/gradio_api/mcp/schema`;
 
-	logger.debug({ url: remoteUrl.toString(), endpointId }, 'Connecting to remote SSE endpoint');
+	logger.debug({ url: schemaUrl, endpointId }, 'Fetching schema from endpoint');
+
+	// Prepare headers
+	const headers: Record<string, string> = {
+		'Content-Type': 'application/json',
+	};
+	if (hfToken) {
+		headers.Authorization = `Bearer ${hfToken}`;
+		logger.debug({ endpointId }, 'Including HF token in schema request');
+	}
+
+	// Add timeout using AbortController (same pattern as HfApiCall)
+	const apiTimeout = process.env.HF_API_TIMEOUT ? parseInt(process.env.HF_API_TIMEOUT, 10) : 12500;
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), apiTimeout);
+
+	// Fetch schema directly
+	const response = await fetch(schemaUrl, {
+		method: 'GET',
+		headers,
+		signal: controller.signal,
+	});
+
+	clearTimeout(timeoutId);
+
+	if (!response.ok) {
+		logger.error({ 
+			endpointId, 
+			subdomain: endpoint.subdomain, 
+			status: response.status, 
+			statusText: response.statusText 
+		}, 'Failed to fetch schema from endpoint');
+		throw new Error(`Failed to fetch schema: ${response.status} ${response.statusText}`);
+	}
+
+	const schema = await response.json() as Record<string, JsonSchema>;
+	logger.debug(
+		{
+			endpointId,
+			toolCount: Object.keys(schema).length,
+			tools: Object.keys(schema),
+		},
+		'Retrieved schema'
+	);
+
+	// Select which tool to use based on the algorithm:
+	// 1. Find a tool containing "infer" (case-insensitive)
+	// 2. Otherwise, use the last tool
+	const toolNames = Object.keys(schema);
+	if (toolNames.length === 0) {
+		logger.error({ endpointId, subdomain: endpoint.subdomain }, 'No tools found in schema');
+		throw new Error('No tools found in schema');
+	}
+
+	let selectedToolName = toolNames[toolNames.length - 1];
+	if (!selectedToolName) {
+		throw new Error('No tools found in schema');
+	}
+	const inferToolName = toolNames.find((name) => name.toLowerCase().includes('infer'));
+
+	if (inferToolName) {
+		selectedToolName = inferToolName;
+		logger.debug({ endpointId, toolName: selectedToolName }, 'Selected tool containing "infer"');
+	} else {
+		logger.debug({ endpointId, toolName: selectedToolName }, 'Selected last tool (no "infer" tool found)');
+	}
+
+	const selectedSchema = schema[selectedToolName];
+	if (!selectedSchema) {
+		logger.error({ endpointId, subdomain: endpoint.subdomain, toolName: selectedToolName }, 'Selected tool not found in schema');
+		throw new Error('No tool selected from schema');
+	}
+
+	// Create tool with raw JSON schema (conversion to Zod happens in registerRemoteTool)
+	const tool: Tool = {
+		name: selectedToolName,
+		description: typeof selectedSchema.description === 'string' ? selectedSchema.description : `${selectedToolName} tool`,
+		inputSchema: {
+			type: 'object',
+			properties: selectedSchema.properties || {},
+			required: selectedSchema.required || [],
+			description: selectedSchema.description,
+		},
+	};
+
+	return {
+		endpointId,
+		originalIndex,
+		client: null, // No client connection yet
+		tool,
+		name: endpoint.name,
+		emoji: endpoint.emoji,
+		sseUrl: `https://${endpoint.subdomain}.hf.space/gradio_api/mcp/sse`, // Store SSE URL for later
+	};
+}
+
+/**
+ * Fetches schemas from multiple Gradio endpoints in parallel with timeout
+ * Uses efficient /mcp/schema endpoint instead of SSE connections
+ */
+export async function connectToGradioEndpoints(
+	gradioEndpoints: GradioEndpoint[],
+	hfToken: string | undefined
+): Promise<EndpointConnectionResult[]> {
+	// Filter and map valid endpoints with their indices
+	const validWithIndex = gradioEndpoints
+		.map((ep, index) => ({ endpoint: ep, originalIndex: index }))
+		.filter((item) => item.endpoint.subdomain && item.endpoint.subdomain.trim() !== '');
+
+	if (validWithIndex.length === 0) {
+		logger.debug('No valid Gradio endpoints to fetch schemas from');
+		return [];
+	}
+
+	// Create schema fetch tasks with timeout
+	const schemaFetchTasks = validWithIndex.map(({ endpoint, originalIndex }) => {
+		const endpointId = `endpoint${(originalIndex + 1).toString()}`;
+
+		return Promise.race([
+			fetchEndpointSchema(endpoint, originalIndex, hfToken),
+			createTimeout(CONNECTION_TIMEOUT_MS),
+		])
+			.then(
+				(connection): EndpointConnectionResult => ({
+					success: true,
+					endpointId,
+					connection,
+				})
+			)
+			.catch(
+				(error: unknown): EndpointConnectionResult => {
+					logger.error({
+						endpointId,
+						subdomain: endpoint.subdomain,
+						error: error instanceof Error ? error.message : String(error),
+					}, 'Failed to fetch schema from endpoint');
+					return {
+						success: false,
+						endpointId,
+						error: error instanceof Error ? error : new Error(String(error)),
+					};
+				}
+			);
+	});
+
+	// Execute all schema fetches in parallel
+	const results = await Promise.all(schemaFetchTasks);
+
+	// Log results
+	const successful = results.filter((r) => r.success);
+	const failed = results.filter((r) => !r.success);
+
+	logger.debug(
+		{
+			total: results.length,
+			successful: successful.length,
+			failed: failed.length,
+		},
+		'Gradio endpoint schema fetch results'
+	);
+
+	// Log failed endpoints separately for debugging
+	if (failed.length > 0) {
+		failed.forEach((f) => {
+			logger.error({
+				endpointId: f.endpointId,
+				error: f.error.message,
+			}, 'Endpoint schema fetch failed');
+		});
+	}
+
+	return results;
+}
+
+/**
+ * Creates SSE connection to endpoint when needed for tool execution
+ */
+async function createLazyConnection(
+	sseUrl: string,
+	hfToken: string | undefined
+): Promise<Client> {
+	logger.debug({ url: sseUrl }, 'Creating lazy SSE connection for tool execution');
 
 	// Create MCP client
 	const remoteClient = new Client(
@@ -103,128 +285,15 @@ async function connectToSingleEndpoint(
 			},
 		};
 
-		logger.debug({ endpointId }, 'Including HF token in Gradio endpoint requests');
+		logger.debug('Including HF token in lazy SSE connection');
 	}
-	const transport = new SSEClientTransport(remoteUrl, transportOptions);
+	const transport = new SSEClientTransport(new URL(sseUrl), transportOptions);
 
 	// Connect the client to the transport
 	await remoteClient.connect(transport);
-	logger.debug({ endpointId }, 'Connected to remote SSE endpoint');
+	logger.debug('Lazy SSE connection established');
 
-	// Get remote tools
-	const remoteToolsResponse = await remoteClient.request(
-		{
-			method: 'tools/list',
-		},
-		ListToolsResultSchema
-	);
-
-	logger.debug(
-		{
-			endpointId,
-			toolCount: remoteToolsResponse.tools.length,
-			tools: remoteToolsResponse.tools.map((t) => t.name),
-		},
-		'Retrieved remote tools'
-	);
-
-	// Select which tool to use based on the algorithm:
-	// 1. Find a tool containing "infer" (case-insensitive)
-	// 2. Otherwise, use the last tool
-	if (remoteToolsResponse.tools.length === 0) {
-		throw new Error('No tools returned from remote endpoint');
-	}
-
-	let selectedTool = remoteToolsResponse.tools[remoteToolsResponse.tools.length - 1];
-
-	const inferTool = remoteToolsResponse.tools.find((tool) => tool.name.toLowerCase().includes('infer'));
-
-	if (inferTool) {
-		selectedTool = inferTool;
-		logger.debug({ endpointId, toolName: selectedTool.name }, 'Selected tool containing "infer"');
-	} else if (selectedTool) {
-		logger.debug({ endpointId, toolName: selectedTool.name }, 'Selected last tool (no "infer" tool found)');
-	}
-
-	if (!selectedTool) {
-		throw new Error('No tool selected from remote endpoint');
-	}
-
-	return {
-		endpointId,
-		originalIndex,
-		client: remoteClient,
-		tool: selectedTool,
-		name: endpoint.name,
-		emoji: endpoint.emoji,
-	};
-}
-
-/**
- * Connects to multiple Gradio endpoints in parallel with timeout
- *
- * HIGH PRIO TODO -- ADD A SHORT TERM CACHE FOR ENDPOINT DEFINITIONS
- *
- */
-export async function connectToGradioEndpoints(
-	gradioEndpoints: GradioEndpoint[],
-	hfToken: string | undefined
-): Promise<EndpointConnectionResult[]> {
-	// Filter and map valid endpoints with their indices
-	const validWithIndex = gradioEndpoints
-		.map((ep, index) => ({ endpoint: ep, originalIndex: index }))
-		.filter((item) => item.endpoint.subdomain && item.endpoint.subdomain.trim() !== '');
-
-	if (validWithIndex.length === 0) {
-		logger.debug('No valid Gradio endpoints to connect');
-		return [];
-	}
-
-	// Create connection tasks with timeout
-	const connectionTasks = validWithIndex.map(({ endpoint, originalIndex }) => {
-		const endpointId = `endpoint${(originalIndex + 1).toString()}`;
-
-		return Promise.race([
-			connectToSingleEndpoint(endpoint, originalIndex, hfToken),
-			createTimeout(CONNECTION_TIMEOUT_MS),
-		])
-			.then(
-				(connection): EndpointConnectionResult => ({
-					success: true,
-					endpointId,
-					connection,
-				})
-			)
-			.catch(
-				(error: unknown): EndpointConnectionResult => ({
-					success: false,
-					endpointId,
-					error: error instanceof Error ? error : new Error(String(error)),
-				})
-			);
-	});
-
-	// Execute all connections in parallel
-	const results = await Promise.all(connectionTasks);
-
-	// Log results
-	const successful = results.filter((r) => r.success);
-	const failed = results.filter((r) => !r.success);
-
-	logger.debug(
-		{
-			total: results.length,
-			successful: successful.length,
-			failed: failed.length,
-			failedEndpoints: failed.map((f) => ({
-				endpointId: f.endpointId,
-				error: f.error.message,
-			})),
-		},
-		'Gradio endpoint connection results'
-	);
-
-	return results;
+	return remoteClient;
 }
 
 /**
@@ -234,10 +303,12 @@ export function registerRemoteTool(
 	server: McpServer,
 	endpointId: string,
 	originalIndex: number,
-	client: Client,
+	_client: Client | null,
 	tool: Tool,
 	name?: string,
-	emoji?: string
+	emoji?: string,
+	sseUrl?: string,
+	hfToken?: string
 ): void {
 	// Use new naming convention: gr<index>_<sanitized_name>
 	// Convert "evalstate/flux1_schnell" to "evalstate_flux1_schnell"
@@ -303,7 +374,14 @@ export function registerRemoteTool(
 		async (params: Record<string, unknown>) => {
 			logger.info({ tool: tool.name, params }, 'Calling remote tool');
 			try {
-				const result = await client.request(
+				// Since we use schema fetch, we always need to create SSE connection for tool execution
+				if (!sseUrl) {
+					throw new Error('No SSE URL available for tool execution');
+				}
+				logger.debug({ tool: tool.name }, 'Creating SSE connection for tool execution');
+				const activeClient = await createLazyConnection(sseUrl, hfToken);
+
+				const result = await activeClient.request(
 					{
 						method: 'tools/call',
 						params: {
@@ -316,7 +394,7 @@ export function registerRemoteTool(
 				logger.debug({ tool: tool.name }, 'Remote tool call successful');
 				return result;
 			} catch (error) {
-				logger.debug({ tool: tool.name, error }, 'Remote tool call failed');
+				logger.error({ tool: tool.name, error }, 'Remote tool call failed');
 				throw error;
 			}
 		}
