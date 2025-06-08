@@ -149,6 +149,41 @@ export abstract class BaseTransport {
 	protected disconnectClient(clientInfo?: { name: string; version: string }): void {
 		this.metrics.disconnectClient(clientInfo);
 	}
+
+	/**
+	 * Extract method name from JSON-RPC request body for tracking
+	 * Handles special case for tools/call to include tool name
+	 */
+	protected extractMethodForTracking(requestBody: unknown): string {
+		const body = requestBody as
+			| { method?: string; params?: { name?: string } }
+			| undefined;
+
+		const methodName = body?.method || 'unknown';
+		
+		// For tools/call, extract the tool name as well
+		if (
+			methodName === 'tools/call' &&
+			body?.params &&
+			typeof body.params === 'object' &&
+			'name' in body.params
+		) {
+			const toolName = body.params.name;
+			if (typeof toolName === 'string') {
+				return `tools/call:${toolName}`;
+			}
+		}
+
+		return methodName;
+	}
+
+	/**
+	 * Track a method call with timing and error status
+	 */
+	protected trackMethodCall(methodName: string, startTime: number, isError: boolean = false): void {
+		const duration = Date.now() - startTime;
+		this.metrics.trackMethod(methodName, duration, isError);
+	}
 }
 
 /**

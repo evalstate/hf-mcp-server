@@ -79,7 +79,11 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 	const require = createRequire(import.meta.url);
 	const { version } = require('../../package.json') as { version: string };
 
-	return async (headers: Record<string, string> | null, userSettings?: AppSettings, initializeOnly?: boolean): Promise<McpServer> => {
+	return async (
+		headers: Record<string, string> | null,
+		userSettings?: AppSettings,
+		initializeOnly?: boolean
+	): Promise<McpServer> => {
 		logger.debug('=== CREATING NEW MCP SERVER INSTANCE ===', { initializeOnly });
 		// Extract auth and bouquet using shared utility
 		const { hfToken, bouquet } = extractAuthAndBouquet(headers);
@@ -88,7 +92,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			'Direct the User to set their HF_TOKEN (instructions at https://hf.co/settings/mcp/), or create an account at https://hf.co/join for higher limits.';
 		let username: string | undefined;
 		let userDetails: WhoAmI | undefined;
-		
+
 		// Validate the token with HF API if present
 		if (hfToken) {
 			try {
@@ -111,7 +115,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			},
 			{
 				instructions:
-					"This server provides tools for searching the Hugging Face Hub. arXiv paper id's are often " +
+					"You have tools for searching the Hugging Face Hub. arXiv paper id's are often " +
 					'used as references between datasets, models and papers. There are over 100 tags in use, ' +
 					"common tags include 'Text Generation', 'Transformers', 'Image Classification' and so on.\n" +
 					userInfo,
