@@ -2,11 +2,11 @@ import { BaseTransport, type TransportOptions, STATELESS_MODE, type SessionMetad
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { isInitializedNotification } from '@modelcontextprotocol/sdk/types.js';
+import { isJSONRPCNotification } from '@modelcontextprotocol/sdk/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +16,28 @@ const __dirname = path.dirname(__filename);
  * Creates a new server AND transport instance for each request to ensure complete isolation
  */
 export class StatelessHttpTransport extends BaseTransport {
+	/**
+	 * Determines if a request should be handled by the full server
+	 * or can be handled by the stub responder
+	 */
+	private shouldHandle(requestBody: unknown): boolean {
+		const body = requestBody as { method?: string } | undefined;
+		const method = body?.method;
+		
+		// Always handle tool-related requests
+		if (method === 'tools/list' || method === 'tools/call') {
+			return true;
+		}
+		
+		// Handle initialize to set up client tracking
+		if (method === 'initialize') {
+			return true;
+		}
+		
+		// All other requests can be handled by stub responder
+		return false;
+	}
+
 	initialize(_options: TransportOptions): Promise<void> {
 		// Handle POST requests (the only valid method for stateless JSON-RPC)
 		this.app.post('/mcp', (req: Request, res: Response) => {
@@ -69,8 +91,7 @@ export class StatelessHttpTransport extends BaseTransport {
 		// Extract method name for tracking using shared utility
 		const trackingName = this.extractMethodForTracking(requestBody);
 
-		// Handle initialized notification early
-		if (isInitializedNotification(req.body)) {
+		if (isJSONRPCNotification(req.body)) {
 			this.trackMethodCall(trackingName, startTime, false);
 			res.status(202).json({ jsonrpc: '2.0', result: null });
 			return;
@@ -84,7 +105,7 @@ export class StatelessHttpTransport extends BaseTransport {
 					this.associateSessionWithClient({ name: clientInfo.name, version: clientInfo.version });
 					this.updateClientActivity({ name: clientInfo.name, version: clientInfo.version });
 				}
-				
+
 				logger.debug(
 					{
 						clientInfo: requestBody.params.clientInfo,
@@ -94,17 +115,25 @@ export class StatelessHttpTransport extends BaseTransport {
 				);
 			}
 
-			// Create new server instance using factory with request headers and bouquet
-			logger.debug({ headerCount: Object.keys(req.headers).length }, 'Request received');
-			const headers = req.headers as Record<string, string>;
-			const bouquet = req.query.bouquet as string | undefined;
-			if (bouquet) {
-				headers['x-mcp-bouquet'] = bouquet;
-			}
+			// Determine which server to use
+			const useFullServer = this.shouldHandle(requestBody);
 			
-			// Skip Gradio endpoints for initialize requests or non-Gradio tool calls
-			const skipGradio = this.shouldSkipGradio(requestBody);
-			server = await this.serverFactory(headers, undefined, skipGradio);
+			if (useFullServer) {
+				// Create new server instance using factory with request headers and bouquet
+				logger.debug({ headerCount: Object.keys(req.headers).length }, 'Request received');
+				const headers = req.headers as Record<string, string>;
+				const bouquet = req.query.bouquet as string | undefined;
+				if (bouquet) {
+					headers['x-mcp-bouquet'] = bouquet;
+				}
+
+				// Skip Gradio endpoints for initialize requests or non-Gradio tool calls
+				const skipGradio = this.shouldSkipGradio(requestBody);
+				server = await this.serverFactory(headers, undefined, skipGradio);
+			} else {
+				// Create fresh stub responder for simple requests
+				server = new McpServer({ name: '@huggingface/internal-responder', version: '0.0.1' });
+			}
 
 			// Create new transport instance for this request
 			transport = new StreamableHTTPServerTransport({
@@ -150,6 +179,7 @@ export class StatelessHttpTransport extends BaseTransport {
 				{
 					duration: Date.now() - startTime,
 					method: trackingName,
+					handledBy: useFullServer ? 'full' : 'stub',
 				},
 				'Request completed'
 			);

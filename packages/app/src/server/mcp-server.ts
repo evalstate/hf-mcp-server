@@ -314,16 +314,17 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			);
 		};
 
+		// Always register capabilities consistently for stateless vs stateful modes
+		const transportInfo = sharedApiClient.getTransportInfo();
+		server.server.registerCapabilities({
+			tools: {
+				listChanged: !transportInfo?.jsonResponseEnabled,
+			},
+		});
+
 		if (!skipGradio) {
 			// Apply initial tool states (fetch from API)
 			void applyToolStates();
-
-			const transportInfo = sharedApiClient.getTransportInfo();
-			server.server.registerCapabilities({
-				tools: {
-					listChanged: !transportInfo?.jsonResponseEnabled,
-				},
-			});
 
 			if (!transportInfo?.jsonResponseEnabled && !transportInfo?.externalApiMode) {
 				// Set up event listener for dynamic tool state changes
