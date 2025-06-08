@@ -32,7 +32,7 @@ export function McpMethodsCard() {
 				<CardTitle>HTTP JSON Transport Statistics</CardTitle>
 				<CardDescription>
 					MCP method call statistics and performance metrics
-					{isStdioMode && ' (Empty in STDIO mode)'}
+					{isStdioMode ? ' (Empty in STDIO mode)' : metrics?.isStateless ? '' : ' (Response times not available in stateful modes)'}
 				</CardDescription>
 			</CardHeader>
 			<CardContent>
