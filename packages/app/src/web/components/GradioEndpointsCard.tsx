@@ -17,7 +17,7 @@ export function GradioEndpointsCard({ spaceNames, spaceSubdomains, enabledSpaces
 	const spaceRows = [0, 1, 2];
 
 	return (
-		<Card className="w-[700px]">
+		<Card className="w-full">
 			<CardHeader>
 				<CardTitle>🚀 Gradio Spaces</CardTitle>
 				<CardDescription>

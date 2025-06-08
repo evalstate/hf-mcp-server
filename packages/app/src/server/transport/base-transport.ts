@@ -12,7 +12,7 @@ import type { AppSettings } from '../../shared/settings.js';
 export type ServerFactory = (
 	headers: Record<string, string> | null,
 	userSettings?: AppSettings,
-	initializeOnly?: boolean
+	skipGradio?: boolean
 ) => Promise<McpServer>;
 
 export interface TransportOptions {
@@ -148,6 +148,75 @@ export abstract class BaseTransport {
 	 */
 	protected disconnectClient(clientInfo?: { name: string; version: string }): void {
 		this.metrics.disconnectClient(clientInfo);
+	}
+
+	/**
+	 * Extract method name from JSON-RPC request body for tracking
+	 * Handles special case for tools/call to include tool name
+	 */
+	protected extractMethodForTracking(requestBody: unknown): string {
+		const body = requestBody as
+			| { method?: string; params?: { name?: string } }
+			| undefined;
+
+		const methodName = body?.method || 'unknown';
+		
+		// For tools/call, extract the tool name as well
+		if (
+			methodName === 'tools/call' &&
+			body?.params &&
+			typeof body.params === 'object' &&
+			'name' in body.params
+		) {
+			const toolName = body.params.name;
+			if (typeof toolName === 'string') {
+				return `tools/call:${toolName}`;
+			}
+		}
+
+		return methodName;
+	}
+
+	/**
+	 * Determine if Gradio endpoints should be skipped based on request type
+	 * Returns true for initialize requests or non-Gradio tool calls
+	 */
+	protected shouldSkipGradio(requestBody: unknown): boolean {
+		const body = requestBody as
+			| { method?: string; params?: { name?: string } }
+			| undefined;
+
+		const methodName = body?.method || 'unknown';
+		
+		// Always skip for initialize requests
+		if (methodName === 'initialize') {
+			return true;
+		}
+		
+		// For tools/call, check if it's a Gradio tool (gr<number>_*)
+		if (
+			methodName === 'tools/call' &&
+			body?.params &&
+			typeof body.params === 'object' &&
+			'name' in body.params
+		) {
+			const toolName = body.params.name;
+			if (typeof toolName === 'string') {
+				// Gradio tools follow pattern: gr<number>_<name>
+				return !/^gr\d+_/.test(toolName);
+			}
+		}
+
+		// For other methods, don't skip Gradio (conservative default)
+		return false;
+	}
+
+	/**
+	 * Track a method call with timing and error status
+	 */
+	protected trackMethodCall(methodName: string, startTime: number, isError: boolean = false): void {
+		const duration = Date.now() - startTime;
+		this.metrics.trackMethod(methodName, duration, isError);
 	}
 }
 

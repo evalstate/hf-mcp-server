@@ -66,33 +66,19 @@ export class StatelessHttpTransport extends BaseTransport {
 			| { method?: string; params?: { clientInfo?: unknown; capabilities?: unknown; name?: string } }
 			| undefined;
 
-		// Extract method name for tracking
-		const methodName = requestBody?.method || 'unknown';
-		
-		// For tools/call, extract the tool name as well
-		let trackingName = methodName;
-		if (
-			methodName === 'tools/call' &&
-			requestBody?.params &&
-			typeof requestBody.params === 'object' &&
-			'name' in requestBody.params
-		) {
-			const toolName = requestBody.params.name;
-			if (typeof toolName === 'string') {
-				trackingName = `tools/call:${toolName}`;
-			}
-		}
+		// Extract method name for tracking using shared utility
+		const trackingName = this.extractMethodForTracking(requestBody);
 
 		// Handle initialized notification early
 		if (isInitializedNotification(req.body)) {
-			this.metrics.trackMethod(trackingName, Date.now() - startTime, false);
+			this.trackMethodCall(trackingName, startTime, false);
 			res.status(202).json({ jsonrpc: '2.0', result: null });
 			return;
 		}
 
 		try {
 			// Track client info for initialize requests
-			if (methodName === 'initialize' && requestBody?.params) {
+			if (requestBody?.method === 'initialize' && requestBody?.params) {
 				const clientInfo = requestBody.params.clientInfo as { name?: string; version?: string } | undefined;
 				if (clientInfo?.name && clientInfo?.version) {
 					this.associateSessionWithClient({ name: clientInfo.name, version: clientInfo.version });
@@ -116,9 +102,9 @@ export class StatelessHttpTransport extends BaseTransport {
 				headers['x-mcp-bouquet'] = bouquet;
 			}
 			
-			// Use initializeOnly flag for initialize requests to skip expensive operations
-			const isInitialize = methodName === 'initialize';
-			server = await this.serverFactory(headers, undefined, isInitialize);
+			// Skip Gradio endpoints for initialize requests or non-Gradio tool calls
+			const skipGradio = this.shouldSkipGradio(requestBody);
+			server = await this.serverFactory(headers, undefined, skipGradio);
 
 			// Create new transport instance for this request
 			transport = new StreamableHTTPServerTransport({
@@ -158,12 +144,11 @@ export class StatelessHttpTransport extends BaseTransport {
 			await transport.handleRequest(req, res, req.body);
 
 			// Track successful method call
-			const duration = Date.now() - startTime;
-			this.metrics.trackMethod(trackingName, duration, false);
+			this.trackMethodCall(trackingName, startTime, false);
 
 			logger.debug(
 				{
-					duration,
+					duration: Date.now() - startTime,
 					method: trackingName,
 				},
 				'Request completed'
@@ -172,7 +157,7 @@ export class StatelessHttpTransport extends BaseTransport {
 			logger.error({ error, method: trackingName }, 'Error handling request');
 
 			// Track failed method call
-			this.metrics.trackMethod(trackingName, Date.now() - startTime, true);
+			this.trackMethodCall(trackingName, startTime, true);
 
 			this.trackError(500, error instanceof Error ? error : new Error(String(error)));
 

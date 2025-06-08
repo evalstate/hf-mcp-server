@@ -77,48 +77,64 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 	}
 
 	private async handlePostRequest(req: Request, res: Response, sessionId?: string): Promise<void> {
-		// Reject new connections during shutdown
-		if (!sessionId && this.isShuttingDown) {
-			this.trackError(503);
-			res.status(503).json(JsonRpcErrors.serverShuttingDown(extractJsonRpcId(req.body)));
-			return;
-		}
+		const trackingName = this.extractMethodForTracking(req.body);
 
-		let transport: StreamableHTTPServerTransport;
+		try {
+			// Reject new connections during shutdown
+			if (!sessionId && this.isShuttingDown) {
+				this.trackError(503);
+				// Track method call without timing (stateful mode measures HTTP dispatch time, not MCP processing time)
+				this.metrics.trackMethod(trackingName, undefined, true);
+				res.status(503).json(JsonRpcErrors.serverShuttingDown(extractJsonRpcId(req.body)));
+				return;
+			}
 
-		if (sessionId && this.sessions.has(sessionId)) {
-			const existingSession = this.sessions.get(sessionId);
-			if (!existingSession) {
+			let transport: StreamableHTTPServerTransport;
+
+			if (sessionId && this.sessions.has(sessionId)) {
+				const existingSession = this.sessions.get(sessionId);
+				if (!existingSession) {
+					this.trackError(404);
+					this.metrics.trackMethod(trackingName, undefined, true);
+					res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(req.body)));
+					return;
+				}
+				transport = existingSession.transport;
+			} else if (!sessionId && isInitializeRequest(req.body)) {
+				// Create new session only for initialization requests
+				const headers = req.headers as Record<string, string>;
+				const bouquet = req.query.bouquet as string | undefined;
+				if (bouquet) {
+					headers['x-mcp-bouquet'] = bouquet;
+				}
+				transport = await this.createSession(headers);
+			} else if (!sessionId) {
+				// No session ID and not an initialization request
+				this.trackError(400);
+				this.metrics.trackMethod(trackingName, undefined, true);
+				res
+					.status(400)
+					.json(
+						JsonRpcErrors.invalidRequest(extractJsonRpcId(req.body), 'Missing session ID for non-initialization request')
+					);
+				return;
+			} else {
+				// Invalid session ID
 				this.trackError(404);
+				this.metrics.trackMethod(trackingName, undefined, true);
 				res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(req.body)));
 				return;
 			}
-			transport = existingSession.transport;
-		} else if (!sessionId && isInitializeRequest(req.body)) {
-			// Create new session only for initialization requests
-			const headers = req.headers as Record<string, string>;
-			const bouquet = req.query.bouquet as string | undefined;
-			if (bouquet) {
-				headers['x-mcp-bouquet'] = bouquet;
-			}
-			transport = await this.createSession(headers);
-		} else if (!sessionId) {
-			// No session ID and not an initialization request
-			this.trackError(400);
-			res
-				.status(400)
-				.json(
-					JsonRpcErrors.invalidRequest(extractJsonRpcId(req.body), 'Missing session ID for non-initialization request')
-				);
-			return;
-		} else {
-			// Invalid session ID
-			this.trackError(404);
-			res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(req.body)));
-			return;
-		}
 
-		await transport.handleRequest(req, res, req.body);
+			await transport.handleRequest(req, res, req.body);
+			
+			// Track successful method call without timing (stateful mode measures HTTP dispatch time, not MCP processing time)
+			this.metrics.trackMethod(trackingName, undefined, false);
+		} catch (error) {
+			// Track failed method call without timing
+			this.metrics.trackMethod(trackingName, undefined, true);
+			throw error; // Re-throw to be handled by outer error handler
+		}
 	}
 
 	private async handleGetRequest(req: Request, res: Response, sessionId?: string): Promise<void> {

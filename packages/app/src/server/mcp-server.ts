@@ -79,8 +79,12 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 	const require = createRequire(import.meta.url);
 	const { version } = require('../../package.json') as { version: string };
 
-	return async (headers: Record<string, string> | null, userSettings?: AppSettings, initializeOnly?: boolean): Promise<McpServer> => {
-		logger.debug('=== CREATING NEW MCP SERVER INSTANCE ===', { initializeOnly });
+	return async (
+		headers: Record<string, string> | null,
+		userSettings?: AppSettings,
+		skipGradio?: boolean
+	): Promise<McpServer> => {
+		logger.debug('=== CREATING NEW MCP SERVER INSTANCE ===', { skipGradio });
 		// Extract auth and bouquet using shared utility
 		const { hfToken, bouquet } = extractAuthAndBouquet(headers);
 		let userInfo: string =
@@ -88,7 +92,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			'Direct the User to set their HF_TOKEN (instructions at https://hf.co/settings/mcp/), or create an account at https://hf.co/join for higher limits.';
 		let username: string | undefined;
 		let userDetails: WhoAmI | undefined;
-		
+
 		// Validate the token with HF API if present
 		if (hfToken) {
 			try {
@@ -111,21 +115,12 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			},
 			{
 				instructions:
-					"This server provides tools for searching the Hugging Face Hub. arXiv paper id's are often " +
+					"You have tools for searching the Hugging Face Hub. arXiv paper id's are often " +
 					'used as references between datasets, models and papers. There are over 100 tags in use, ' +
 					"common tags include 'Text Generation', 'Transformers', 'Image Classification' and so on.\n" +
 					userInfo,
 			}
 		);
-
-		// For initialize-only requests, return early without tool registration
-		if (initializeOnly) {
-			server.server.registerCapabilities({
-				tools: {},
-			});
-			logger.debug('Initialize-only request, skipping tool registration');
-			return server;
-		}
 
 		interface Tool {
 			enable(): void;
@@ -319,8 +314,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			);
 		};
 
-		// Skip expensive operations for initialize-only requests
-		if (!initializeOnly) {
+		if (!skipGradio) {
 			// Apply initial tool states (fetch from API)
 			void applyToolStates();
 
@@ -353,13 +347,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 					logger.debug('Removed toolStateChange listener for closed server');
 				};
 			}
-		} else {
-			// For initialize-only, just set basic capabilities
-			server.server.registerCapabilities({
-				tools: {},
-			});
 		}
-
 		return server;
 	};
 };

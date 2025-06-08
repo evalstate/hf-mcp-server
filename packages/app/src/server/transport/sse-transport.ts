@@ -133,12 +133,16 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 	}
 
 	private async handleSseMessage(req: Request, res: Response): Promise<void> {
+		const trackingName = this.extractMethodForTracking(req.body);
+
 		try {
 			const sessionId = req.query.sessionId as string;
 
 			if (!sessionId) {
 				logger.warn('SSE message received without sessionId');
 				this.trackError(400);
+				// Track method call without timing (stateful mode measures HTTP dispatch time, not MCP processing time)
+				this.metrics.trackMethod(trackingName, undefined, true);
 				res.status(400).json(JsonRpcErrors.invalidParams('sessionId is required', extractJsonRpcId(req.body)));
 				return;
 			}
@@ -148,6 +152,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			if (!connection) {
 				logger.warn({ sessionId }, 'SSE message for unknown session');
 				this.trackError(404);
+				this.metrics.trackMethod(trackingName, undefined, true);
 				res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(req.body)));
 				return;
 			}
@@ -158,10 +163,14 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			// Handle message with the transport
 			await connection.transport.handlePostMessage(req, res, req.body);
 
+			// Track successful method call without timing (stateful mode measures HTTP dispatch time, not MCP processing time)
+			this.metrics.trackMethod(trackingName, undefined, false);
+
 			logger.debug({ sessionId }, 'SSE message handled successfully');
 		} catch (error) {
 			logger.error({ error }, 'Error handling SSE message');
 			this.trackError(500, error instanceof Error ? error : new Error(String(error)));
+			this.metrics.trackMethod(trackingName, undefined, true);
 
 			if (!res.headersSent) {
 				res

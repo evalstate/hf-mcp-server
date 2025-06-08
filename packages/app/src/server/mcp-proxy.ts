@@ -15,25 +15,25 @@ export const createProxyServerFactory = (
 	sharedApiClient: McpApiClient,
 	originalServerFactory: ServerFactory
 ): ServerFactory => {
-	return async (headers: Record<string, string> | null, userSettings?: AppSettings, initializeOnly?: boolean): Promise<McpServer> => {
-		logger.debug('=== PROXY FACTORY CALLED ===', { initializeOnly });
+	return async (headers: Record<string, string> | null, userSettings?: AppSettings, skipGradio?: boolean): Promise<McpServer> => {
+		logger.debug('=== PROXY FACTORY CALLED ===', { skipGradio });
 
 		// Extract auth and bouquet using shared utility
 		const { hfToken, bouquet } = extractAuthAndBouquet(headers);
 
-		// Skip expensive operations for initialize-only requests
+		// Skip expensive operations for requests that skip Gradio
 		let settings = userSettings;
-		if (!initializeOnly && !settings && !bouquet) {
+		if (!skipGradio && !settings && !bouquet) {
 			settings = await sharedApiClient.getSettings(hfToken);
 			logger.debug({ hasSettings: !!settings }, 'Fetched user settings for proxy');
 		}
 
 		// Create the original server instance with user settings
-		const server = await originalServerFactory(headers, settings, initializeOnly);
+		const server = await originalServerFactory(headers, settings, skipGradio);
 
-		// Skip Gradio endpoint connection for initialize-only requests
-		if (initializeOnly) {
-			logger.debug('Initialize-only request, skipping Gradio endpoints');
+		// Skip Gradio endpoint connection for requests that skip Gradio
+		if (skipGradio) {
+			logger.debug('Skipping Gradio endpoints (initialize or non-Gradio tool call)');
 			return server;
 		}
 

@@ -235,10 +235,6 @@ export function TransportMetricsCard() {
 								<TableCell className="text-sm font-mono">{metrics.connections.cleaned ?? 0}</TableCell>
 							</TableRow>
 							<TableRow>
-								<TableCell className="font-medium text-sm">Request Count (MCP)</TableCell>
-								<TableCell className="text-sm font-mono">{metrics.requests.total}</TableCell>
-							</TableRow>
-							<TableRow>
 								<TableCell className="font-medium text-sm">Requests per Minute</TableCell>
 								<TableCell className="text-sm font-mono">{metrics.requests.averagePerMinute}</TableCell>
 							</TableRow>
