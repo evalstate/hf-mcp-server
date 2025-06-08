@@ -82,9 +82,9 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 	return async (
 		headers: Record<string, string> | null,
 		userSettings?: AppSettings,
-		initializeOnly?: boolean
+		skipGradio?: boolean
 	): Promise<McpServer> => {
-		logger.debug('=== CREATING NEW MCP SERVER INSTANCE ===', { initializeOnly });
+		logger.debug('=== CREATING NEW MCP SERVER INSTANCE ===', { skipGradio });
 		// Extract auth and bouquet using shared utility
 		const { hfToken, bouquet } = extractAuthAndBouquet(headers);
 		let userInfo: string =
@@ -121,15 +121,6 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 					userInfo,
 			}
 		);
-
-		// For initialize-only requests, return early without tool registration
-		if (initializeOnly) {
-			server.server.registerCapabilities({
-				tools: {},
-			});
-			logger.debug('Initialize-only request, skipping tool registration');
-			return server;
-		}
 
 		interface Tool {
 			enable(): void;
@@ -323,8 +314,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			);
 		};
 
-		// Skip expensive operations for initialize-only requests
-		if (!initializeOnly) {
+		if (!skipGradio) {
 			// Apply initial tool states (fetch from API)
 			void applyToolStates();
 
@@ -357,13 +347,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 					logger.debug('Removed toolStateChange listener for closed server');
 				};
 			}
-		} else {
-			// For initialize-only, just set basic capabilities
-			server.server.registerCapabilities({
-				tools: {},
-			});
 		}
-
 		return server;
 	};
 };

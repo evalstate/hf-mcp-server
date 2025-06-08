@@ -102,9 +102,9 @@ export class StatelessHttpTransport extends BaseTransport {
 				headers['x-mcp-bouquet'] = bouquet;
 			}
 			
-			// Use initializeOnly flag for initialize requests to skip expensive operations
-			const isInitialize = requestBody?.method === 'initialize';
-			server = await this.serverFactory(headers, undefined, isInitialize);
+			// Skip Gradio endpoints for initialize requests or non-Gradio tool calls
+			const skipGradio = this.shouldSkipGradio(requestBody);
+			server = await this.serverFactory(headers, undefined, skipGradio);
 
 			// Create new transport instance for this request
 			transport = new StreamableHTTPServerTransport({
