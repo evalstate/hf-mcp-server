@@ -4,6 +4,7 @@ import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { extractQueryParamsToHeaders } from '../utils/query-params.js';
 
 interface SSEConnection extends BaseSession<SSEServerTransport> {
 	cleanup: () => Promise<void>;
@@ -44,7 +45,6 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			}
 
 			const existingSessionId = req.query.sessionId as string | undefined;
-			const bouquet = req.query.bouquet as string | undefined;
 
 			// Handle reconnection attempts
 			if (existingSessionId) {
@@ -63,11 +63,9 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 				}
 			}
 
-			// Create server instance using factory with request headers and bouquet
+			// Create server instance using factory with request headers and query params
 			const headers = req.headers as Record<string, string>;
-			if (bouquet) {
-				headers['x-mcp-bouquet'] = bouquet;
-			}
+			extractQueryParamsToHeaders(req, headers);
 			const server = await this.serverFactory(headers);
 
 			// Create new transport
