@@ -77,14 +77,14 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 	}
 
 	private async handlePostRequest(req: Request, res: Response, sessionId?: string): Promise<void> {
-		const startTime = Date.now();
 		const trackingName = this.extractMethodForTracking(req.body);
 
 		try {
 			// Reject new connections during shutdown
 			if (!sessionId && this.isShuttingDown) {
 				this.trackError(503);
-				this.trackMethodCall(trackingName, startTime, true);
+				// Track method call without timing (stateful mode measures HTTP dispatch time, not MCP processing time)
+				this.metrics.trackMethod(trackingName, undefined, true);
 				res.status(503).json(JsonRpcErrors.serverShuttingDown(extractJsonRpcId(req.body)));
 				return;
 			}
@@ -95,7 +95,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 				const existingSession = this.sessions.get(sessionId);
 				if (!existingSession) {
 					this.trackError(404);
-					this.trackMethodCall(trackingName, startTime, true);
+					this.metrics.trackMethod(trackingName, undefined, true);
 					res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(req.body)));
 					return;
 				}
@@ -111,7 +111,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 			} else if (!sessionId) {
 				// No session ID and not an initialization request
 				this.trackError(400);
-				this.trackMethodCall(trackingName, startTime, true);
+				this.metrics.trackMethod(trackingName, undefined, true);
 				res
 					.status(400)
 					.json(
@@ -121,18 +121,18 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 			} else {
 				// Invalid session ID
 				this.trackError(404);
-				this.trackMethodCall(trackingName, startTime, true);
+				this.metrics.trackMethod(trackingName, undefined, true);
 				res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(req.body)));
 				return;
 			}
 
 			await transport.handleRequest(req, res, req.body);
 			
-			// Track successful method call
-			this.trackMethodCall(trackingName, startTime, false);
+			// Track successful method call without timing (stateful mode measures HTTP dispatch time, not MCP processing time)
+			this.metrics.trackMethod(trackingName, undefined, false);
 		} catch (error) {
-			// Track failed method call
-			this.trackMethodCall(trackingName, startTime, true);
+			// Track failed method call without timing
+			this.metrics.trackMethod(trackingName, undefined, true);
 			throw error; // Re-throw to be handled by outer error handler
 		}
 	}
