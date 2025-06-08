@@ -6,6 +6,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { isInitializedNotification } from '@modelcontextprotocol/sdk/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,17 +53,61 @@ export class StatelessHttpTransport extends BaseTransport {
 		logger.info('HTTP JSON transport initialized (stateless mode)');
 		return Promise.resolve();
 	}
+
 	private async handleJsonRpcRequest(req: Request, res: Response): Promise<void> {
 		const startTime = Date.now();
 		let server: McpServer | null = null;
 		let transport: StreamableHTTPServerTransport | null = null;
+
+		// Track new connection for metrics (each request is a "connection" in stateless mode)
+		this.trackNewConnection();
+
 		const requestBody = req.body as
-			| { method?: string; params?: { clientInfo?: unknown; capabilities?: unknown } }
+			| { method?: string; params?: { clientInfo?: unknown; capabilities?: unknown; name?: string } }
 			| undefined;
 
+		// Extract method name for tracking
+		const methodName = requestBody?.method || 'unknown';
+		
+		// For tools/call, extract the tool name as well
+		let trackingName = methodName;
+		if (
+			methodName === 'tools/call' &&
+			requestBody?.params &&
+			typeof requestBody.params === 'object' &&
+			'name' in requestBody.params
+		) {
+			const toolName = requestBody.params.name;
+			if (typeof toolName === 'string') {
+				trackingName = `tools/call:${toolName}`;
+			}
+		}
+
+		// Handle initialized notification early
+		if (isInitializedNotification(req.body)) {
+			this.metrics.trackMethod(trackingName, Date.now() - startTime, false);
+			res.status(202).json({ jsonrpc: '2.0', result: null });
+			return;
+		}
+
 		try {
-			// Track new connection for metrics (each request is a "connection" in stateless mode)
-			this.trackNewConnection();
+			// Track client info for initialize requests
+			if (methodName === 'initialize' && requestBody?.params) {
+				const clientInfo = requestBody.params.clientInfo as { name?: string; version?: string } | undefined;
+				if (clientInfo?.name && clientInfo?.version) {
+					this.associateSessionWithClient({ name: clientInfo.name, version: clientInfo.version });
+					this.updateClientActivity({ name: clientInfo.name, version: clientInfo.version });
+				}
+				
+				logger.debug(
+					{
+						clientInfo: requestBody.params.clientInfo,
+						capabilities: requestBody.params.capabilities,
+					},
+					'Initialize request received'
+				);
+			}
+
 			// Create new server instance using factory with request headers and bouquet
 			logger.debug({ headerCount: Object.keys(req.headers).length }, 'Request received');
 			const headers = req.headers as Record<string, string>;
@@ -70,26 +115,10 @@ export class StatelessHttpTransport extends BaseTransport {
 			if (bouquet) {
 				headers['x-mcp-bouquet'] = bouquet;
 			}
-			server = await this.serverFactory(headers);
-
-			// After handling, check if it was an initialize request
-			if (requestBody?.method === 'initialize') {
-				const clientInfo = requestBody.params?.clientInfo as { name?: string; version?: string } | undefined;
-
-				// Track client info for metrics if available
-				if (clientInfo?.name && clientInfo?.version) {
-					this.associateSessionWithClient({ name: clientInfo.name, version: clientInfo.version });
-					this.updateClientActivity({ name: clientInfo.name, version: clientInfo.version });
-				}
-
-				logger.debug(
-					{
-						clientInfo: requestBody.params?.clientInfo,
-						capabilities: requestBody.params?.capabilities,
-					},
-					'Initialize request processed'
-				);
-			}
+			
+			// Use initializeOnly flag for initialize requests to skip expensive operations
+			const isInitialize = methodName === 'initialize';
+			server = await this.serverFactory(headers, undefined, isInitialize);
 
 			// Create new transport instance for this request
 			transport = new StreamableHTTPServerTransport({
@@ -127,15 +156,24 @@ export class StatelessHttpTransport extends BaseTransport {
 			await server.connect(transport);
 
 			await transport.handleRequest(req, res, req.body);
+
+			// Track successful method call
+			const duration = Date.now() - startTime;
+			this.metrics.trackMethod(trackingName, duration, false);
+
 			logger.debug(
 				{
-					duration: Date.now() - startTime,
-					method: requestBody?.method,
+					duration,
+					method: trackingName,
 				},
 				'Request completed'
 			);
 		} catch (error) {
-			logger.error({ error }, 'Error handling request');
+			logger.error({ error, method: trackingName }, 'Error handling request');
+
+			// Track failed method call
+			this.metrics.trackMethod(trackingName, Date.now() - startTime, true);
+
 			this.trackError(500, error instanceof Error ? error : new Error(String(error)));
 
 			// Ensure cleanup on error

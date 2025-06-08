@@ -35,6 +35,9 @@ export interface TransportMetrics {
 
 	// Client identity aggregation (name version)
 	clients: Map<string, ClientMetrics>;
+
+	// Method metrics
+	methods: Map<string, MethodMetrics>;
 }
 
 /**
@@ -49,6 +52,18 @@ export interface ClientMetrics {
 	isConnected: boolean;
 	activeConnections: number;
 	totalConnections: number;
+}
+
+/**
+ * Metrics per MCP method
+ */
+export interface MethodMetrics {
+	method: string;
+	count: number;
+	firstCalled: Date;
+	lastCalled: Date;
+	averageResponseTime?: number;
+	errors: number;
 }
 
 /**
@@ -98,6 +113,16 @@ export interface TransportMetricsResponse {
 		activeConnections: number;
 		totalConnections: number;
 	}>;
+
+	methods: Array<{
+		method: string;
+		count: number;
+		firstCalled: string; // ISO date string
+		lastCalled: string; // ISO date string
+		averageResponseTime?: number; // milliseconds
+		errors: number;
+		errorRate: number; // percentage
+	}>;
 }
 
 /**
@@ -133,7 +158,20 @@ export function formatMetricsForAPI(
 			firstSeen: client.firstSeen.toISOString(),
 			lastSeen: client.lastSeen.toISOString(),
 		})),
+		methods: Array.from(metrics.methods.values()).map((method) => ({
+			...method,
+			firstCalled: method.firstCalled.toISOString(),
+			lastCalled: method.lastCalled.toISOString(),
+			errorRate: method.count > 0 ? (method.errors / method.count) * 100 : 0,
+		})),
 	};
+}
+
+/**
+ * Check if a method name is an initialization request
+ */
+export function isInitializeRequest(method: string): boolean {
+	return method === 'initialize';
 }
 
 /**
@@ -158,6 +196,7 @@ export function createEmptyMetrics(): TransportMetrics {
 			unexpected: 0,
 		},
 		clients: new Map(),
+		methods: new Map(),
 	};
 }
 
@@ -291,6 +330,43 @@ export class MetricsCounter {
 			clientMetrics.activeConnections--;
 			if (clientMetrics.activeConnections === 0) {
 				clientMetrics.isConnected = false;
+			}
+		}
+	}
+
+	/**
+	 * Track a method call
+	 */
+	trackMethod(method: string, responseTime?: number, isError: boolean = false): void {
+		let methodMetrics = this.metrics.methods.get(method);
+
+		if (!methodMetrics) {
+			methodMetrics = {
+				method,
+				count: 0,
+				firstCalled: new Date(),
+				lastCalled: new Date(),
+				errors: 0,
+			};
+			this.metrics.methods.set(method, methodMetrics);
+		}
+
+		methodMetrics.count++;
+		methodMetrics.lastCalled = new Date();
+
+		if (isError) {
+			methodMetrics.errors++;
+		}
+
+		// Update average response time if provided
+		if (responseTime !== undefined && !isError) {
+			const successfulCalls = methodMetrics.count - methodMetrics.errors;
+			if (successfulCalls === 1) {
+				methodMetrics.averageResponseTime = responseTime;
+			} else {
+				const currentAvg = methodMetrics.averageResponseTime || 0;
+				const totalTime = currentAvg * (successfulCalls - 1) + responseTime;
+				methodMetrics.averageResponseTime = totalTime / successfulCalls;
 			}
 		}
 	}

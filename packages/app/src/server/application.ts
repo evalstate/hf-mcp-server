@@ -85,10 +85,10 @@ export class Application {
 		}
 		this.apiClient = new McpApiClient(apiClientConfig, transportInfo);
 
-		// Create the server factory
+		// This creates our MCP Server with the standard tools.
 		const originalServerFactory = createServerFactory(this.webServerInstance, this.apiClient);
 
-		// Wrap with proxy (for now just passes through, later will add remote tools)
+		// This adds the Gradio endpoints to the original MCP Server.
 		this.serverFactory = createProxyServerFactory(this.webServerInstance, this.apiClient, originalServerFactory);
 
 		// Get Express app instance

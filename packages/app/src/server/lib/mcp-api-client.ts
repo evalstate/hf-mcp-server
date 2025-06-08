@@ -39,7 +39,7 @@ export class McpApiClient extends EventEmitter {
 		super();
 		this.config = config;
 		this.transportInfo = transportInfo || null;
-		
+
 		// Initialize gradio endpoints from config if provided
 		if (config.staticGradioEndpoints) {
 			this.gradioEndpoints = [...config.staticGradioEndpoints];
@@ -113,7 +113,6 @@ export class McpApiClient extends EventEmitter {
 	}
 
 	async getToolStates(overrideToken?: string): Promise<Record<string, boolean> | null> {
-
 		const settings = await this.getSettings(overrideToken);
 		if (!settings) {
 			return null;
@@ -136,7 +135,6 @@ export class McpApiClient extends EventEmitter {
 		for (const toolId of ALL_BUILTIN_TOOL_IDS) {
 			toolStates[toolId] = settings.builtInTools.includes(toolId);
 		}
-		console.debug({ toolStates: toolStates }, 'Generated tool states from settings');
 		return toolStates;
 	}
 

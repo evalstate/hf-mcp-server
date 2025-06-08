@@ -79,8 +79,8 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 	const require = createRequire(import.meta.url);
 	const { version } = require('../../package.json') as { version: string };
 
-	return async (headers: Record<string, string> | null, userSettings?: AppSettings): Promise<McpServer> => {
-		logger.debug('=== CREATING NEW MCP SERVER INSTANCE ===');
+	return async (headers: Record<string, string> | null, userSettings?: AppSettings, initializeOnly?: boolean): Promise<McpServer> => {
+		logger.debug('=== CREATING NEW MCP SERVER INSTANCE ===', { initializeOnly });
 		// Extract auth and bouquet using shared utility
 		const { hfToken, bouquet } = extractAuthAndBouquet(headers);
 		let userInfo: string =
@@ -88,6 +88,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			'Direct the User to set their HF_TOKEN (instructions at https://hf.co/settings/mcp/), or create an account at https://hf.co/join for higher limits.';
 		let username: string | undefined;
 		let userDetails: WhoAmI | undefined;
+		
 		// Validate the token with HF API if present
 		if (hfToken) {
 			try {
@@ -116,6 +117,15 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 					userInfo,
 			}
 		);
+
+		// For initialize-only requests, return early without tool registration
+		if (initializeOnly) {
+			server.server.registerCapabilities({
+				tools: {},
+			});
+			logger.debug('Initialize-only request, skipping tool registration');
+			return server;
+		}
 
 		interface Tool {
 			enable(): void;
@@ -309,37 +319,45 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			);
 		};
 
-		// Apply initial tool states (fetch from API)
-		void applyToolStates();
+		// Skip expensive operations for initialize-only requests
+		if (!initializeOnly) {
+			// Apply initial tool states (fetch from API)
+			void applyToolStates();
 
-		const transportInfo = sharedApiClient.getTransportInfo();
-		server.server.registerCapabilities({
-			tools: {
-				listChanged: !transportInfo?.jsonResponseEnabled,
-			},
-		});
+			const transportInfo = sharedApiClient.getTransportInfo();
+			server.server.registerCapabilities({
+				tools: {
+					listChanged: !transportInfo?.jsonResponseEnabled,
+				},
+			});
 
-		if (!transportInfo?.jsonResponseEnabled && !transportInfo?.externalApiMode) {
-			// Set up event listener for dynamic tool state changes
-			const toolStateChangeHandler = (toolId: string, enabled: boolean) => {
-				const toolInstance = toolInstances[toolId];
-				if (toolInstance) {
-					if (enabled) {
-						toolInstance.enable();
-					} else {
-						toolInstance.disable();
+			if (!transportInfo?.jsonResponseEnabled && !transportInfo?.externalApiMode) {
+				// Set up event listener for dynamic tool state changes
+				const toolStateChangeHandler = (toolId: string, enabled: boolean) => {
+					const toolInstance = toolInstances[toolId];
+					if (toolInstance) {
+						if (enabled) {
+							toolInstance.enable();
+						} else {
+							toolInstance.disable();
+						}
+						logger.debug({ toolId, enabled }, 'Applied single tool state change');
 					}
-					logger.debug({ toolId, enabled }, 'Applied single tool state change');
-				}
-			};
+				};
 
-			sharedApiClient.on('toolStateChange', toolStateChangeHandler);
+				sharedApiClient.on('toolStateChange', toolStateChangeHandler);
 
-			// Clean up event listener when server closes
-			server.server.onclose = () => {
-				sharedApiClient.removeListener('toolStateChange', toolStateChangeHandler);
-				logger.debug('Removed toolStateChange listener for closed server');
-			};
+				// Clean up event listener when server closes
+				server.server.onclose = () => {
+					sharedApiClient.removeListener('toolStateChange', toolStateChangeHandler);
+					logger.debug('Removed toolStateChange listener for closed server');
+				};
+			}
+		} else {
+			// For initialize-only, just set basic capabilities
+			server.server.registerCapabilities({
+				tools: {},
+			});
 		}
 
 		return server;

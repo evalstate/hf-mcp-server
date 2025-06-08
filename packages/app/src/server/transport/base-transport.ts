@@ -11,7 +11,8 @@ import type { AppSettings } from '../../shared/settings.js';
  */
 export type ServerFactory = (
 	headers: Record<string, string> | null,
-	userSettings?: AppSettings
+	userSettings?: AppSettings,
+	initializeOnly?: boolean
 ) => Promise<McpServer>;
 
 export interface TransportOptions {
