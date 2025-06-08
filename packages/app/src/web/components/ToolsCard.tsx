@@ -21,7 +21,7 @@ interface ToolsCardProps {
 
 export function ToolsCard({ title, description, tools, onToolToggle }: ToolsCardProps) {
   return (
-    <Card className="w-[700px]">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>

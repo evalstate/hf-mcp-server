@@ -5,6 +5,7 @@ import useSWR, { mutate } from 'swr';
 import { ToolsCard } from './components/ToolsCard';
 import { GradioEndpointsCard } from './components/GradioEndpointsCard';
 import { TransportMetricsCard } from './components/TransportMetricsCard';
+import { McpMethodsCard } from './components/McpMethodsCard';
 import { ConnectionFooter } from './components/ConnectionFooter';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './components/ui/card';
@@ -273,17 +274,21 @@ function App() {
 	return (
 		<>
 			<div className="min-h-screen p-8">
-				<div className="max-w-2xl mx-auto">
+				<div className="max-w-4xl mx-auto">
 					<Tabs defaultValue="metrics" className="w-full">
-						<TabsList className="mb-6">
+						<TabsList className="mb-6 w-full">
 							<TabsTrigger value="metrics">📊 Transport Metrics</TabsTrigger>
+							<TabsTrigger value="mcp">🔧 MCP</TabsTrigger>
 							<TabsTrigger value="search">🔍 Search Tools</TabsTrigger>
 							<TabsTrigger value="spaces">🚀 Space Tools</TabsTrigger>
 							<TabsTrigger value="gradio">🚀 Gradio Spaces</TabsTrigger>
-							<TabsTrigger value="home">🏠 Welcome Page</TabsTrigger>
+							<TabsTrigger value="home">🏠 Welcome</TabsTrigger>
 						</TabsList>
 						<TabsContent value="metrics">
 							<TransportMetricsCard />
+						</TabsContent>
+						<TabsContent value="mcp">
+							<McpMethodsCard />
 						</TabsContent>
 						<TabsContent value="search">
 							<ToolsCard
@@ -352,13 +357,14 @@ function App() {
 												<h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
 													Tool Management Scope
 												</h3>
-												{(transportInfo?.externalApiMode || (transportInfo?.transport !== 'stdio' && !transportInfo?.externalApiMode)) && (
+												{(transportInfo?.externalApiMode ||
+													(transportInfo?.transport !== 'stdio' && !transportInfo?.externalApiMode)) && (
 													<p className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed">
 														{transportInfo?.externalApiMode ? (
 															<>
 																<strong>External API Mode:</strong> Tool toggles in this interface only affect the{' '}
-																<strong>web interface display</strong> and have no effect on the actual MCP server configuration.
-																Configure tools on the external API endpoint.
+																<strong>web interface display</strong> and have no effect on the actual MCP server
+																configuration. Configure tools on the external API endpoint.
 															</>
 														) : (
 															<>
