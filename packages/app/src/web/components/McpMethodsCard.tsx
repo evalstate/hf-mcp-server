@@ -1,6 +1,8 @@
 import useSWR from 'swr';
+import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Checkbox } from './ui/checkbox';
 import type { TransportMetricsResponse } from '../../shared/transport-metrics.js';
 
 // SWR fetcher function
@@ -13,6 +15,9 @@ const fetcher = (url: string) =>
 	});
 
 export function McpMethodsCard() {
+	// State for filtering only tool calls
+	const [showOnlyToolCalls, setShowOnlyToolCalls] = useState(false);
+
 	// Use SWR for transport metrics with auto-refresh
 	const { data: metrics, error } = useSWR<TransportMetricsResponse>('/api/transport-metrics', fetcher, {
 		refreshInterval: 3000, // Refresh every 3 seconds
@@ -23,8 +28,20 @@ export function McpMethodsCard() {
 	const isLoading = !metrics && !error;
 	const isStdioMode = metrics?.transport === 'stdio';
 
+	// Filter methods if checkbox is checked
+	const allMethods = metrics?.methods || [];
+	const filteredMethods = showOnlyToolCalls 
+		? allMethods.filter(m => m.method.startsWith('tools/call'))
+		: allMethods;
+
 	// Sort methods by call count (descending)
-	const sortedMethods = metrics?.methods?.sort((a, b) => b.count - a.count) || [];
+	const sortedMethods = filteredMethods.sort((a, b) => b.count - a.count);
+
+	// Calculate total calls and tool calls
+	const totalMcpCalls = allMethods.reduce((sum, method) => sum + method.count, 0);
+	const toolCalls = allMethods
+		.filter(m => m.method.startsWith('tools/call'))
+		.reduce((sum, method) => sum + method.count, 0);
 
 	return (
 		<Card>
@@ -56,25 +73,49 @@ export function McpMethodsCard() {
 					</div>
 				)}
 
-				{metrics && !isStdioMode && sortedMethods.length === 0 && (
-					<div className="flex items-center justify-center py-8">
-						<div className="text-sm text-muted-foreground">No method calls recorded yet.</div>
-					</div>
-				)}
-
-				{metrics && !isStdioMode && sortedMethods.length > 0 && (
+				{metrics && !isStdioMode && (
 					<div className="space-y-4">
-						<div className="flex items-center justify-between">
-							<div className="text-sm text-muted-foreground">
-								Showing {sortedMethods.length} method{sortedMethods.length !== 1 ? 's' : ''} tracked since{' '}
-								{new Date(metrics.startupTime).toLocaleString()}
+						{allMethods.length > 0 && (
+							<div className="flex items-center justify-between">
+								<div className="text-sm text-muted-foreground">
+									Showing {sortedMethods.length} method{sortedMethods.length !== 1 ? 's' : ''} tracked since{' '}
+									{new Date(metrics.startupTime).toLocaleString()}
+								</div>
+								<div className="flex items-center gap-6">
+									<div className="text-sm font-medium">
+										Total MCP Calls: <span className="font-mono">{totalMcpCalls.toLocaleString()}</span>
+									</div>
+									<div className="text-sm font-medium">
+										Tool Calls: <span className="font-mono">{toolCalls.toLocaleString()}</span>
+									</div>
+								</div>
 							</div>
-							<div className="text-sm font-medium">
-								Total MCP Calls: <span className="font-mono">{sortedMethods.reduce((sum, method) => sum + method.count, 0).toLocaleString()}</span>
-							</div>
-						</div>
+						)}
 
-						<Table>
+						{allMethods.length > 0 && (
+							<div className="flex items-center space-x-2">
+								<Checkbox 
+									id="tool-calls-filter"
+									checked={showOnlyToolCalls}
+									onCheckedChange={(checked) => setShowOnlyToolCalls(!!checked)}
+								/>
+								<label
+									htmlFor="tool-calls-filter"
+									className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+								>
+									Show only tools/call methods
+								</label>
+							</div>
+						)}
+
+						{sortedMethods.length === 0 ? (
+							<div className="flex items-center justify-center py-8">
+								<div className="text-sm text-muted-foreground">
+									{showOnlyToolCalls ? 'No tool calls recorded yet.' : 'No method calls recorded yet.'}
+								</div>
+							</div>
+						) : (
+							<Table>
 							<TableHeader>
 								<TableRow>
 									<TableHead>Method</TableHead>
@@ -127,8 +168,9 @@ export function McpMethodsCard() {
 								))}
 							</TableBody>
 						</Table>
-					</div>
-				)}
+					)}
+				</div>
+			)}
 			</CardContent>
 		</Card>
 	);
