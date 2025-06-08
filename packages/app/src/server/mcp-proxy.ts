@@ -15,21 +15,27 @@ export const createProxyServerFactory = (
 	sharedApiClient: McpApiClient,
 	originalServerFactory: ServerFactory
 ): ServerFactory => {
-	return async (headers: Record<string, string> | null, userSettings?: AppSettings): Promise<McpServer> => {
-		logger.debug('=== PROXY FACTORY CALLED ===');
+	return async (headers: Record<string, string> | null, userSettings?: AppSettings, initializeOnly?: boolean): Promise<McpServer> => {
+		logger.debug('=== PROXY FACTORY CALLED ===', { initializeOnly });
 
 		// Extract auth and bouquet using shared utility
 		const { hfToken, bouquet } = extractAuthAndBouquet(headers);
 
-		// If no userSettings provided, fetch them (external mode)
+		// Skip expensive operations for initialize-only requests
 		let settings = userSettings;
-		if (!settings && !bouquet) {
+		if (!initializeOnly && !settings && !bouquet) {
 			settings = await sharedApiClient.getSettings(hfToken);
 			logger.debug({ hasSettings: !!settings }, 'Fetched user settings for proxy');
 		}
 
 		// Create the original server instance with user settings
-		const server = await originalServerFactory(headers, settings);
+		const server = await originalServerFactory(headers, settings, initializeOnly);
+
+		// Skip Gradio endpoint connection for initialize-only requests
+		if (initializeOnly) {
+			logger.debug('Initialize-only request, skipping Gradio endpoints');
+			return server;
+		}
 
 		// Skip Gradio endpoints if bouquet is "search"
 		if (bouquet === 'search') {

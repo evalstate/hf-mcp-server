@@ -115,7 +115,10 @@ export class StatelessHttpTransport extends BaseTransport {
 			if (bouquet) {
 				headers['x-mcp-bouquet'] = bouquet;
 			}
-			server = await this.serverFactory(headers);
+			
+			// Use initializeOnly flag for initialize requests to skip expensive operations
+			const isInitialize = methodName === 'initialize';
+			server = await this.serverFactory(headers, undefined, isInitialize);
 
 			// Create new transport instance for this request
 			transport = new StreamableHTTPServerTransport({
