@@ -1,8 +1,9 @@
 import useSWR from 'swr';
 import { useState } from 'react';
+import type { ColumnDef } from '@tanstack/react-table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Checkbox } from './ui/checkbox';
+import { DataTable, createSortableHeader } from './data-table';
 import type { TransportMetricsResponse } from '../../shared/transport-metrics.js';
 
 // SWR fetcher function
@@ -13,6 +14,15 @@ const fetcher = (url: string) =>
 		}
 		return res.json();
 	});
+
+type MethodData = {
+	method: string;
+	count: number;
+	errors: number;
+	errorRate: number;
+	averageResponseTime?: number;
+	lastCalled: string;
+};
 
 export function McpMethodsCard() {
 	// State for filtering only tool calls
@@ -34,14 +44,98 @@ export function McpMethodsCard() {
 		? allMethods.filter(m => m.method.startsWith('tools/call'))
 		: allMethods;
 
-	// Sort methods by call count (descending)
-	const sortedMethods = filteredMethods.sort((a, b) => b.count - a.count);
-
 	// Calculate total calls and tool calls
 	const totalMcpCalls = allMethods.reduce((sum, method) => sum + method.count, 0);
 	const toolCalls = allMethods
 		.filter(m => m.method.startsWith('tools/call'))
 		.reduce((sum, method) => sum + method.count, 0);
+
+	// Define columns for the data table
+	const columns: ColumnDef<MethodData>[] = [
+		{
+			accessorKey: "method",
+			header: createSortableHeader("Method"),
+			cell: ({ row }) => {
+				const method = row.getValue("method") as string;
+				return (
+					<div className="font-mono text-sm">
+						{method === 'tools/call' ? (
+							<span className="text-blue-600 dark:text-blue-400">tools/call</span>
+						) : method.startsWith('tools/call:') ? (
+							<>
+								<span className="text-blue-600 dark:text-blue-400">tools/call:</span>
+								<span className="text-green-600 dark:text-green-400">
+									{method.replace('tools/call:', '')}
+								</span>
+							</>
+						) : (
+							method
+						)}
+					</div>
+				);
+			},
+		},
+		{
+			accessorKey: "count",
+			header: createSortableHeader("Calls", "right"),
+			cell: ({ row }) => (
+				<div className="text-right font-mono">{row.getValue<number>("count").toLocaleString()}</div>
+			),
+		},
+		{
+			accessorKey: "errors",
+			header: createSortableHeader("Errors", "right"),
+			cell: ({ row }) => {
+				const errors = row.getValue<number>("errors");
+				return (
+					<div className="text-right font-mono">
+						{errors > 0 ? (
+							<span className="text-red-600 dark:text-red-400">{errors}</span>
+						) : (
+							'0'
+						)}
+					</div>
+				);
+			},
+		},
+		{
+			accessorKey: "errorRate",
+			header: createSortableHeader("Error Rate", "right"),
+			cell: ({ row }) => {
+				const errorRate = row.getValue<number>("errorRate");
+				return (
+					<div className="text-right font-mono">
+						{errorRate > 0 ? (
+							<span className="text-red-600 dark:text-red-400">{errorRate.toFixed(1)}%</span>
+						) : (
+							'0%'
+						)}
+					</div>
+				);
+			},
+		},
+		{
+			accessorKey: "averageResponseTime",
+			header: createSortableHeader("Avg Response", "right"),
+			cell: ({ row }) => {
+				const avgTime = row.getValue<number | undefined>("averageResponseTime");
+				return (
+					<div className="text-right font-mono">
+						{avgTime ? `${avgTime.toFixed(0)}ms` : '—'}
+					</div>
+				);
+			},
+		},
+		{
+			accessorKey: "lastCalled",
+			header: createSortableHeader("Last Called", "right"),
+			cell: ({ row }) => (
+				<div className="text-right text-sm text-muted-foreground">
+					{new Date(row.getValue<string>("lastCalled")).toLocaleTimeString()}
+				</div>
+			),
+		},
+	];
 
 	return (
 		<Card>
@@ -78,7 +172,7 @@ export function McpMethodsCard() {
 						{allMethods.length > 0 && (
 							<div className="flex items-center justify-between">
 								<div className="text-sm text-muted-foreground">
-									Showing {sortedMethods.length} method{sortedMethods.length !== 1 ? 's' : ''} tracked since{' '}
+									Showing {filteredMethods.length} method{filteredMethods.length !== 1 ? 's' : ''} tracked since{' '}
 									{new Date(metrics.startupTime).toLocaleString()}
 								</div>
 								<div className="flex items-center gap-6">
@@ -108,69 +202,30 @@ export function McpMethodsCard() {
 							</div>
 						)}
 
-						{sortedMethods.length === 0 ? (
+						{filteredMethods.length === 0 ? (
 							<div className="flex items-center justify-center py-8">
 								<div className="text-sm text-muted-foreground">
 									{showOnlyToolCalls ? 'No tool calls recorded yet.' : 'No method calls recorded yet.'}
 								</div>
 							</div>
 						) : (
-							<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>Method</TableHead>
-									<TableHead className="text-right">Calls</TableHead>
-									<TableHead className="text-right">Errors</TableHead>
-									<TableHead className="text-right">Error Rate</TableHead>
-									<TableHead className="text-right">Avg Response</TableHead>
-									<TableHead className="text-right">Last Called</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{sortedMethods.map((method) => (
-									<TableRow key={method.method}>
-										<TableCell className="font-mono text-sm">
-											{method.method === 'tools/call' ? (
-												<span className="text-blue-600 dark:text-blue-400">tools/call</span>
-											) : method.method.startsWith('tools/call:') ? (
-												<>
-													<span className="text-blue-600 dark:text-blue-400">tools/call:</span>
-													<span className="text-green-600 dark:text-green-400">
-														{method.method.replace('tools/call:', '')}
-													</span>
-												</>
-											) : (
-												method.method
-											)}
-										</TableCell>
-										<TableCell className="text-right font-mono">{method.count.toLocaleString()}</TableCell>
-										<TableCell className="text-right font-mono">
-											{method.errors > 0 ? (
-												<span className="text-red-600 dark:text-red-400">{method.errors}</span>
-											) : (
-												'0'
-											)}
-										</TableCell>
-										<TableCell className="text-right font-mono">
-											{method.errorRate > 0 ? (
-												<span className="text-red-600 dark:text-red-400">{method.errorRate.toFixed(1)}%</span>
-											) : (
-												'0%'
-											)}
-										</TableCell>
-										<TableCell className="text-right font-mono">
-											{method.averageResponseTime ? `${method.averageResponseTime.toFixed(0)}ms` : '—'}
-										</TableCell>
-										<TableCell className="text-right text-sm text-muted-foreground">
-											{new Date(method.lastCalled).toLocaleTimeString()}
-										</TableCell>
-									</TableRow>
-								))}
-							</TableBody>
-						</Table>
-					)}
-				</div>
-			)}
+							<DataTable 
+								columns={columns} 
+								data={filteredMethods} 
+								searchColumn="method"
+								searchPlaceholder="Filter methods..."
+								defaultColumnVisibility={{
+									method: true,
+									count: true,
+									errors: false,
+									errorRate: true,
+									averageResponseTime: metrics.transport === 'streamableHttpJson',
+									lastCalled: true,
+								}}
+							/>
+						)}
+					</div>
+				)}
 			</CardContent>
 		</Card>
 	);

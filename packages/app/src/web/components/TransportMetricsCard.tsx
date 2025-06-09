@@ -1,10 +1,12 @@
 import useSWR from 'swr';
+import type { ColumnDef } from '@tanstack/react-table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Separator } from './ui/separator';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Table, TableBody, TableCell, TableRow } from './ui/table';
 import { AlertTriangle, Activity, Wifi, WifiOff, Clock } from 'lucide-react';
+import { DataTable, createSortableHeader } from './data-table';
 import type { TransportMetricsResponse } from '../../shared/transport-metrics.js';
 
 // SWR fetcher function
@@ -15,6 +17,17 @@ const fetcher = (url: string) =>
 		}
 		return res.json();
 	});
+
+type ClientData = {
+	name: string;
+	version: string;
+	requestCount: number;
+	activeConnections: number;
+	totalConnections: number;
+	isConnected: boolean;
+	lastSeen: string;
+	firstSeen: string;
+};
 
 /**
  * Format relative time (e.g., "5m ago", "2h ago", "just now")
@@ -103,6 +116,88 @@ export function TransportMetricsCard() {
 		revalidateOnReconnect: true,
 	});
 
+	// Define columns for the client identities table
+	const createClientColumns = (isStateless: boolean): ColumnDef<ClientData>[] => [
+		{
+			accessorKey: "name",
+			header: createSortableHeader("Client"),
+			cell: ({ row }) => {
+				const client = row.original;
+				return (
+					<div>
+						<p className="font-medium font-mono text-sm">
+							{client.name}@{client.version}
+						</p>
+						<p className="text-xs text-muted-foreground">
+							First seen {formatRelativeTime(client.firstSeen)}
+						</p>
+					</div>
+				);
+			},
+		},
+		{
+			accessorKey: "requestCount",
+			header: createSortableHeader("Request Count", "right"),
+			cell: ({ row }) => (
+				<div className="text-right font-mono text-sm">{row.getValue<number>("requestCount")}</div>
+			),
+		},
+		{
+			accessorKey: "activeConnections",
+			header: createSortableHeader("Connections", "right"),
+			cell: ({ row }) => {
+				const client = row.original;
+				return (
+					<div className="text-right font-mono text-sm">
+						{formatConnectionDisplay(
+							client.activeConnections,
+							client.totalConnections,
+							isStateless
+						)}
+					</div>
+				);
+			},
+		},
+		{
+			accessorKey: "isConnected",
+			header: createSortableHeader("Status"),
+			cell: ({ row }) => {
+				const client = row.original;
+				return (
+					<div>
+						{isStateless ? (
+							isRecentlyActive(client.lastSeen) ? (
+								<Badge variant="success" className="gap-1">
+									<Activity className="h-3 w-3" />
+									Recent
+								</Badge>
+							) : (
+								<Badge variant="secondary" className="gap-1">
+									<Clock className="h-3 w-3" />
+									Idle
+								</Badge>
+							)
+						) : (
+							<Badge variant={getConnectionBadgeVariant(client.isConnected)} className="gap-1">
+								{client.isConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+								{client.isConnected ? 'Connected' : 'Disconnected'}
+							</Badge>
+						)}
+					</div>
+				);
+			},
+		},
+		{
+			accessorKey: "lastSeen",
+			header: createSortableHeader("Last Seen", "right"),
+			cell: ({ row }) => (
+				<div className="text-right text-sm text-muted-foreground">
+					{formatRelativeTime(row.getValue<string>("lastSeen"))}
+				</div>
+			),
+		},
+	];
+
 	if (error) {
 		return (
 			<Card>
@@ -138,23 +233,7 @@ export function TransportMetricsCard() {
 		);
 	}
 
-	// Sort clients by connection status (connected first), then by last seen time, then by request count
-	const sortedClients = [...metrics.clients].sort((a, b) => {
-		// Connected clients first
-		if (a.isConnected !== b.isConnected) {
-			return b.isConnected ? 1 : -1;
-		}
-
-		// Then by most recent activity
-		const aTime = new Date(a.lastSeen).getTime();
-		const bTime = new Date(b.lastSeen).getTime();
-		if (aTime !== bTime) {
-			return bTime - aTime;
-		}
-
-		// Finally by request count
-		return b.requestCount - a.requestCount;
-	});
+	const clientData = metrics.clients;
 
 	const transportTypeDisplay = {
 		stdio: 'STDIO',
@@ -256,69 +335,17 @@ export function TransportMetricsCard() {
 				</div>
 
 				{/* Client Identities */}
-				{sortedClients.length > 0 && (
+				{clientData.length > 0 && (
 					<>
 						<Separator />
 						<div>
 							<h3 className="text-sm font-semibold text-foreground mb-3">Client Identities</h3>
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>Client</TableHead>
-										<TableHead>Request Count</TableHead>
-										<TableHead>Connections</TableHead>
-										<TableHead>Status</TableHead>
-										<TableHead>Last Seen</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{sortedClients.map((client) => (
-										<TableRow key={`${client.name}@${client.version}`}>
-											<TableCell>
-												<div>
-													<p className="font-medium font-mono text-sm">
-														{client.name}@{client.version}
-													</p>
-													<p className="text-xs text-muted-foreground">
-														First seen {formatRelativeTime(client.firstSeen)}
-													</p>
-												</div>
-											</TableCell>
-											<TableCell className="font-mono text-sm">{client.requestCount}</TableCell>
-											<TableCell className="font-mono text-sm">
-												{formatConnectionDisplay(
-													client.activeConnections,
-													client.totalConnections,
-													metrics.isStateless
-												)}
-											</TableCell>
-											<TableCell>
-												{metrics.isStateless ? (
-													isRecentlyActive(client.lastSeen) ? (
-														<Badge variant="success" className="gap-1">
-															<Activity className="h-3 w-3" />
-															Recent
-														</Badge>
-													) : (
-														<Badge variant="secondary" className="gap-1">
-															<Clock className="h-3 w-3" />
-															Idle
-														</Badge>
-													)
-												) : (
-													<Badge variant={getConnectionBadgeVariant(client.isConnected)} className="gap-1">
-														{client.isConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-														{client.isConnected ? 'Connected' : 'Disconnected'}
-													</Badge>
-												)}
-											</TableCell>
-											<TableCell className="text-sm text-muted-foreground">
-												{formatRelativeTime(client.lastSeen)}
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+							<DataTable 
+								columns={createClientColumns(metrics.isStateless)} 
+								data={clientData} 
+								searchColumn="name"
+								searchPlaceholder="Filter clients..."
+							/>
 						</div>
 					</>
 				)}
