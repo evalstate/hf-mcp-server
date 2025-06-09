@@ -72,7 +72,9 @@ The `sse` and `streamingHttp` transports are both _stateful_ - they maintain a c
 |-----------------------------------|---------|-------------|
 | `MCP_CLIENT_HEARTBEAT_INTERVAL`   | 30000ms | How often to check SSE connection health |
 | `MCP_CLIENT_CONNECTION_CHECK`     | 90000ms | How often to check for stale sessions |
-| `MCP_CLIENT_CONNECTION_TIMEOUT`   | 300000ms | Remove sessions inactive for this duration | 
+| `MCP_CLIENT_CONNECTION_TIMEOUT`   | 300000ms | Remove sessions inactive for this duration |
+| `MCP_PING_ENABLED`                | true    | Enable ping keep-alive for sessions |
+| `MCP_PING_INTERVAL`               | 30000ms | Interval between ping cycles | 
 
 
 ### Environment Variables

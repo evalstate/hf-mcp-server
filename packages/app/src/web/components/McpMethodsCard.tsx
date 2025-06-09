@@ -3,7 +3,8 @@ import { useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Checkbox } from './ui/checkbox';
-import { DataTable, createSortableHeader } from './data-table';
+import { DataTable } from './data-table';
+import { createSortableHeader } from './data-table-utils';
 import type { TransportMetricsResponse } from '../../shared/transport-metrics.js';
 
 // SWR fetcher function
@@ -214,6 +215,7 @@ export function McpMethodsCard() {
 								data={filteredMethods} 
 								searchColumn="method"
 								searchPlaceholder="Filter methods..."
+								pageSize={50}
 								defaultColumnVisibility={{
 									method: true,
 									count: true,

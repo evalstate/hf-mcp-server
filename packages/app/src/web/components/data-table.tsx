@@ -15,7 +15,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import { ChevronDown, ChevronUp } from "lucide-react"
+import { ChevronDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -40,6 +40,7 @@ interface DataTableProps<TData, TValue> {
   searchColumn?: string
   searchPlaceholder?: string
   defaultColumnVisibility?: VisibilityState
+  pageSize?: number
 }
 
 export function DataTable<TData, TValue>({
@@ -48,6 +49,7 @@ export function DataTable<TData, TValue>({
   searchColumn,
   searchPlaceholder = "Filter...",
   defaultColumnVisibility = {},
+  pageSize = 25,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -68,6 +70,11 @@ export function DataTable<TData, TValue>({
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    initialState: {
+      pagination: {
+        pageSize: pageSize,
+      },
+    },
     state: {
       sorting,
       columnFilters,
@@ -191,26 +198,4 @@ export function DataTable<TData, TValue>({
       </div>
     </div>
   )
-}
-
-export function createSortableHeader(title: string, align: "left" | "right" | "center" = "left") {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return ({ column }: { column: any }) => {
-    const alignClass = align === "right" ? "justify-end" : align === "center" ? "justify-center" : "justify-start";
-    const sortDirection = column.getIsSorted();
-    
-    return (
-      <div className={`flex ${alignClass}`}>
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className={`${align === "right" ? "ml-auto" : ""} hover:bg-muted/50 h-auto p-0 font-medium text-sm`}
-        >
-          {title}
-          {sortDirection === "asc" && <ChevronUp className="ml-1 h-3 w-3 text-muted-foreground" />}
-          {sortDirection === "desc" && <ChevronDown className="ml-1 h-3 w-3 text-muted-foreground" />}
-        </Button>
-      </div>
-    )
-  }
 }

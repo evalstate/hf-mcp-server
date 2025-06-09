@@ -22,6 +22,14 @@ export interface TransportMetrics {
 		averagePerMinute: number;
 	};
 
+	// Ping metrics (for stateful transports)
+	pings?: {
+		sent: number;
+		successful: number;
+		failed: number;
+		lastPingTime?: Date;
+	};
+
 	// Error metrics
 	errors: {
 		expected: number; // 4xx errors
@@ -81,6 +89,8 @@ export interface TransportMetricsResponse {
 		heartbeatInterval: number; // milliseconds
 		staleCheckInterval: number; // milliseconds
 		staleTimeout: number; // milliseconds
+		pingEnabled?: boolean;
+		pingInterval?: number; // milliseconds
 	};
 
 	connections: {
@@ -92,6 +102,13 @@ export interface TransportMetricsResponse {
 	requests: {
 		total: number;
 		averagePerMinute: number;
+	};
+
+	pings?: {
+		sent: number;
+		successful: number;
+		failed: number;
+		lastPingTime?: string; // ISO date string
 	};
 
 	errors: {
@@ -145,6 +162,10 @@ export function formatMetricsForAPI(
 		uptimeSeconds,
 		connections: metrics.connections,
 		requests: metrics.requests,
+		pings: metrics.pings ? {
+			...metrics.pings,
+			lastPingTime: metrics.pings.lastPingTime?.toISOString()
+		} : undefined,
 		errors: {
 			...metrics.errors,
 			lastError: metrics.errors.lastError
@@ -338,7 +359,8 @@ export class MetricsCounter {
 	/**
 	 * Track a method call
 	 */
-	trackMethod(method: string, responseTime?: number, isError: boolean = false): void {
+	trackMethod(method: string | null, responseTime?: number, isError: boolean = false): void {
+		if (!method) return;
 		let methodMetrics = this.metrics.methods.get(method);
 
 		if (!methodMetrics) {
@@ -370,6 +392,49 @@ export class MetricsCounter {
 				methodMetrics.averageResponseTime = totalTime / successfulCalls;
 			}
 		}
+	}
+
+	/**
+	 * Track a ping being sent
+	 */
+	trackPingSent(): void {
+		if (!this.metrics.pings) {
+			this.metrics.pings = {
+				sent: 0,
+				successful: 0,
+				failed: 0,
+			};
+		}
+		this.metrics.pings.sent++;
+	}
+
+	/**
+	 * Track a successful ping response
+	 */
+	trackPingSuccess(): void {
+		if (!this.metrics.pings) {
+			this.metrics.pings = {
+				sent: 0,
+				successful: 0,
+				failed: 0,
+			};
+		}
+		this.metrics.pings.successful++;
+		this.metrics.pings.lastPingTime = new Date();
+	}
+
+	/**
+	 * Track a failed ping
+	 */
+	trackPingFailed(): void {
+		if (!this.metrics.pings) {
+			this.metrics.pings = {
+				sent: 0,
+				successful: 0,
+				failed: 0,
+			};
+		}
+		this.metrics.pings.failed++;
 	}
 
 	/**

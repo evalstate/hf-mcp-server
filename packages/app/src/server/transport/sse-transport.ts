@@ -25,11 +25,14 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 		});
 
 		this.startStaleConnectionCheck();
+		this.startPingKeepAlive();
 
 		logger.info('SSE transport routes initialized', {
 			heartbeatInterval: this.HEARTBEAT_INTERVAL,
 			staleCheckInterval: this.STALE_CHECK_INTERVAL,
 			staleTimeout: this.STALE_TIMEOUT,
+			pingEnabled: this.PING_ENABLED,
+			pingInterval: this.PING_INTERVAL,
 		});
 		return Promise.resolve();
 	}

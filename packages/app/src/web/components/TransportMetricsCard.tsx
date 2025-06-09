@@ -6,7 +6,8 @@ import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Separator } from './ui/separator';
 import { Table, TableBody, TableCell, TableRow } from './ui/table';
 import { AlertTriangle, Activity, Wifi, WifiOff, Clock } from 'lucide-react';
-import { DataTable, createSortableHeader } from './data-table';
+import { DataTable } from './data-table';
+import { createSortableHeader } from './data-table-utils';
 import type { TransportMetricsResponse } from '../../shared/transport-metrics.js';
 
 // SWR fetcher function
@@ -286,11 +287,27 @@ export function TransportMetricsCard() {
 									<p className="text-sm font-medium text-muted-foreground">Stale Timeout</p>
 									<p className="text-sm font-mono">{formatMilliseconds(metrics.configuration.staleTimeout)}</p>
 								</div>
+								{metrics.configuration.pingEnabled !== undefined && (
+									<>
+										<div>
+											<p className="text-sm font-medium text-muted-foreground">Ping Keep-Alive</p>
+											<p className="text-sm font-mono">{metrics.configuration.pingEnabled ? 'Enabled' : 'Disabled'}</p>
+										</div>
+										{metrics.configuration.pingEnabled && metrics.configuration.pingInterval && (
+											<div>
+												<p className="text-sm font-medium text-muted-foreground">Ping Interval</p>
+												<p className="text-sm font-mono">{formatMilliseconds(metrics.configuration.pingInterval)}</p>
+											</div>
+										)}
+									</>
+								)}
 							</div>
 							<p className="text-xs text-muted-foreground mt-2">
 								SSE connections checked every {formatMilliseconds(metrics.configuration.heartbeatInterval || 30000)}, 
 								sessions swept every {formatMilliseconds(metrics.configuration.staleCheckInterval)}, 
 								removed after {formatMilliseconds(metrics.configuration.staleTimeout)} inactive
+								{metrics.configuration.pingEnabled && metrics.configuration.pingInterval && 
+									`, pings sent every ${formatMilliseconds(metrics.configuration.pingInterval)}`}
 							</p>
 						</div>
 					</>
@@ -330,6 +347,28 @@ export function TransportMetricsCard() {
 								<TableCell className="font-medium text-sm">Server Errors (5xx)</TableCell>
 								<TableCell className="text-sm font-mono">{metrics.errors.unexpected}</TableCell>
 							</TableRow>
+							{metrics.pings && (
+								<>
+									<TableRow>
+										<TableCell className="font-medium text-sm">Pings Sent</TableCell>
+										<TableCell className="text-sm font-mono">{metrics.pings.sent}</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell className="font-medium text-sm">Ping Success Rate</TableCell>
+										<TableCell className="text-sm font-mono">
+											{metrics.pings.sent > 0 
+												? `${Math.round((metrics.pings.successful / metrics.pings.sent) * 100)}%`
+												: '-'}
+										</TableCell>
+									</TableRow>
+									{metrics.pings.lastPingTime && (
+										<TableRow>
+											<TableCell className="font-medium text-sm">Last Ping</TableCell>
+											<TableCell className="text-sm font-mono">{formatRelativeTime(metrics.pings.lastPingTime)}</TableCell>
+										</TableRow>
+									)}
+								</>
+							)}
 						</TableBody>
 					</Table>
 				</div>
@@ -345,6 +384,7 @@ export function TransportMetricsCard() {
 								data={clientData} 
 								searchColumn="name"
 								searchPlaceholder="Filter clients..."
+								pageSize={50}
 							/>
 						</div>
 					</>

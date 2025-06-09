@@ -200,7 +200,9 @@ export class WebServer {
 					formattedMetrics.configuration = {
 						heartbeatInterval: config.heartbeatInterval || 30000,
 						staleCheckInterval: config.staleCheckInterval,
-						staleTimeout: config.staleTimeout
+						staleTimeout: config.staleTimeout,
+						pingEnabled: config.pingEnabled,
+						pingInterval: config.pingInterval
 					};
 				}
 

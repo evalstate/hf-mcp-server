@@ -18,11 +18,14 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 	initialize(_options: TransportOptions): Promise<void> {
 		this.setupRoutes();
 		this.startStaleConnectionCheck();
+		this.startPingKeepAlive();
 
 		logger.info('StreamableHTTP transport initialized', {
 			heartbeatInterval: this.HEARTBEAT_INTERVAL,
 			staleCheckInterval: this.STALE_CHECK_INTERVAL,
 			staleTimeout: this.STALE_TIMEOUT,
+			pingEnabled: this.PING_ENABLED,
+			pingInterval: this.PING_INTERVAL,
 		});
 		return Promise.resolve();
 	}

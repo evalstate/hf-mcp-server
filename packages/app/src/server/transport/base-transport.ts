@@ -106,7 +106,7 @@ export abstract class BaseTransport {
 	/**
 	 * Get configuration settings (only relevant for stateful transports)
 	 */
-	getConfiguration(): { heartbeatInterval?: number; staleCheckInterval?: number; staleTimeout?: number } {
+	getConfiguration(): { heartbeatInterval?: number; staleCheckInterval?: number; staleTimeout?: number; pingEnabled?: boolean; pingInterval?: number } {
 		return {};
 	}
 
@@ -155,9 +155,15 @@ export abstract class BaseTransport {
 	/**
 	 * Extract method name from JSON-RPC request body for tracking
 	 * Handles special case for tools/call to include tool name
+	 * Returns null for responses (which should not be tracked as methods)
 	 */
-	protected extractMethodForTracking(requestBody: unknown): string {
-		const body = requestBody as { method?: string; params?: { name?: string } } | undefined;
+	protected extractMethodForTracking(requestBody: unknown): string | null {
+		const body = requestBody as { method?: string; params?: { name?: string }; id?: unknown; result?: unknown; error?: unknown } | undefined;
+
+		// If this is a JSON-RPC response (has id and result/error but no method), don't track it
+		if (body && 'id' in body && !('method' in body)) {
+			return null;
+		}
 
 		const methodName = body?.method || 'unknown';
 
@@ -202,7 +208,7 @@ export abstract class BaseTransport {
 	/**
 	 * Track a method call with timing and error status
 	 */
-	protected trackMethodCall(methodName: string, startTime: number, isError: boolean = false): void {
+	protected trackMethodCall(methodName: string | null, startTime: number, isError: boolean = false): void {
 		const duration = Date.now() - startTime;
 		this.metrics.trackMethod(methodName, duration, isError);
 	}
@@ -216,11 +222,15 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	protected sessions: Map<string, TSession> = new Map();
 	protected isShuttingDown = false;
 	protected staleCheckInterval?: NodeJS.Timeout;
+	protected pingInterval?: NodeJS.Timeout;
+	protected pingsInFlight = new Set<string>();
 
 	// Configuration from environment variables
 	protected readonly STALE_CHECK_INTERVAL = parseInt(process.env.MCP_CLIENT_CONNECTION_CHECK || '90000', 10);
 	protected readonly STALE_TIMEOUT = parseInt(process.env.MCP_CLIENT_CONNECTION_TIMEOUT || '600000', 10);
 	protected readonly HEARTBEAT_INTERVAL = parseInt(process.env.MCP_CLIENT_HEARTBEAT_INTERVAL || '30000', 10);
+	protected readonly PING_ENABLED = process.env.MCP_PING_ENABLED !== 'false';
+	protected readonly PING_INTERVAL = parseInt(process.env.MCP_PING_INTERVAL || '30000', 10);
 
 	/**
 	 * Update the last activity timestamp for a session
@@ -267,6 +277,81 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 				);
 			}
 		};
+	}
+
+	/**
+	 * Send a fire-and-forget ping to a single session
+	 * Success updates lastActivity, failures are ignored
+	 */
+	protected pingSingleSession(sessionId: string): void {
+		const session = this.sessions.get(sessionId);
+		if (!session) return;
+
+		// Skip if ping already in progress for this session
+		if (this.pingsInFlight.has(sessionId)) {
+			return;
+		}
+
+		// Mark ping as in-flight
+		this.pingsInFlight.add(sessionId);
+
+		// Track ping being sent
+		this.metrics.trackPingSent();
+
+		// Fire ping and handle result asynchronously
+		session.server.server.ping()
+			.then(() => {
+				// SUCCESS: Update lastActivity timestamp
+				// This prevents the stale checker from removing this session
+				this.updateSessionActivity(sessionId);
+				this.metrics.trackPingSuccess();
+				logger.debug({ sessionId }, 'Ping succeeded');
+			})
+			.catch((error: unknown) => {
+				// FAILURE: Do nothing
+				// No activity update means stale checker will eventually remove it
+				const errorMessage = error instanceof Error ? error.message : String(error);
+				this.metrics.trackPingFailed();
+				logger.debug({ sessionId, error: errorMessage }, 'Ping failed');
+			})
+			.finally(() => {
+				// Always remove from tracking set
+				this.pingsInFlight.delete(sessionId);
+			});
+	}
+
+	/**
+	 * Start the ping keep-alive interval
+	 */
+	protected startPingKeepAlive(): void {
+		if (!this.PING_ENABLED) {
+			logger.debug('Ping keep-alive disabled');
+			return;
+		}
+
+		this.pingInterval = setInterval(() => {
+			if (this.isShuttingDown) return;
+
+			// Ping all sessions that don't have an active ping
+			for (const sessionId of this.sessions.keys()) {
+				this.pingSingleSession(sessionId);
+			}
+		}, this.PING_INTERVAL);
+
+		logger.debug({ pingInterval: this.PING_INTERVAL }, 'Started ping keep-alive');
+	}
+
+	/**
+	 * Stop the ping keep-alive interval
+	 */
+	protected stopPingKeepAlive(): void {
+		if (this.pingInterval) {
+			clearInterval(this.pingInterval);
+			this.pingInterval = undefined;
+			// Clear any in-flight pings
+			this.pingsInFlight.clear();
+			logger.debug('Stopped ping keep-alive');
+		}
 	}
 
 	/**
@@ -348,6 +433,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 			clearInterval(this.staleCheckInterval);
 			this.staleCheckInterval = undefined;
 		}
+		this.stopPingKeepAlive();
 	}
 
 	/**
@@ -374,11 +460,13 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	/**
 	 * Get configuration settings for stateful transports
 	 */
-	override getConfiguration(): { heartbeatInterval: number; staleCheckInterval: number; staleTimeout: number } {
+	override getConfiguration(): { heartbeatInterval: number; staleCheckInterval: number; staleTimeout: number; pingEnabled: boolean; pingInterval: number } {
 		return {
 			heartbeatInterval: this.HEARTBEAT_INTERVAL,
 			staleCheckInterval: this.STALE_CHECK_INTERVAL,
 			staleTimeout: this.STALE_TIMEOUT,
+			pingEnabled: this.PING_ENABLED,
+			pingInterval: this.PING_INTERVAL,
 		};
 	}
 
@@ -506,7 +594,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 		sessionId: string | undefined, 
 		requestBody: unknown,
 		allowMissingSession: boolean = false
-	): { isValid: boolean; errorResponse?: object; statusCode?: number; trackingName: string } {
+	): { isValid: boolean; errorResponse?: object; statusCode?: number; trackingName: string | null } {
 		const trackingName = this.extractMethodForTracking(requestBody);
 		
 		// Check if server is shutting down
