@@ -194,9 +194,13 @@ export function TransportMetricsCard() {
 						<Separator />
 						<div>
 							<h3 className="text-sm font-semibold text-foreground mb-3">Configuration</h3>
-							<div className="grid grid-cols-2 gap-4">
+							<div className="grid grid-cols-3 gap-4">
 								<div>
-									<p className="text-sm font-medium text-muted-foreground">Stale Check Interval</p>
+									<p className="text-sm font-medium text-muted-foreground">Heartbeat</p>
+									<p className="text-sm font-mono">{formatMilliseconds(metrics.configuration.heartbeatInterval || 30000)}</p>
+								</div>
+								<div>
+									<p className="text-sm font-medium text-muted-foreground">Stale Check</p>
 									<p className="text-sm font-mono">{formatMilliseconds(metrics.configuration.staleCheckInterval)}</p>
 								</div>
 								<div>
@@ -205,8 +209,9 @@ export function TransportMetricsCard() {
 								</div>
 							</div>
 							<p className="text-xs text-muted-foreground mt-2">
-								Sessions are checked every {formatMilliseconds(metrics.configuration.staleCheckInterval)} and removed
-								after {formatMilliseconds(metrics.configuration.staleTimeout)} of inactivity
+								SSE connections checked every {formatMilliseconds(metrics.configuration.heartbeatInterval || 30000)}, 
+								sessions swept every {formatMilliseconds(metrics.configuration.staleCheckInterval)}, 
+								removed after {formatMilliseconds(metrics.configuration.staleTimeout)} inactive
 							</p>
 						</div>
 					</>

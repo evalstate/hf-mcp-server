@@ -198,6 +198,7 @@ export class WebServer {
 				// Add configuration if available
 				if (!isStateless && config.staleCheckInterval && config.staleTimeout) {
 					formattedMetrics.configuration = {
+						heartbeatInterval: config.heartbeatInterval || 30000,
 						staleCheckInterval: config.staleCheckInterval,
 						staleTimeout: config.staleTimeout
 					};

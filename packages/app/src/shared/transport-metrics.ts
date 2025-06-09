@@ -78,6 +78,7 @@ export interface TransportMetricsResponse {
 
 	// Configuration settings (only for stateful transports)
 	configuration?: {
+		heartbeatInterval: number; // milliseconds
 		staleCheckInterval: number; // milliseconds
 		staleTimeout: number; // milliseconds
 	};

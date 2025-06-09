@@ -64,6 +64,17 @@ The different transport types use the following endpoints:
 - Streamable HTTP: `/mcp` (regular or JSON mode)
 - STDIO: Uses stdin/stdout directly, no HTTP endpoint
 
+### Stateful Connection Management
+
+The `sse` and `streamingHttp` transports are both _stateful_ - they maintain a connection with the MCP Client through an SSE connection. When using these transports, the following configuration options take effect:
+
+| Environment Variable              | Default | Description |
+|-----------------------------------|---------|-------------|
+| `MCP_CLIENT_HEARTBEAT_INTERVAL`   | 30000ms | How often to check SSE connection health |
+| `MCP_CLIENT_CONNECTION_CHECK`     | 90000ms | How often to check for stale sessions |
+| `MCP_CLIENT_CONNECTION_TIMEOUT`   | 300000ms | Remove sessions inactive for this duration | 
+
+
 ### Environment Variables
 
 The server respects the following environment variables:

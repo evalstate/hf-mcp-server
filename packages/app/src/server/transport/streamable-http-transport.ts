@@ -7,7 +7,11 @@ import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { extractQueryParamsToHeaders } from '../utils/query-params.js';
 
-type Session = BaseSession<StreamableHTTPServerTransport>;
+interface StreamableHttpConnection extends BaseSession<StreamableHTTPServerTransport> {
+	activeResponse?: Response;
+}
+
+type Session = StreamableHttpConnection;
 
 export class StreamableHttpTransport extends StatefulTransport<Session> {
 
@@ -16,6 +20,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 		this.startStaleConnectionCheck();
 
 		logger.info('StreamableHTTP transport initialized', {
+			heartbeatInterval: this.HEARTBEAT_INTERVAL,
 			staleCheckInterval: this.STALE_CHECK_INTERVAL,
 			staleTimeout: this.STALE_TIMEOUT,
 		});
@@ -154,6 +159,15 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 			logger.warn({ sessionId, lastEventId }, 'Client attempting to result with Last-Event-ID');
 		}
 
+		// Store the active response for heartbeat monitoring
+		session.activeResponse = res;
+
+		// Set up heartbeat to detect stale SSE connections
+		this.startHeartbeat(sessionId, res);
+
+		// Set up connection event handlers
+		this.setupSseEventHandlers(sessionId, res);
+
 		await session.transport.handleRequest(req, res);
 	}
 
@@ -213,17 +227,18 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 			}
 		};
 
+		// Set up error tracking for server errors
+		server.server.onerror = (error) => {
+			this.trackError(undefined, error);
+			logger.error({ error, sessionId: transport.sessionId }, 'StreamableHTTP server error');
+		};
+
+		// Set up client info capture when initialized
 		server.server.oninitialized = () => {
 			const sessionId = transport.sessionId;
 			if (sessionId) {
 				this.createClientInfoCapture(sessionId)();
 			}
-		};
-
-		// Set up error tracking for server errors
-		server.server.onerror = (error) => {
-			this.trackError(undefined, error);
-			logger.error({ error, sessionId: transport.sessionId }, 'StreamableHTTP server error');
 		};
 
 		// Connect to session-specific server
@@ -233,25 +248,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 	}
 
 	private async removeSession(sessionId: string): Promise<void> {
-		const session = this.sessions.get(sessionId);
-		if (!session) return;
-
-		try {
-			await session.transport.close();
-		} catch (error) {
-			logger.error({ error, sessionId }, 'Error closing transport');
-		}
-
-		try {
-			await session.server.close();
-		} catch (error) {
-			logger.error({ error, sessionId }, 'Error closing server');
-		}
-
-		// Track session cleanup for metrics
-		this.trackSessionCleaned(session);
-		this.sessions.delete(sessionId);
-		logger.debug({ sessionId }, 'Session removed');
+		await this.cleanupSession(sessionId);
 	}
 
 	/**
@@ -259,23 +256,16 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 	 */
 	protected async removeStaleSession(sessionId: string): Promise<void> {
 		logger.info({ sessionId }, 'Removing stale session');
-		await this.removeSession(sessionId);
+		await this.cleanupSession(sessionId);
 	}
 
 	async cleanup(): Promise<void> {
 		// Stop stale checker using base class helper
 		this.stopStaleConnectionCheck();
 
-		// Close all sessions gracefully
-		const closePromises = Array.from(this.sessions.keys()).map((sessionId) =>
-			this.removeSession(sessionId).catch((error: unknown) => {
-				logger.error({ error, sessionId }, 'Error during cleanup');
-			})
-		);
+		// Use base class cleanup method
+		await this.cleanupAllSessions();
 
-		await Promise.allSettled(closePromises);
-
-		this.sessions.clear();
 		logger.info('StreamableHTTP transport cleanup complete');
 	}
 }
