@@ -4,6 +4,7 @@ import { logger } from '../lib/logger.js';
 import type { TransportMetrics } from '../../shared/transport-metrics.js';
 import { MetricsCounter } from '../../shared/transport-metrics.js';
 import type { AppSettings } from '../../shared/settings.js';
+import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 
 /**
  * Factory function to create server instances
@@ -45,6 +46,7 @@ export interface BaseSession<T = unknown> {
 	transport: T;
 	server: McpServer;
 	metadata: SessionMetadata;
+	heartbeatInterval?: NodeJS.Timeout;
 }
 
 /**
@@ -92,7 +94,9 @@ export abstract class BaseTransport {
 	 * Get all active sessions with their metadata
 	 * Returns an array of session metadata for connection dashboard
 	 */
-	abstract getSessions(): SessionMetadata[];
+	getSessions(): SessionMetadata[] {
+		return [];
+	}
 
 	/**
 	 * Get current transport metrics
@@ -104,7 +108,13 @@ export abstract class BaseTransport {
 	/**
 	 * Get configuration settings (only relevant for stateful transports)
 	 */
-	getConfiguration(): { staleCheckInterval?: number; staleTimeout?: number } {
+	getConfiguration(): {
+		heartbeatInterval?: number;
+		staleCheckInterval?: number;
+		staleTimeout?: number;
+		pingEnabled?: boolean;
+		pingInterval?: number;
+	} {
 		return {};
 	}
 
@@ -153,21 +163,22 @@ export abstract class BaseTransport {
 	/**
 	 * Extract method name from JSON-RPC request body for tracking
 	 * Handles special case for tools/call to include tool name
+	 * Returns null for responses (which should not be tracked as methods)
 	 */
-	protected extractMethodForTracking(requestBody: unknown): string {
+	protected extractMethodForTracking(requestBody: unknown): string | null {
 		const body = requestBody as
-			| { method?: string; params?: { name?: string } }
+			| { method?: string; params?: { name?: string }; id?: unknown; result?: unknown; error?: unknown }
 			| undefined;
 
+		// If this is a JSON-RPC response (has id and result/error but no method), don't track it
+		if (body && 'id' in body && !('method' in body)) {
+			return null;
+		}
+
 		const methodName = body?.method || 'unknown';
-		
+
 		// For tools/call, extract the tool name as well
-		if (
-			methodName === 'tools/call' &&
-			body?.params &&
-			typeof body.params === 'object' &&
-			'name' in body.params
-		) {
+		if (methodName === 'tools/call' && body?.params && typeof body.params === 'object' && 'name' in body.params) {
 			const toolName = body.params.name;
 			if (typeof toolName === 'string') {
 				return `tools/call:${toolName}`;
@@ -182,24 +193,17 @@ export abstract class BaseTransport {
 	 * Returns true for initialize requests or non-Gradio tool calls
 	 */
 	protected shouldSkipGradio(requestBody: unknown): boolean {
-		const body = requestBody as
-			| { method?: string; params?: { name?: string } }
-			| undefined;
+		const body = requestBody as { method?: string; params?: { name?: string } } | undefined;
 
 		const methodName = body?.method || 'unknown';
-		
+
 		// Always skip for initialize requests
 		if (methodName === 'initialize') {
 			return true;
 		}
-		
+
 		// For tools/call, check if it's a Gradio tool (gr<number>_*)
-		if (
-			methodName === 'tools/call' &&
-			body?.params &&
-			typeof body.params === 'object' &&
-			'name' in body.params
-		) {
+		if (methodName === 'tools/call' && body?.params && typeof body.params === 'object' && 'name' in body.params) {
 			const toolName = body.params.name;
 			if (typeof toolName === 'string') {
 				// Gradio tools follow pattern: gr<number>_<name>
@@ -214,7 +218,7 @@ export abstract class BaseTransport {
 	/**
 	 * Track a method call with timing and error status
 	 */
-	protected trackMethodCall(methodName: string, startTime: number, isError: boolean = false): void {
+	protected trackMethodCall(methodName: string | null, startTime: number, isError: boolean = false): void {
 		const duration = Date.now() - startTime;
 		this.metrics.trackMethod(methodName, duration, isError);
 	}
@@ -228,10 +232,15 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	protected sessions: Map<string, TSession> = new Map();
 	protected isShuttingDown = false;
 	protected staleCheckInterval?: NodeJS.Timeout;
+	protected pingInterval?: NodeJS.Timeout;
+	protected pingsInFlight = new Set<string>();
 
 	// Configuration from environment variables
 	protected readonly STALE_CHECK_INTERVAL = parseInt(process.env.MCP_CLIENT_CONNECTION_CHECK || '90000', 10);
-	protected readonly STALE_TIMEOUT = parseInt(process.env.MCP_CLIENT_CONNECTION_TIMEOUT || '300000', 10);
+	protected readonly STALE_TIMEOUT = parseInt(process.env.MCP_CLIENT_CONNECTION_TIMEOUT || '600000', 10);
+	protected readonly HEARTBEAT_INTERVAL = parseInt(process.env.MCP_CLIENT_HEARTBEAT_INTERVAL || '30000', 10);
+	protected readonly PING_ENABLED = process.env.MCP_PING_ENABLED !== 'false';
+	protected readonly PING_INTERVAL = parseInt(process.env.MCP_PING_INTERVAL || '30000', 10);
 
 	/**
 	 * Update the last activity timestamp for a session
@@ -256,8 +265,12 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 				const clientCapabilities = session.server.server.getClientCapabilities();
 
 				if (clientInfo) {
+					// Disconnect the old client info if it exists
+					if (session.metadata.clientInfo) {
+						this.metrics.disconnectClient(session.metadata.clientInfo);
+					}
 					session.metadata.clientInfo = clientInfo;
-					// Associate session with client for metrics tracking
+					// Associate session with real client for metrics tracking
 					this.metrics.associateSessionWithClient(clientInfo);
 				}
 
@@ -278,6 +291,82 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 				);
 			}
 		};
+	}
+
+	/**
+	 * Send a fire-and-forget ping to a single session
+	 * Success updates lastActivity, failures are ignored
+	 */
+	protected pingSingleSession(sessionId: string): void {
+		const session = this.sessions.get(sessionId);
+		if (!session) return;
+
+		// Skip if ping already in progress for this session
+		if (this.pingsInFlight.has(sessionId)) {
+			return;
+		}
+
+		// Mark ping as in-flight
+		this.pingsInFlight.add(sessionId);
+
+		// Track ping being sent
+		this.metrics.trackPingSent();
+
+		// Fire ping and handle result asynchronously
+		session.server.server
+			.ping()
+			.then(() => {
+				// SUCCESS: Update lastActivity timestamp
+				// This prevents the stale checker from removing this session
+				this.updateSessionActivity(sessionId);
+				this.metrics.trackPingSuccess();
+				logger.trace({ sessionId }, 'Ping succeeded');
+			})
+			.catch((error: unknown) => {
+				// FAILURE: Do nothing
+				// No activity update means stale checker will eventually remove it
+				const errorMessage = error instanceof Error ? error.message : String(error);
+				this.metrics.trackPingFailed();
+				logger.trace({ sessionId, error: errorMessage }, 'Ping failed');
+			})
+			.finally(() => {
+				// Always remove from tracking set
+				this.pingsInFlight.delete(sessionId);
+			});
+	}
+
+	/**
+	 * Start the ping keep-alive interval
+	 */
+	protected startPingKeepAlive(): void {
+		if (!this.PING_ENABLED) {
+			logger.debug('Ping keep-alive disabled');
+			return;
+		}
+
+		this.pingInterval = setInterval(() => {
+			if (this.isShuttingDown) return;
+
+			// Ping all sessions that don't have an active ping
+			for (const sessionId of this.sessions.keys()) {
+				this.pingSingleSession(sessionId);
+			}
+		}, this.PING_INTERVAL);
+
+		logger.debug({ pingInterval: this.PING_INTERVAL }, 'Started ping keep-alive');
+	}
+
+	/**
+	 * Stop the ping keep-alive interval
+	 */
+	protected stopPingKeepAlive(): void {
+		if (this.pingInterval) {
+			clearInterval(this.pingInterval);
+			this.pingInterval = undefined;
+			// Clear any in-flight pings
+			this.pingsInFlight.clear();
+			logger.debug('Stopped ping keep-alive');
+		}
 	}
 
 	/**
@@ -334,17 +423,6 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	}
 
 	/**
-	 * Get all active sessions with their metadata
-	 */
-	override getSessions(): SessionMetadata[] {
-		const sessions: SessionMetadata[] = [];
-		for (const session of this.sessions.values()) {
-			sessions.push({ ...session.metadata });
-		}
-		return sessions;
-	}
-
-	/**
 	 * Check if server is accepting new connections
 	 */
 	isAcceptingConnections(): boolean {
@@ -359,14 +437,21 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 			clearInterval(this.staleCheckInterval);
 			this.staleCheckInterval = undefined;
 		}
+		this.stopPingKeepAlive();
 	}
 
 	/**
 	 * Track a new session created (called when session is added to sessions map)
 	 */
-	protected trackSessionCreated(): void {
+	protected trackSessionCreated(sessionId: string): void {
 		this.trackNewConnection();
 		this.metrics.updateActiveConnections(this.sessions.size);
+		// Track as unknown client initially - will be updated when client info is available
+		const session = this.sessions.get(sessionId);
+		if (session) {
+			session.metadata.clientInfo = { name: 'unknown', version: 'unknown' };
+			this.metrics.associateSessionWithClient(session.metadata.clientInfo);
+		}
 	}
 
 	/**
@@ -383,12 +468,197 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	}
 
 	/**
+	 * Get all active sessions with their metadata
+	 */
+	override getSessions(): SessionMetadata[] {
+		return Array.from(this.sessions.values()).map((session) => session.metadata);
+	}
+
+	/**
 	 * Get configuration settings for stateful transports
 	 */
-	override getConfiguration(): { staleCheckInterval: number; staleTimeout: number } {
+	override getConfiguration(): {
+		heartbeatInterval: number;
+		staleCheckInterval: number;
+		staleTimeout: number;
+		pingEnabled: boolean;
+		pingInterval: number;
+	} {
 		return {
+			heartbeatInterval: this.HEARTBEAT_INTERVAL,
 			staleCheckInterval: this.STALE_CHECK_INTERVAL,
 			staleTimeout: this.STALE_TIMEOUT,
+			pingEnabled: this.PING_ENABLED,
+			pingInterval: this.PING_INTERVAL,
 		};
+	}
+
+	/**
+	 * Start heartbeat monitoring for a session with SSE response
+	 * Automatically detects stale connections and cleans them up
+	 */
+	protected startHeartbeat(sessionId: string, response: { destroyed: boolean; writableEnded: boolean }): void {
+		const session = this.sessions.get(sessionId);
+		if (!session) return;
+
+		// Clear any existing heartbeat
+		this.stopHeartbeat(sessionId);
+
+		session.heartbeatInterval = setInterval(() => {
+			if (response.destroyed || response.writableEnded) {
+				logger.debug({ sessionId }, 'Detected stale connection via heartbeat');
+				void this.removeStaleSession(sessionId);
+			}
+		}, this.HEARTBEAT_INTERVAL);
+	}
+
+	/**
+	 * Stop heartbeat monitoring for a session
+	 */
+	protected stopHeartbeat(sessionId: string): void {
+		const session = this.sessions.get(sessionId);
+		if (session?.heartbeatInterval) {
+			clearInterval(session.heartbeatInterval);
+			session.heartbeatInterval = undefined;
+		}
+	}
+
+	/**
+	 * Set up standard SSE connection event handlers
+	 */
+	protected setupSseEventHandlers(
+		sessionId: string,
+		response: { on: (event: string, handler: (...args: unknown[]) => void) => void }
+	): void {
+		response.on('close', () => {
+			logger.info({ sessionId }, 'SSE connection closed by client');
+			void this.removeStaleSession(sessionId);
+		});
+
+		response.on('error', (...args: unknown[]) => {
+			const error = args[0] as Error;
+			logger.error({ error, sessionId }, 'SSE connection error');
+			this.trackError(500, error);
+			void this.removeStaleSession(sessionId);
+		});
+	}
+
+	/**
+	 * Standard session cleanup implementation
+	 * Handles stopping heartbeat, closing transport/server, and tracking cleanup
+	 */
+	protected async cleanupSession(sessionId: string): Promise<void> {
+		try {
+			const session = this.sessions.get(sessionId);
+			if (!session) return;
+
+			logger.debug({ sessionId }, 'Cleaning up session');
+
+			// Clear heartbeat interval
+			this.stopHeartbeat(sessionId);
+
+			// Close transport
+			try {
+				await (session.transport as { close(): Promise<void> }).close();
+			} catch (error) {
+				logger.error({ error, sessionId }, 'Error closing transport');
+			}
+
+			// Close server
+			try {
+				await session.server.close();
+			} catch (error) {
+				logger.error({ error, sessionId }, 'Error closing server');
+			}
+
+			// Remove from map and track cleanup
+			this.sessions.delete(sessionId);
+			this.trackSessionCleaned(session);
+
+			logger.debug({ sessionId }, 'Session cleaned up');
+		} catch (error) {
+			logger.error({ error, sessionId }, 'Error during session cleanup');
+		}
+	}
+
+	/**
+	 * Clean up all sessions in parallel
+	 */
+	protected async cleanupAllSessions(): Promise<void> {
+		const sessionIds = Array.from(this.sessions.keys());
+
+		const cleanupPromises = sessionIds.map((sessionId) =>
+			this.cleanupSession(sessionId).catch((error: unknown) => {
+				logger.error({ error, sessionId }, 'Error during session cleanup');
+			})
+		);
+
+		await Promise.allSettled(cleanupPromises);
+		this.sessions.clear();
+	}
+
+	/**
+	 * Set up standard server configuration for a session
+	 * Configures client info capture and error tracking
+	 */
+	protected setupServerForSession(server: McpServer, sessionId: string): void {
+		// Set up client info capture
+		server.server.oninitialized = this.createClientInfoCapture(sessionId);
+
+		// Set up error tracking for server errors
+		server.server.onerror = (error) => {
+			this.trackError(undefined, error);
+			logger.error({ error, sessionId }, 'Server error');
+		};
+	}
+
+	/**
+	 * Validate common request conditions and track method calls
+	 * Returns validation result with error response if invalid
+	 */
+	protected validateSessionRequest(
+		sessionId: string | undefined,
+		requestBody: unknown,
+		allowMissingSession: boolean = false
+	): { isValid: boolean; errorResponse?: object; statusCode?: number; trackingName: string | null } {
+		const trackingName = this.extractMethodForTracking(requestBody);
+
+		// Check if server is shutting down
+		if (this.isShuttingDown) {
+			this.trackError(503);
+			this.metrics.trackMethod(trackingName, undefined, true);
+			return {
+				isValid: false,
+				errorResponse: JsonRpcErrors.serverShuttingDown(extractJsonRpcId(requestBody)),
+				statusCode: 503,
+				trackingName,
+			};
+		}
+
+		// Check session ID requirements
+		if (!sessionId && !allowMissingSession) {
+			this.trackError(400);
+			this.metrics.trackMethod(trackingName, undefined, true);
+			return {
+				isValid: false,
+				errorResponse: JsonRpcErrors.invalidParams('sessionId is required', extractJsonRpcId(requestBody)),
+				statusCode: 400,
+				trackingName,
+			};
+		}
+
+		// Check session existence
+		if (sessionId && !this.sessions.has(sessionId)) {
+			this.trackError(404);
+			this.metrics.trackMethod(trackingName, undefined, true);
+			return {
+				isValid: false,
+				errorResponse: JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(requestBody)),
+				statusCode: 404,
+				trackingName,
+			};
+		}
+
+		return { isValid: true, trackingName };
 	}
 }

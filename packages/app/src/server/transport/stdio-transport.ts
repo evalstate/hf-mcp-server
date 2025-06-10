@@ -32,7 +32,7 @@ export class StdioTransport extends StatefulTransport<StdioSession> {
 		this.sessions.set(this.SESSION_ID, session);
 		
 		// Track the session creation for metrics
-		this.trackSessionCreated();
+		this.trackSessionCreated(this.SESSION_ID);
 
 		try {
 			// Set up request/response interceptors for metrics

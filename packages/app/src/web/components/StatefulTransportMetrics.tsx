@@ -1,0 +1,266 @@
+import type { ColumnDef } from '@tanstack/react-table';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { Separator } from './ui/separator';
+import { Table, TableBody, TableCell, TableRow } from './ui/table';
+import { Wifi, WifiOff } from 'lucide-react';
+import { DataTable } from './data-table';
+import { createSortableHeader } from './data-table-utils';
+import type { TransportMetricsResponse } from '../../shared/transport-metrics.js';
+
+type SessionData = {
+	id: string;
+	connectedAt: string;
+	lastActivity: string;
+	clientInfo?: {
+		name: string;
+		version: string;
+	};
+	isConnected: boolean;
+};
+
+/**
+ * Format relative time (e.g., "5m ago", "2h ago", "just now")
+ */
+function formatRelativeTime(timestamp: string): string {
+	const now = new Date();
+	const time = new Date(timestamp);
+	const diffMs = now.getTime() - time.getTime();
+	const diffSeconds = Math.floor(diffMs / 1000);
+
+	if (diffSeconds < 60) return 'just now';
+
+	const diffMinutes = Math.floor(diffSeconds / 60);
+	if (diffMinutes < 60) return `${diffMinutes}m ago`;
+
+	const diffHours = Math.floor(diffMinutes / 60);
+	if (diffHours < 24) return `${diffHours}h ago`;
+
+	const diffDays = Math.floor(diffHours / 24);
+	return `${diffDays}d ago`;
+}
+
+/**
+ * Format uptime in a human-readable way
+ */
+function formatUptime(seconds: number): string {
+	const days = Math.floor(seconds / 86400);
+	const hours = Math.floor((seconds % 86400) / 3600);
+	const minutes = Math.floor((seconds % 3600) / 60);
+
+	if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+	if (hours > 0) return `${hours}h ${minutes}m`;
+	return `${minutes}m`;
+}
+
+/**
+ * Format milliseconds to human readable time
+ */
+function formatMilliseconds(ms: number): string {
+	if (ms < 1000) return `${ms}ms`;
+	if (ms < 60000) return `${Math.round(ms / 1000)}s`;
+	return `${Math.round(ms / 60000)}m`;
+}
+
+/**
+ * Truncate session ID to show first 5 and last 5 characters
+ */
+function truncateSessionId(id: string): string {
+	if (id.length <= 12) return id;
+	return `${id.slice(0, 5)}...${id.slice(-5)}`;
+}
+
+/**
+ * Truncate client name to show first 35 and last 5 characters
+ */
+function truncateClientName(name: string): string {
+	if (name.length <= 42) return name;
+	return `${name.slice(0, 35)}.....${name.slice(-5)}`;
+}
+
+interface StatefulTransportMetricsProps {
+	metrics: TransportMetricsResponse;
+}
+
+export function StatefulTransportMetrics({ metrics }: StatefulTransportMetricsProps) {
+	const sessionData = metrics.sessions || [];
+
+	const transportTypeDisplay = {
+		sse: 'Server-Sent Events',
+		streamableHttp: 'Streamable HTTP',
+	} as const;
+
+	// Define columns for the sessions table
+	const createSessionColumns = (): ColumnDef<SessionData>[] => [
+		{
+			accessorKey: "clientInfo",
+			header: createSortableHeader("Client"),
+			cell: ({ row }) => {
+				const session = row.original;
+				const clientDisplay = session.clientInfo 
+					? `${truncateClientName(session.clientInfo.name)}@${session.clientInfo.version}`
+					: 'unknown';
+				return (
+					<div className="font-mono text-sm" title={session.clientInfo ? `${session.clientInfo.name}@${session.clientInfo.version}` : 'unknown'}>
+						{clientDisplay}
+					</div>
+				);
+			},
+		},
+		{
+			accessorKey: "id",
+			header: createSortableHeader("Session ID"),
+			cell: ({ row }) => (
+				<div className="font-mono text-sm" title={row.getValue<string>("id")}>
+					{truncateSessionId(row.getValue<string>("id"))}
+				</div>
+			),
+		},
+		{
+			accessorKey: "isConnected",
+			header: createSortableHeader("Status"),
+			cell: ({ row }) => {
+				const session = row.original;
+				return (
+					<Badge variant={session.isConnected ? 'success' : 'secondary'} className="gap-1">
+						{session.isConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+						{session.isConnected ? 'Connected' : 'Stale'}
+					</Badge>
+				);
+			},
+		},
+		{
+			accessorKey: "connectedAt",
+			header: createSortableHeader("Connected"),
+			cell: ({ row }) => (
+				<div className="text-sm">
+					{formatRelativeTime(row.getValue<string>("connectedAt"))}
+				</div>
+			),
+		},
+		{
+			accessorKey: "lastActivity",
+			header: createSortableHeader("Last Activity"),
+			cell: ({ row }) => (
+				<div className="text-sm">
+					{formatRelativeTime(row.getValue<string>("lastActivity"))}
+				</div>
+			),
+		},
+	];
+
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle>📊 Transport Metrics</CardTitle>
+				<CardDescription>
+					Real-time connection and performance metrics for{' '}
+					{transportTypeDisplay[metrics.transport as keyof typeof transportTypeDisplay] || metrics.transport} transport
+				</CardDescription>
+			</CardHeader>
+			<CardContent className="space-y-4">
+				{/* Transport Info */}
+				<div className="grid grid-cols-2 gap-4">
+					<div>
+						<p className="text-sm font-medium text-muted-foreground">Transport Type</p>
+						<p className="text-sm font-mono">
+							{transportTypeDisplay[metrics.transport as keyof typeof transportTypeDisplay] || metrics.transport}
+						</p>
+					</div>
+					<div>
+						<p className="text-sm font-medium text-muted-foreground">Uptime</p>
+						<p className="text-sm font-mono">{formatUptime(metrics.uptimeSeconds)}</p>
+					</div>
+				</div>
+
+				{/* Configuration for stateful transports */}
+				{metrics.configuration && (
+					<>
+						<div>
+							<p className="text-sm font-medium text-muted-foreground mb-2">Configuration</p>
+							<div className="grid grid-cols-1 gap-2">
+								{metrics.pings && (
+									<div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
+										{metrics.pings.sent > 0 && (
+											<p>
+												<span className="font-medium">Ping Status:</span>{' '}
+												{metrics.pings.successful}/{metrics.pings.sent} successful 
+												({metrics.pings.sent > 0 
+													? Math.round((metrics.pings.successful / metrics.pings.sent) * 100)
+													: 0}%)
+											</p>
+										)}
+									</div>
+								)}
+							</div>
+							<p className="text-xs text-muted-foreground mt-2">
+								SSE connections checked every {formatMilliseconds(metrics.configuration.heartbeatInterval || 30000)}, 
+								sessions swept every {formatMilliseconds(metrics.configuration.staleCheckInterval)}, 
+								removed after {formatMilliseconds(metrics.configuration.staleTimeout)} inactive
+								{metrics.configuration.pingEnabled && metrics.configuration.pingInterval && 
+									`, pings sent every ${formatMilliseconds(metrics.configuration.pingInterval)}`}
+							</p>
+						</div>
+					</>
+				)}
+
+				<Separator />
+
+				{/* Metrics Table - 2 columns layout */}
+				<div>
+					<Table>
+						<TableBody>
+							<TableRow>
+								<TableCell className="font-medium text-sm">Active Connections</TableCell>
+								<TableCell className="text-sm font-mono">{metrics.connections.active}</TableCell>
+								<TableCell className="font-medium text-sm">Cleaned Sessions</TableCell>
+								<TableCell className="text-sm font-mono">{metrics.connections.cleaned ?? 0}</TableCell>
+							</TableRow>
+							<TableRow>
+								<TableCell className="font-medium text-sm">Total Connections</TableCell>
+								<TableCell className="text-sm font-mono">{metrics.connections.total}</TableCell>
+								<TableCell className="font-medium text-sm">Requests per Minute</TableCell>
+								<TableCell className="text-sm font-mono">{metrics.requests.averagePerMinute}</TableCell>
+							</TableRow>
+							<TableRow>
+								<TableCell className="font-medium text-sm">Client Errors (4xx)</TableCell>
+								<TableCell className="text-sm font-mono">{metrics.errors.expected}</TableCell>
+								<TableCell className="font-medium text-sm">Server Errors (5xx)</TableCell>
+								<TableCell className="text-sm font-mono">{metrics.errors.unexpected}</TableCell>
+							</TableRow>
+							{metrics.pings && (
+								<TableRow>
+									<TableCell className="font-medium text-sm">Pings Sent</TableCell>
+									<TableCell className="text-sm font-mono">{metrics.pings.sent}</TableCell>
+									<TableCell className="font-medium text-sm">Ping Success Rate</TableCell>
+									<TableCell className="text-sm font-mono">
+										{metrics.pings.sent > 0 
+											? `${Math.round((metrics.pings.successful / metrics.pings.sent) * 100)}%`
+											: '-'}
+									</TableCell>
+								</TableRow>
+							)}
+						</TableBody>
+					</Table>
+				</div>
+
+				{/* Sessions */}
+				{sessionData.length > 0 && (
+					<>
+						<Separator />
+						<div>
+							<h3 className="text-sm font-semibold text-foreground mb-3">Active Sessions</h3>
+							<DataTable 
+								columns={createSessionColumns()} 
+								data={sessionData} 
+								searchColumn="id"
+								searchPlaceholder="Filter sessions..."
+								pageSize={10}
+							/>
+						</div>
+					</>
+				)}
+			</CardContent>
+		</Card>
+	);
+}

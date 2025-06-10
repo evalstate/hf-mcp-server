@@ -22,6 +22,14 @@ export interface TransportMetrics {
 		averagePerMinute: number;
 	};
 
+	// Ping metrics (for stateful transports)
+	pings?: {
+		sent: number;
+		successful: number;
+		failed: number;
+		lastPingTime?: Date;
+	};
+
 	// Error metrics
 	errors: {
 		expected: number; // 4xx errors
@@ -38,6 +46,9 @@ export interface TransportMetrics {
 
 	// Method metrics
 	methods: Map<string, MethodMetrics>;
+
+	// Static page hits (for stateless transport)
+	staticPageHits?: number;
 }
 
 /**
@@ -69,6 +80,17 @@ export interface MethodMetrics {
 /**
  * API response format for transport metrics
  */
+export interface SessionData {
+	id: string;
+	connectedAt: string; // ISO date string
+	lastActivity: string; // ISO date string
+	clientInfo?: {
+		name: string;
+		version: string;
+	};
+	isConnected: boolean;
+}
+
 export interface TransportMetricsResponse {
 	transport: TransportType;
 	isStateless: boolean;
@@ -78,8 +100,11 @@ export interface TransportMetricsResponse {
 
 	// Configuration settings (only for stateful transports)
 	configuration?: {
+		heartbeatInterval: number; // milliseconds
 		staleCheckInterval: number; // milliseconds
 		staleTimeout: number; // milliseconds
+		pingEnabled?: boolean;
+		pingInterval?: number; // milliseconds
 	};
 
 	connections: {
@@ -91,6 +116,16 @@ export interface TransportMetricsResponse {
 	requests: {
 		total: number;
 		averagePerMinute: number;
+	};
+
+	// Static page hits (stateless transport only)
+	staticPageHits?: number;
+
+	pings?: {
+		sent: number;
+		successful: number;
+		failed: number;
+		lastPingTime?: string; // ISO date string
 	};
 
 	errors: {
@@ -114,6 +149,8 @@ export interface TransportMetricsResponse {
 		totalConnections: number;
 	}>;
 
+	sessions: SessionData[];
+
 	methods: Array<{
 		method: string;
 		count: number;
@@ -131,7 +168,8 @@ export interface TransportMetricsResponse {
 export function formatMetricsForAPI(
 	metrics: TransportMetrics,
 	transport: TransportType,
-	isStateless: boolean
+	isStateless: boolean,
+	sessions: SessionData[] = []
 ): TransportMetricsResponse {
 	const currentTime = new Date();
 	const uptimeSeconds = Math.floor((currentTime.getTime() - metrics.startupTime.getTime()) / 1000);
@@ -144,6 +182,10 @@ export function formatMetricsForAPI(
 		uptimeSeconds,
 		connections: metrics.connections,
 		requests: metrics.requests,
+		pings: metrics.pings ? {
+			...metrics.pings,
+			lastPingTime: metrics.pings.lastPingTime?.toISOString()
+		} : undefined,
 		errors: {
 			...metrics.errors,
 			lastError: metrics.errors.lastError
@@ -158,6 +200,8 @@ export function formatMetricsForAPI(
 			firstSeen: client.firstSeen.toISOString(),
 			lastSeen: client.lastSeen.toISOString(),
 		})),
+		sessions,
+		staticPageHits: metrics.staticPageHits,
 		methods: Array.from(metrics.methods.values()).map((method) => ({
 			...method,
 			firstCalled: method.firstCalled.toISOString(),
@@ -337,7 +381,8 @@ export class MetricsCounter {
 	/**
 	 * Track a method call
 	 */
-	trackMethod(method: string, responseTime?: number, isError: boolean = false): void {
+	trackMethod(method: string | null, responseTime?: number, isError: boolean = false): void {
+		if (!method) return;
 		let methodMetrics = this.metrics.methods.get(method);
 
 		if (!methodMetrics) {
@@ -369,6 +414,59 @@ export class MetricsCounter {
 				methodMetrics.averageResponseTime = totalTime / successfulCalls;
 			}
 		}
+	}
+
+	/**
+	 * Track a ping being sent
+	 */
+	trackPingSent(): void {
+		if (!this.metrics.pings) {
+			this.metrics.pings = {
+				sent: 0,
+				successful: 0,
+				failed: 0,
+			};
+		}
+		this.metrics.pings.sent++;
+	}
+
+	/**
+	 * Track a successful ping response
+	 */
+	trackPingSuccess(): void {
+		if (!this.metrics.pings) {
+			this.metrics.pings = {
+				sent: 0,
+				successful: 0,
+				failed: 0,
+			};
+		}
+		this.metrics.pings.successful++;
+		this.metrics.pings.lastPingTime = new Date();
+	}
+
+	/**
+	 * Track a failed ping
+	 */
+	trackPingFailed(): void {
+		if (!this.metrics.pings) {
+			this.metrics.pings = {
+				sent: 0,
+				successful: 0,
+				failed: 0,
+			};
+		}
+		this.metrics.pings.failed++;
+	}
+
+	/**
+	 * Track a static page hit
+	 */
+	trackStaticPageHit(): void {
+		if (this.metrics.staticPageHits === undefined) {
+			this.metrics.staticPageHits = 0;
+		}
+		this.metrics.staticPageHits++;
 	}
 
 	/**

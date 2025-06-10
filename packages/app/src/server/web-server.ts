@@ -188,18 +188,37 @@ export class WebServer {
 				// Get configuration for stateful transports
 				const config = this.transport.getConfiguration();
 				
+				// Get sessions (empty for stateless transports)
+				const sessions = this.transport.getSessions().map(session => {
+					// Consider a session stale if no activity in the last 5 minutes
+					const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+					const isConnected = session.lastActivity > fiveMinutesAgo;
+					
+					return {
+						id: session.id,
+						connectedAt: session.connectedAt.toISOString(),
+						lastActivity: session.lastActivity.toISOString(),
+						clientInfo: session.clientInfo,
+						isConnected
+					};
+				});
+				
 				// Format for API response
 				const formattedMetrics = formatMetricsForAPI(
 					metrics,
 					this.transportInfo.transport,
-					isStateless
+					isStateless,
+					sessions
 				);
 
 				// Add configuration if available
 				if (!isStateless && config.staleCheckInterval && config.staleTimeout) {
 					formattedMetrics.configuration = {
+						heartbeatInterval: config.heartbeatInterval || 30000,
 						staleCheckInterval: config.staleCheckInterval,
-						staleTimeout: config.staleTimeout
+						staleTimeout: config.staleTimeout,
+						pingEnabled: config.pingEnabled,
+						pingInterval: config.pingInterval
 					};
 				}
 

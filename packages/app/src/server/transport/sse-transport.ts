@@ -8,7 +8,6 @@ import { extractQueryParamsToHeaders } from '../utils/query-params.js';
 
 interface SSEConnection extends BaseSession<SSEServerTransport> {
 	cleanup: () => Promise<void>;
-	heartbeatInterval?: NodeJS.Timeout;
 }
 
 export class SseTransport extends StatefulTransport<SSEConnection> {
@@ -26,10 +25,14 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 		});
 
 		this.startStaleConnectionCheck();
+		this.startPingKeepAlive();
 
 		logger.info('SSE transport routes initialized', {
+			heartbeatInterval: this.HEARTBEAT_INTERVAL,
 			staleCheckInterval: this.STALE_CHECK_INTERVAL,
 			staleTimeout: this.STALE_TIMEOUT,
+			pingEnabled: this.PING_ENABLED,
+			pingInterval: this.PING_INTERVAL,
 		});
 		return Promise.resolve();
 	}
@@ -77,20 +80,12 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			// Create comprehensive cleanup function
 			const cleanup = this.createCleanupFunction(sessionId);
 
-			// Set up heartbeat to detect stale connections
-			const heartbeatInterval = setInterval(() => {
-				if (res.destroyed || res.writableEnded) {
-					logger.debug({ sessionId }, 'Detected stale SSE connection');
-					void cleanup();
-				}
-			}, 30000); // Check every 30 seconds
 
 			// Store connection with metadata
 			const connection: SSEConnection = {
 				transport,
 				server,
 				cleanup,
-				heartbeatInterval,
 				metadata: {
 					id: sessionId,
 					connectedAt: new Date(),
@@ -102,19 +97,11 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			this.sessions.set(sessionId, connection);
 
 			// Track the session creation for metrics
-			this.trackSessionCreated();
+			this.trackSessionCreated(sessionId);
 
-			// Set up connection event handlers
-			res.on('close', () => {
-				logger.info({ sessionId }, 'SSE connection closed by client');
-				void cleanup();
-			});
-
-			res.on('error', (error) => {
-				logger.error({ error, sessionId }, 'SSE connection error');
-				this.trackError(500, error);
-				void cleanup();
-			});
+			// Set up heartbeat and connection event handlers
+			this.startHeartbeat(sessionId, res);
+			this.setupSseEventHandlers(sessionId, res);
 
 			// Connect to server with proper cleanup handling
 			await this.connectWithCleanup(transport, server, sessionId, cleanup);
@@ -179,41 +166,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 	}
 
 	private createCleanupFunction(sessionId: string): () => Promise<void> {
-		return async () => {
-			try {
-				const connection = this.sessions.get(sessionId);
-				if (!connection) return;
-
-				logger.debug({ sessionId }, 'Cleaning up SSE connection');
-
-				// Clear heartbeat interval
-				if (connection.heartbeatInterval) {
-					clearInterval(connection.heartbeatInterval);
-				}
-
-				// Close transport
-				try {
-					await connection.transport.close();
-				} catch (error) {
-					logger.error({ error, sessionId }, 'Error closing transport');
-				}
-
-				// Close server
-				try {
-					await connection.server.close();
-				} catch (error) {
-					logger.error({ error, sessionId }, 'Error closing server');
-				}
-
-				// Remove from map and track cleanup
-				this.trackSessionCleaned(connection);
-				this.sessions.delete(sessionId);
-
-				logger.debug({ sessionId }, 'SSE connection cleaned up');
-			} catch (error) {
-				logger.error({ error, sessionId }, 'Error during SSE connection cleanup');
-			}
-		};
+		return () => this.cleanupSession(sessionId);
 	}
 
 	private async connectWithCleanup(
@@ -223,14 +176,8 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 		cleanup: () => Promise<void>
 	): Promise<void> {
 		try {
-			// Set up oninitialized callback to capture client info using base class helper
-			server.server.oninitialized = this.createClientInfoCapture(sessionId);
-
-			// Set up error tracking for server errors
-			server.server.onerror = (error) => {
-				this.trackError(undefined, error);
-				logger.error({ error, sessionId }, 'SSE server error');
-			};
+			// Set up standard server configuration
+			this.setupServerForSession(server, sessionId);
 
 			await server.connect(transport);
 		} catch (error) {
@@ -246,7 +193,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 	 */
 	protected async removeStaleSession(sessionId: string): Promise<void> {
 		logger.info({ sessionId }, 'Removing stale SSE connection');
-		await this.closeConnection(sessionId);
+		await this.cleanupSession(sessionId);
 	}
 
 	async cleanup(): Promise<void> {
@@ -260,20 +207,8 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 		// Stop stale checker using base class helper
 		this.stopStaleConnectionCheck();
 
-		// Get all session IDs to avoid mutation during iteration
-		const sessionIds = Array.from(this.sessions.keys());
-
-		// Close all connections in parallel
-		const cleanupPromises = sessionIds.map((sessionId) =>
-			this.closeConnection(sessionId).catch((error: unknown) => {
-				logger.error({ error, sessionId }, 'Error during connection cleanup');
-			})
-		);
-
-		await Promise.allSettled(cleanupPromises);
-
-		// Ensure map is cleared
-		this.sessions.clear();
+		// Use base class cleanup method
+		await this.cleanupAllSessions();
 
 		logger.info('SSE transport cleanup completed');
 	}
@@ -282,14 +217,14 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 	 * Force close a specific connection
 	 */
 	async closeConnection(sessionId: string): Promise<boolean> {
-		const connection = this.sessions.get(sessionId);
-		if (!connection) {
+		const session = this.sessions.get(sessionId);
+		if (!session) {
 			logger.debug({ sessionId }, 'Attempted to close non-existent connection');
 			return false;
 		}
 
 		try {
-			await connection.cleanup();
+			await this.cleanupSession(sessionId);
 			return true;
 		} catch (error) {
 			logger.error({ error, sessionId }, 'Error closing connection');
