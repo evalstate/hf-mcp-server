@@ -12,6 +12,7 @@ type SessionData = {
 	id: string;
 	connectedAt: string;
 	lastActivity: string;
+	requestCount: number;
 	clientInfo?: {
 		name: string;
 		version: string;
@@ -122,6 +123,15 @@ export function StdioTransportMetrics({ metrics }: StdioTransportMetricsProps) {
 			cell: ({ row }) => (
 				<div className="text-sm">
 					{formatRelativeTime(row.getValue<string>("connectedAt"))}
+				</div>
+			),
+		},
+		{
+			accessorKey: "requestCount",
+			header: createSortableHeader("Requests", "right"),
+			cell: ({ row }) => (
+				<div className="text-right font-mono text-sm">
+					{row.getValue<number>("requestCount")}
 				</div>
 			),
 		},

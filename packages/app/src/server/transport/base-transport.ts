@@ -28,6 +28,7 @@ export interface SessionMetadata {
 	id: string;
 	connectedAt: Date;
 	lastActivity: Date;
+	requestCount: number;
 	clientInfo?: {
 		name: string;
 		version: string;

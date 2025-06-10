@@ -198,6 +198,7 @@ export class WebServer {
 						id: session.id,
 						connectedAt: session.connectedAt.toISOString(),
 						lastActivity: session.lastActivity.toISOString(),
+						requestCount: session.requestCount,
 						clientInfo: session.clientInfo,
 						isConnected
 					};

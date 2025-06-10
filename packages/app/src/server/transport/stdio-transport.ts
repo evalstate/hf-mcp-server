@@ -24,6 +24,7 @@ export class StdioTransport extends StatefulTransport<StdioSession> {
 				id: this.SESSION_ID,
 				connectedAt: new Date(),
 				lastActivity: new Date(),
+				requestCount: 0,
 				capabilities: {},
 			},
 		};
@@ -40,6 +41,13 @@ export class StdioTransport extends StatefulTransport<StdioSession> {
 			transport.send = (message) => {
 				this.trackRequest();
 				this.updateSessionActivity(this.SESSION_ID);
+				
+				// Increment request count
+				const session = this.sessions.get(this.SESSION_ID);
+				if (session) {
+					session.metadata.requestCount++;
+				}
+				
 				return originalSendMessage(message);
 			};
 

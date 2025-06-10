@@ -4,6 +4,7 @@ type SessionData = {
   id: string;
   connectedAt: string;
   lastActivity: string;
+  requestCount: number;
   clientInfo?: {
     name: string;
     version: string;
