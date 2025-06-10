@@ -224,6 +224,7 @@ export function McpMethodsCard() {
 									averageResponseTime: metrics.transport === 'streamableHttpJson',
 									lastCalled: true,
 								}}
+								defaultSorting={[{ id: "count", desc: true }]}
 							/>
 						)}
 					</div>

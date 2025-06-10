@@ -82,8 +82,8 @@ export function StatelessTransportMetrics({ metrics }: StatelessTransportMetrics
 	// Define columns for the client identities table
 	const createClientColumns = (): ColumnDef<ClientData>[] => [
 		{
-			accessorKey: "name",
-			header: createSortableHeader("Client"),
+			accessorKey: 'name',
+			header: createSortableHeader('Client'),
 			cell: ({ row }) => {
 				const client = row.original;
 				const clientDisplay = `${truncateClientName(client.name)}@${client.version}`;
@@ -92,23 +92,19 @@ export function StatelessTransportMetrics({ metrics }: StatelessTransportMetrics
 						<p className="font-medium font-mono text-sm" title={`${client.name}@${client.version}`}>
 							{clientDisplay}
 						</p>
-						<p className="text-xs text-muted-foreground">
-							First seen {formatRelativeTime(client.firstSeen)}
-						</p>
+						<p className="text-xs text-muted-foreground">First seen {formatRelativeTime(client.firstSeen)}</p>
 					</div>
 				);
 			},
 		},
 		{
-			accessorKey: "requestCount",
-			header: createSortableHeader("Request Count", "right"),
-			cell: ({ row }) => (
-				<div className="text-right font-mono text-sm">{row.getValue<number>("requestCount")}</div>
-			),
+			accessorKey: 'requestCount',
+			header: createSortableHeader('Initializations', 'right'),
+			cell: ({ row }) => <div className="text-right font-mono text-sm">{row.getValue<number>('requestCount')}</div>,
 		},
 		{
-			accessorKey: "isConnected",
-			header: createSortableHeader("Status"),
+			accessorKey: 'isConnected',
+			header: createSortableHeader('Status'),
 			cell: ({ row }) => {
 				const client = row.original;
 				return (
@@ -129,12 +125,10 @@ export function StatelessTransportMetrics({ metrics }: StatelessTransportMetrics
 			},
 		},
 		{
-			accessorKey: "lastSeen",
-			header: createSortableHeader("Last Seen", "right"),
+			accessorKey: 'lastSeen',
+			header: createSortableHeader('Last Seen', 'right'),
 			cell: ({ row }) => (
-				<div className="text-right text-sm">
-					{formatRelativeTime(row.getValue<string>("lastSeen"))}
-				</div>
+				<div className="text-right text-sm">{formatRelativeTime(row.getValue<string>('lastSeen'))}</div>
 			),
 		},
 	];
@@ -170,7 +164,7 @@ export function StatelessTransportMetrics({ metrics }: StatelessTransportMetrics
 					<Table>
 						<TableBody>
 							<TableRow>
-								<TableCell className="font-medium text-sm">Request Count (HTTP)</TableCell>
+								<TableCell className="font-medium text-sm">Request Count (MCP)</TableCell>
 								<TableCell className="text-sm font-mono">{metrics.connections.total}</TableCell>
 								<TableCell className="font-medium text-sm">Requests per Minute</TableCell>
 								<TableCell className="text-sm font-mono">{metrics.requests.averagePerMinute}</TableCell>
@@ -199,21 +193,20 @@ export function StatelessTransportMetrics({ metrics }: StatelessTransportMetrics
 				</div>
 
 				{/* Client Identities */}
-				{clientData.length > 0 && (
-					<>
-						<Separator />
-						<div>
-							<h3 className="text-sm font-semibold text-foreground mb-3">Client Identities</h3>
-							<DataTable 
-								columns={createClientColumns()} 
-								data={clientData} 
-								searchColumn="name"
-								searchPlaceholder="Filter clients..."
-								pageSize={50}
-							/>
-						</div>
-					</>
-				)}
+				<>
+					<Separator />
+					<div>
+						<h3 className="text-sm font-semibold text-foreground mb-3">Client Identities</h3>
+						<DataTable
+							columns={createClientColumns()}
+							data={clientData}
+							searchColumn="name"
+							searchPlaceholder="Filter clients..."
+							pageSize={50}
+							defaultSorting={[{ id: "lastSeen", desc: true }]}
+						/>
+					</div>
+				</>
 			</CardContent>
 		</Card>
 	);

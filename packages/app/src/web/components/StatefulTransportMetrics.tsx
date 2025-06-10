@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableRow } from './ui/table';
 import { Wifi, WifiOff } from 'lucide-react';
 import { DataTable } from './data-table';
 import { createSortableHeader } from './data-table-utils';
+import { useSessionCache } from '../hooks/useSessionCache';
 import type { TransportMetricsResponse } from '../../shared/transport-metrics.js';
 
 type SessionData = {
@@ -83,7 +84,8 @@ interface StatefulTransportMetricsProps {
 }
 
 export function StatefulTransportMetrics({ metrics }: StatefulTransportMetricsProps) {
-	const sessionData = metrics.sessions || [];
+	const apiSessions = metrics.sessions || [];
+	const sessionData = useSessionCache(apiSessions);
 
 	const transportTypeDisplay = {
 		sse: 'Server-Sent Events',
@@ -124,7 +126,7 @@ export function StatefulTransportMetrics({ metrics }: StatefulTransportMetricsPr
 				return (
 					<Badge variant={session.isConnected ? 'success' : 'secondary'} className="gap-1">
 						{session.isConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-						{session.isConnected ? 'Connected' : 'Stale'}
+						{session.isConnected ? 'Connected' : 'Disconnected'}
 					</Badge>
 				);
 			},
@@ -245,21 +247,22 @@ export function StatefulTransportMetrics({ metrics }: StatefulTransportMetricsPr
 				</div>
 
 				{/* Sessions */}
-				{sessionData.length > 0 && (
-					<>
-						<Separator />
-						<div>
-							<h3 className="text-sm font-semibold text-foreground mb-3">Active Sessions</h3>
-							<DataTable 
-								columns={createSessionColumns()} 
-								data={sessionData} 
-								searchColumn="id"
-								searchPlaceholder="Filter sessions..."
-								pageSize={10}
-							/>
-						</div>
-					</>
-				)}
+				<>
+					<Separator />
+					<div>
+						<h3 className="text-sm font-semibold text-foreground mb-3">
+							Sessions ({sessionData.filter(s => s.isConnected).length} active, {sessionData.filter(s => !s.isConnected).length} disconnected)
+						</h3>
+						<DataTable 
+							columns={createSessionColumns()} 
+							data={sessionData} 
+							searchColumn="id"
+							searchPlaceholder="Filter sessions..."
+							pageSize={10}
+							defaultSorting={[{ id: "lastActivity", desc: true }]}
+						/>
+					</div>
+				</>
 			</CardContent>
 		</Card>
 	);
