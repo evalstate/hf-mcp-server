@@ -37,6 +37,8 @@ export interface SessionMetadata {
 		sampling?: boolean;
 		roots?: boolean;
 	};
+	pingFailures?: number;
+	lastPingAttempt?: Date;
 }
 
 /**
@@ -115,6 +117,7 @@ export abstract class BaseTransport {
 		staleTimeout?: number;
 		pingEnabled?: boolean;
 		pingInterval?: number;
+		pingFailureThreshold?: number;
 	} {
 		return {};
 	}
@@ -163,7 +166,7 @@ export abstract class BaseTransport {
 
 	/**
 	 * Extract method name from JSON-RPC request body for tracking
-	 * Handles special case for tools/call to include tool name
+	 * Handles special cases for tools/call and prompts/get to include tool/prompt names
 	 * Returns null for responses (which should not be tracked as methods)
 	 */
 	protected extractMethodForTracking(requestBody: unknown): string | null {
@@ -186,6 +189,14 @@ export abstract class BaseTransport {
 			}
 		}
 
+		// For prompts/get, extract the prompt name as well
+		if (methodName === 'prompts/get' && body?.params && typeof body.params === 'object' && 'name' in body.params) {
+			const promptName = body.params.name;
+			if (typeof promptName === 'string') {
+				return `prompts/get:${promptName}`;
+			}
+		}
+
 		return methodName;
 	}
 
@@ -199,7 +210,7 @@ export abstract class BaseTransport {
 		const methodName = body?.method || 'unknown';
 
 		// Always skip for initialize requests
-		if (methodName === 'initialize') {
+		if (methodName === 'initialize' || methodName.startsWith('prompts/')) {
 			return true;
 		}
 
@@ -242,6 +253,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	protected readonly HEARTBEAT_INTERVAL = parseInt(process.env.MCP_CLIENT_HEARTBEAT_INTERVAL || '30000', 10);
 	protected readonly PING_ENABLED = process.env.MCP_PING_ENABLED !== 'false';
 	protected readonly PING_INTERVAL = parseInt(process.env.MCP_PING_INTERVAL || '30000', 10);
+	protected readonly PING_FAILURE_THRESHOLD = parseInt(process.env.MCP_PING_FAILURE_THRESHOLD || '1', 10);
 
 	/**
 	 * Update the last activity timestamp for a session
@@ -253,6 +265,13 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 			// Update client activity metrics if client info is available
 			this.metrics.updateClientActivity(session.metadata.clientInfo);
 		}
+	}
+
+	/**
+	 * Check if a session is distressed (has excessive ping failures)
+	 */
+	protected isSessionDistressed(session: BaseSession): boolean {
+		return (session.metadata.pingFailures || 0) >= this.PING_FAILURE_THRESHOLD;
 	}
 
 	/**
@@ -296,7 +315,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 
 	/**
 	 * Send a fire-and-forget ping to a single session
-	 * Success updates lastActivity, failures are ignored
+	 * Success updates lastActivity, failures increment failure count
 	 */
 	protected pingSingleSession(sessionId: string): void {
 		const session = this.sessions.get(sessionId);
@@ -307,8 +326,9 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 			return;
 		}
 
-		// Mark ping as in-flight
+		// Mark ping as in-flight and update last ping attempt
 		this.pingsInFlight.add(sessionId);
+		session.metadata.lastPingAttempt = new Date();
 
 		// Track ping being sent
 		this.metrics.trackPingSent();
@@ -317,18 +337,19 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 		session.server.server
 			.ping()
 			.then(() => {
-				// SUCCESS: Update lastActivity timestamp
+				// SUCCESS: Update lastActivity timestamp and reset ping failures
 				// This prevents the stale checker from removing this session
 				this.updateSessionActivity(sessionId);
+				session.metadata.pingFailures = 0;
 				this.metrics.trackPingSuccess();
 				logger.trace({ sessionId }, 'Ping succeeded');
 			})
 			.catch((error: unknown) => {
-				// FAILURE: Do nothing
-				// No activity update means stale checker will eventually remove it
+				// FAILURE: Increment ping failure count
+				session.metadata.pingFailures = (session.metadata.pingFailures || 0) + 1;
 				const errorMessage = error instanceof Error ? error.message : String(error);
 				this.metrics.trackPingFailed();
-				logger.trace({ sessionId, error: errorMessage }, 'Ping failed');
+				logger.trace({ sessionId, error: errorMessage, failures: session.metadata.pingFailures }, 'Ping failed');
 			})
 			.finally(() => {
 				// Always remove from tracking set
@@ -484,6 +505,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 		staleTimeout: number;
 		pingEnabled: boolean;
 		pingInterval: number;
+		pingFailureThreshold: number;
 	} {
 		return {
 			heartbeatInterval: this.HEARTBEAT_INTERVAL,
@@ -491,6 +513,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 			staleTimeout: this.STALE_TIMEOUT,
 			pingEnabled: this.PING_ENABLED,
 			pingInterval: this.PING_INTERVAL,
+			pingFailureThreshold: this.PING_FAILURE_THRESHOLD,
 		};
 	}
 

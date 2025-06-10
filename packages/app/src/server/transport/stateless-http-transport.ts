@@ -30,6 +30,11 @@ export class StatelessHttpTransport extends BaseTransport {
 			return true;
 		}
 		
+		// Always handle prompt-related requests
+		if (method === 'prompts/list' || method === 'prompts/get') {
+			return true;
+		}
+		
 		// Handle initialize to set up client tracking
 		if (method === 'initialize') {
 			return true;

@@ -26,8 +26,8 @@ type MethodData = {
 };
 
 export function McpMethodsCard() {
-	// State for filtering only tool calls
-	const [showOnlyToolCalls, setShowOnlyToolCalls] = useState(false);
+	// State for filtering only tool and prompt calls
+	const [showOnlyToolAndPromptCalls, setShowOnlyToolAndPromptCalls] = useState(false);
 
 	// Use SWR for transport metrics with auto-refresh
 	const { data: metrics, error } = useSWR<TransportMetricsResponse>('/api/transport-metrics', fetcher, {
@@ -41,23 +41,26 @@ export function McpMethodsCard() {
 
 	// Filter methods if checkbox is checked
 	const allMethods = metrics?.methods || [];
-	const filteredMethods = showOnlyToolCalls 
-		? allMethods.filter(m => m.method.startsWith('tools/call'))
+	const filteredMethods = showOnlyToolAndPromptCalls
+		? allMethods.filter((m) => m.method.startsWith('tools/call') || m.method.startsWith('prompts/get'))
 		: allMethods;
 
-	// Calculate total calls and tool calls
+	// Calculate total calls, tool calls, and prompt calls
 	const totalMcpCalls = allMethods.reduce((sum, method) => sum + method.count, 0);
 	const toolCalls = allMethods
-		.filter(m => m.method.startsWith('tools/call'))
+		.filter((m) => m.method.startsWith('tools/call'))
+		.reduce((sum, method) => sum + method.count, 0);
+	const promptCalls = allMethods
+		.filter((m) => m.method.startsWith('prompts/get'))
 		.reduce((sum, method) => sum + method.count, 0);
 
 	// Define columns for the data table
 	const columns: ColumnDef<MethodData>[] = [
 		{
-			accessorKey: "method",
-			header: createSortableHeader("Method"),
+			accessorKey: 'method',
+			header: createSortableHeader('Method'),
 			cell: ({ row }) => {
-				const method = row.getValue("method") as string;
+				const method = row.getValue('method') as string;
 				return (
 					<div className="font-mono text-sm">
 						{method === 'tools/call' ? (
@@ -65,9 +68,14 @@ export function McpMethodsCard() {
 						) : method.startsWith('tools/call:') ? (
 							<>
 								<span className="text-blue-600 dark:text-blue-400">tools/call:</span>
-								<span className="text-green-600 dark:text-green-400">
-									{method.replace('tools/call:', '')}
-								</span>
+								<span className="text-green-600 dark:text-green-400">{method.replace('tools/call:', '')}</span>
+							</>
+						) : method === 'prompts/get' ? (
+							<span className="text-purple-600 dark:text-purple-400">prompts/get</span>
+						) : method.startsWith('prompts/get:') ? (
+							<>
+								<span className="text-purple-600 dark:text-purple-400">prompts/get:</span>
+								<span className="text-orange-600 dark:text-orange-400">{method.replace('prompts/get:', '')}</span>
 							</>
 						) : (
 							method
@@ -77,62 +85,48 @@ export function McpMethodsCard() {
 			},
 		},
 		{
-			accessorKey: "count",
-			header: createSortableHeader("Calls", "right"),
-			cell: ({ row }) => (
-				<div className="text-right font-mono">{row.getValue<number>("count").toLocaleString()}</div>
-			),
+			accessorKey: 'count',
+			header: createSortableHeader('Calls', 'right'),
+			cell: ({ row }) => <div className="text-right font-mono">{row.getValue<number>('count').toLocaleString()}</div>,
 		},
 		{
-			accessorKey: "errors",
-			header: createSortableHeader("Errors", "right"),
+			accessorKey: 'errors',
+			header: createSortableHeader('Errors', 'right'),
 			cell: ({ row }) => {
-				const errors = row.getValue<number>("errors");
+				const errors = row.getValue<number>('errors');
 				return (
 					<div className="text-right font-mono">
-						{errors > 0 ? (
-							<span className="text-red-600 dark:text-red-400">{errors}</span>
-						) : (
-							'0'
-						)}
+						{errors > 0 ? <span className="text-red-600 dark:text-red-400">{errors}</span> : '0'}
 					</div>
 				);
 			},
 		},
 		{
-			accessorKey: "errorRate",
-			header: createSortableHeader("Error Rate", "right"),
+			accessorKey: 'errorRate',
+			header: createSortableHeader('Error Rate', 'right'),
 			cell: ({ row }) => {
-				const errorRate = row.getValue<number>("errorRate");
+				const errorRate = row.getValue<number>('errorRate');
 				return (
 					<div className="text-right font-mono">
-						{errorRate > 0 ? (
-							<span className="text-red-600 dark:text-red-400">{errorRate.toFixed(1)}%</span>
-						) : (
-							'0%'
-						)}
+						{errorRate > 0 ? <span className="text-red-600 dark:text-red-400">{errorRate.toFixed(1)}%</span> : '0%'}
 					</div>
 				);
 			},
 		},
 		{
-			accessorKey: "averageResponseTime",
-			header: createSortableHeader("Avg Response", "right"),
+			accessorKey: 'averageResponseTime',
+			header: createSortableHeader('Avg Response', 'right'),
 			cell: ({ row }) => {
-				const avgTime = row.getValue<number | undefined>("averageResponseTime");
-				return (
-					<div className="text-right font-mono">
-						{avgTime ? `${avgTime.toFixed(0)}ms` : '—'}
-					</div>
-				);
+				const avgTime = row.getValue<number | undefined>('averageResponseTime');
+				return <div className="text-right font-mono">{avgTime ? `${avgTime.toFixed(0)}ms` : '—'}</div>;
 			},
 		},
 		{
-			accessorKey: "lastCalled",
-			header: createSortableHeader("Last Called", "right"),
+			accessorKey: 'lastCalled',
+			header: createSortableHeader('Last Called', 'right'),
 			cell: ({ row }) => (
 				<div className="text-right text-sm text-muted-foreground">
-					{new Date(row.getValue<string>("lastCalled")).toLocaleTimeString()}
+					{new Date(row.getValue<string>('lastCalled')).toLocaleTimeString()}
 				</div>
 			),
 		},
@@ -144,7 +138,11 @@ export function McpMethodsCard() {
 				<CardTitle>HTTP JSON Transport Statistics</CardTitle>
 				<CardDescription>
 					MCP method call statistics and performance metrics
-					{isStdioMode ? ' (Empty in STDIO mode)' : metrics?.isStateless ? '' : ' (Response times not available in stateful modes)'}
+					{isStdioMode
+						? ' (Empty in STDIO mode)'
+						: metrics?.isStateless
+							? ''
+							: ' (Response times not available in stateful modes)'}
 				</CardDescription>
 			</CardHeader>
 			<CardContent>
@@ -176,12 +174,15 @@ export function McpMethodsCard() {
 									Showing {filteredMethods.length} method{filteredMethods.length !== 1 ? 's' : ''} tracked since{' '}
 									{new Date(metrics.startupTime).toLocaleString()}
 								</div>
-								<div className="flex items-center gap-6">
+								<div className="flex items-center gap-4">
 									<div className="text-sm font-medium">
 										Total MCP Calls: <span className="font-mono">{totalMcpCalls.toLocaleString()}</span>
 									</div>
 									<div className="text-sm font-medium">
 										Tool Calls: <span className="font-mono">{toolCalls.toLocaleString()}</span>
+									</div>
+									<div className="text-sm font-medium">
+										Prompt Calls: <span className="font-mono">{promptCalls.toLocaleString()}</span>
 									</div>
 								</div>
 							</div>
@@ -189,16 +190,16 @@ export function McpMethodsCard() {
 
 						{allMethods.length > 0 && (
 							<div className="flex items-center space-x-2">
-								<Checkbox 
-									id="tool-calls-filter"
-									checked={showOnlyToolCalls}
-									onCheckedChange={(checked) => setShowOnlyToolCalls(!!checked)}
+								<Checkbox
+									id="tool-prompt-calls-filter"
+									checked={showOnlyToolAndPromptCalls}
+									onCheckedChange={(checked) => setShowOnlyToolAndPromptCalls(!!checked)}
 								/>
 								<label
-									htmlFor="tool-calls-filter"
+									htmlFor="tool-prompt-calls-filter"
 									className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
 								>
-									Show only tools/call methods
+									Show only Tools/Prompts
 								</label>
 							</div>
 						)}
@@ -206,13 +207,15 @@ export function McpMethodsCard() {
 						{filteredMethods.length === 0 ? (
 							<div className="flex items-center justify-center py-8">
 								<div className="text-sm text-muted-foreground">
-									{showOnlyToolCalls ? 'No tool calls recorded yet.' : 'No method calls recorded yet.'}
+									{showOnlyToolAndPromptCalls
+										? 'No tool or prompt calls recorded yet.'
+										: 'No method calls recorded yet.'}
 								</div>
 							</div>
 						) : (
-							<DataTable 
-								columns={columns} 
-								data={filteredMethods} 
+							<DataTable
+								columns={columns}
+								data={filteredMethods}
 								searchColumn="method"
 								searchPlaceholder="Filter methods..."
 								pageSize={50}
@@ -224,7 +227,7 @@ export function McpMethodsCard() {
 									averageResponseTime: metrics.transport === 'streamableHttpJson',
 									lastCalled: true,
 								}}
-								defaultSorting={[{ id: "count", desc: true }]}
+								defaultSorting={[{ id: 'count', desc: true }]}
 							/>
 						)}
 					</div>

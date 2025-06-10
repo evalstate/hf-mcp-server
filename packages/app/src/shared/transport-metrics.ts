@@ -89,6 +89,9 @@ export interface SessionData {
 		version: string;
 	};
 	isConnected: boolean;
+	connectionStatus?: 'Connected' | 'Distressed' | 'Disconnected';
+	pingFailures?: number;
+	lastPingAttempt?: string; // ISO date string
 }
 
 export interface TransportMetricsResponse {
@@ -105,6 +108,7 @@ export interface TransportMetricsResponse {
 		staleTimeout: number; // milliseconds
 		pingEnabled?: boolean;
 		pingInterval?: number; // milliseconds
+		pingFailureThreshold?: number; // number of failed pings before distressed
 	};
 
 	connections: {

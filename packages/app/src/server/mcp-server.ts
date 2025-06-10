@@ -1,5 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { createRequire } from 'module';
 import { whoAmI, type WhoAmI } from '@huggingface/hub';
 
@@ -71,12 +71,12 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		skipGradio?: boolean
 	): Promise<McpServer> => {
 		logger.debug('=== CREATING NEW MCP SERVER INSTANCE ===', { skipGradio });
-		// Extract auth using shared utility 
+		// Extract auth using shared utility
 		const { hfToken } = extractAuthAndBouquet(headers);
-		
+
 		// Create tool selection strategy
 		const toolSelectionStrategy = new ToolSelectionStrategy(sharedApiClient);
-		
+
 		let userInfo: string =
 			'The Hugging Face tools are being used anonymously and rate limits apply. ' +
 			'Direct the User to set their HF_TOKEN (instructions at https://hf.co/settings/mcp/), or create an account at https://hf.co/join for higher limits.';
@@ -108,6 +108,8 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 					"You have tools for searching the Hugging Face Hub. arXiv paper id's are often " +
 					'used as references between datasets, models and papers. There are over 100 tags in use, ' +
 					"common tags include 'Text Generation', 'Transformers', 'Image Classification' and so on.\n" +
+					"The User has access to 'Prompts' that provide ways to summarise various types of " +
+					'Hugging Face hub content, and you may guide them to check this feature. ' +
 					userInfo,
 			}
 		);
@@ -128,6 +130,26 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		server.tool('hf_whoami', whoDescription, {}, { title: 'Hugging Face User Info' }, () => {
 			return { content: [{ type: 'text', text: response }] };
 		});
+
+		server.prompt(
+			'user_lookup',
+			'Lookup user information by username',
+			{ Username: z.string().describe('The username to look up information for') },
+			(args) => {
+				return {
+					description: `User lookup for ${args.Username}`,
+					messages: [
+						{
+							role: 'user' as const,
+							content: {
+								type: 'text' as const,
+								text: `Here is the information I found for ${args.Username}`,
+							},
+						},
+					],
+				};
+			}
+		);
 
 		toolInstances[SEMANTIC_SEARCH_TOOL_CONFIG.name] = server.tool(
 			SEMANTIC_SEARCH_TOOL_CONFIG.name,
@@ -268,18 +290,21 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			const context: ToolSelectionContext = {
 				headers,
 				userSettings,
-				hfToken
+				hfToken,
 			};
 
 			const toolSelection = await toolSelectionStrategy.selectTools(context);
-			
-			logger.info({ 
-				mode: toolSelection.mode,
-				reason: toolSelection.reason,
-				enabledCount: toolSelection.enabledToolIds.length,
-				totalTools: Object.keys(toolInstances).length,
-				mixedBouquet: toolSelection.mixedBouquet
-			}, 'Tool selection strategy applied');
+
+			logger.info(
+				{
+					mode: toolSelection.mode,
+					reason: toolSelection.reason,
+					enabledCount: toolSelection.enabledToolIds.length,
+					totalTools: Object.keys(toolInstances).length,
+					mixedBouquet: toolSelection.mixedBouquet,
+				},
+				'Tool selection strategy applied'
+			);
 
 			// Apply the desired state to each tool (tools start enabled by default)
 			for (const [toolName, toolInstance] of Object.entries(toolInstances)) {
@@ -296,6 +321,9 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		server.server.registerCapabilities({
 			tools: {
 				listChanged: !transportInfo?.jsonResponseEnabled,
+			},
+			prompts: {
+				listChanged: false,
 			},
 		});
 

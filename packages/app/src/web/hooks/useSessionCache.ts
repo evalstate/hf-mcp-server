@@ -10,6 +10,9 @@ type SessionData = {
     version: string;
   };
   isConnected: boolean;
+  connectionStatus?: 'Connected' | 'Distressed' | 'Disconnected';
+  pingFailures?: number;
+  lastPingAttempt?: string;
 };
 
 type CachedSession = SessionData & {
@@ -50,6 +53,7 @@ export function useSessionCache(activeSessions: SessionData[]): SessionData[] {
           newCache.set(sessionId, {
             ...cachedSession,
             isConnected: false,
+            connectionStatus: 'Disconnected',
             disconnectedAt: now,
             lastActivity: cachedSession.lastActivity || now
           });

@@ -13,7 +13,6 @@ import { ALL_BUILTIN_TOOL_IDS } from '@hf-mcp/mcp';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-
 export class WebServer {
 	private app: Express;
 	private server: Server | null = null;
@@ -154,9 +153,9 @@ export class WebServer {
 				res.json([]);
 				return;
 			}
-			
+
 			const sessions = this.transport.getSessions();
-			
+
 			// For STDIO transport, also update the stdioClient info if we have a session
 			if (this.transportInfo.transport === 'stdio' && sessions.length > 0) {
 				const stdioSession = sessions[0];
@@ -167,7 +166,7 @@ export class WebServer {
 					};
 				}
 			}
-			
+
 			res.json(sessions);
 		});
 
@@ -181,36 +180,46 @@ export class WebServer {
 			try {
 				// Get raw metrics from transport
 				const metrics = this.transport.getMetrics();
-				
+
 				// Determine if transport is stateless
 				const isStateless = this.transportInfo.transport === 'streamableHttpJson';
-				
+
 				// Get configuration for stateful transports
 				const config = this.transport.getConfiguration();
-				
+
 				// Get sessions (empty for stateless transports)
-				const sessions = this.transport.getSessions().map(session => {
-					// Consider a session stale if no activity in the last 5 minutes
+				const sessions = this.transport.getSessions().map((session) => {
+					// Determine connection status: Connected, Distressed, or Disconnected
 					const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-					const isConnected = session.lastActivity > fiveMinutesAgo;
-					
+					const hasRecentActivity = session.lastActivity > fiveMinutesAgo;
+					const hasPingFailures = (session.pingFailures || 0) >= 1;
+
+					// Note that from the WebUI this is provided as a courtesy. If a Client connects and
+					// disconnects before the Client refresh it will not be shown in the Client list.
+					let connectionStatus: 'Connected' | 'Distressed' | 'Disconnected';
+					if (!hasRecentActivity) {
+						connectionStatus = 'Disconnected';
+					} else if (hasPingFailures) {
+						connectionStatus = 'Distressed';
+					} else {
+						connectionStatus = 'Connected';
+					}
+
 					return {
 						id: session.id,
 						connectedAt: session.connectedAt.toISOString(),
 						lastActivity: session.lastActivity.toISOString(),
 						requestCount: session.requestCount,
 						clientInfo: session.clientInfo,
-						isConnected
+						isConnected: hasRecentActivity,
+						connectionStatus,
+						pingFailures: session.pingFailures || 0,
+						lastPingAttempt: session.lastPingAttempt?.toISOString(),
 					};
 				});
-				
+
 				// Format for API response
-				const formattedMetrics = formatMetricsForAPI(
-					metrics,
-					this.transportInfo.transport,
-					isStateless,
-					sessions
-				);
+				const formattedMetrics = formatMetricsForAPI(metrics, this.transportInfo.transport, isStateless, sessions);
 
 				// Add configuration if available
 				if (!isStateless && config.staleCheckInterval && config.staleTimeout) {
@@ -219,7 +228,8 @@ export class WebServer {
 						staleCheckInterval: config.staleCheckInterval,
 						staleTimeout: config.staleTimeout,
 						pingEnabled: config.pingEnabled,
-						pingInterval: config.pingInterval
+						pingInterval: config.pingInterval,
+						pingFailureThreshold: config.pingFailureThreshold || 1,
 					};
 				}
 
@@ -237,14 +247,14 @@ export class WebServer {
 
 		// Update tool settings endpoint
 		this.app.post('/api/settings', express.json(), (req, res) => {
-			const { builtInTools, spaceTools } = req.body as { builtInTools?: string[], spaceTools?: SpaceTool[] };
-			
+			const { builtInTools, spaceTools } = req.body as { builtInTools?: string[]; spaceTools?: SpaceTool[] };
+
 			let updatedSettings = settingsService.getSettings();
-			
+
 			if (builtInTools !== undefined) {
 				updatedSettings = settingsService.updateBuiltInTools(builtInTools);
 			}
-			
+
 			if (spaceTools !== undefined) {
 				updatedSettings = settingsService.updateSpaceTools(spaceTools);
 			}
@@ -254,7 +264,7 @@ export class WebServer {
 				for (const toolId of ALL_BUILTIN_TOOL_IDS) {
 					const shouldBeEnabled = builtInTools.includes(toolId);
 					const currentlyEnabled = this.localSharedToolStates.get(toolId) ?? false;
-					
+
 					// Only update state and emit events if state actually changed
 					if (currentlyEnabled !== shouldBeEnabled) {
 						this.localSharedToolStates.set(toolId, shouldBeEnabled);
@@ -283,7 +293,7 @@ export class WebServer {
 		this.app.post('/api/gradio-endpoints/:index', express.json(), (req, res) => {
 			const index = parseInt(req.params.index);
 			const { enabled } = req.body as { enabled: boolean };
-			
+
 			if (!this.apiClient) {
 				res.status(500).json({ error: 'API client not initialized' });
 				return;
@@ -297,25 +307,30 @@ export class WebServer {
 
 			// Update the state in the API client
 			this.apiClient.updateGradioEndpointState(index, enabled);
-			
+
 			// Emit tool state change event for Gradio endpoint
 			const endpoint = endpoints[index];
 			if (endpoint) {
 				const toolId = `gradio_${endpoint.subdomain}`;
 				this.apiClient.emit('toolStateChange', toolId, enabled);
 			}
-			
+
 			// Get the updated endpoint
 			const updatedEndpoint = endpoints[index];
-			
+
 			res.json(updatedEndpoint);
 		});
 
 		// Update Gradio endpoint
 		this.app.put('/api/gradio-endpoints/:index', express.json(), (req, res) => {
 			const index = parseInt(req.params.index);
-			const { name, subdomain, id, emoji } = req.body as { name: string; subdomain: string; id?: string; emoji?: string };
-			
+			const { name, subdomain, id, emoji } = req.body as {
+				name: string;
+				subdomain: string;
+				id?: string;
+				emoji?: string;
+			};
+
 			if (!this.apiClient) {
 				res.status(500).json({ error: 'API client not initialized' });
 				return;
@@ -336,7 +351,7 @@ export class WebServer {
 			// Update the endpoint in the API client
 			const updatedEndpoint = { name, subdomain, id, emoji };
 			this.apiClient.updateGradioEndpoint(index, updatedEndpoint);
-			
+
 			res.json(updatedEndpoint);
 		});
 	}

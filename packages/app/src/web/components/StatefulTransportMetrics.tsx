@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { Table, TableBody, TableCell, TableRow } from './ui/table';
-import { Wifi, WifiOff } from 'lucide-react';
+import { Wifi, WifiOff, AlertTriangle } from 'lucide-react';
 import { DataTable } from './data-table';
 import { createSortableHeader } from './data-table-utils';
 import { useSessionCache } from '../hooks/useSessionCache';
@@ -19,6 +19,9 @@ type SessionData = {
 		version: string;
 	};
 	isConnected: boolean;
+	connectionStatus?: 'Connected' | 'Distressed' | 'Disconnected';
+	pingFailures?: number;
+	lastPingAttempt?: string;
 };
 
 /**
@@ -120,16 +123,34 @@ export function StatefulTransportMetrics({ metrics }: StatefulTransportMetricsPr
 			),
 		},
 		{
-			accessorKey: "isConnected",
+			accessorKey: "connectionStatus",
 			header: createSortableHeader("Status"),
 			cell: ({ row }) => {
 				const session = row.original;
-				return (
-					<Badge variant={session.isConnected ? 'success' : 'secondary'} className="gap-1">
-						{session.isConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-						{session.isConnected ? 'Connected' : 'Disconnected'}
-					</Badge>
-				);
+				const status = session.connectionStatus || (session.isConnected ? 'Connected' : 'Disconnected');
+				
+				if (status === 'Connected') {
+					return (
+						<Badge variant="success" className="gap-1">
+							<Wifi className="h-3 w-3" />
+							Connected
+						</Badge>
+					);
+				} else if (status === 'Distressed') {
+					return (
+						<Badge variant="destructive" className="gap-1">
+							<AlertTriangle className="h-3 w-3" />
+							Distressed {session.pingFailures ? `(${session.pingFailures} failed)` : ''}
+						</Badge>
+					);
+				} else {
+					return (
+						<Badge variant="secondary" className="gap-1">
+							<WifiOff className="h-3 w-3" />
+							Disconnected
+						</Badge>
+					);
+				}
 			},
 		},
 		{
@@ -211,6 +232,8 @@ export function StatefulTransportMetrics({ metrics }: StatefulTransportMetricsPr
 								removed after {formatMilliseconds(metrics.configuration.staleTimeout)} inactive
 								{metrics.configuration.pingEnabled && metrics.configuration.pingInterval && 
 									`, pings sent every ${formatMilliseconds(metrics.configuration.pingInterval)}`}
+								{metrics.configuration.pingEnabled && 
+									`, marked distressed after ${metrics.configuration.pingFailureThreshold || 1} failed ping${(metrics.configuration.pingFailureThreshold || 1) !== 1 ? 's' : ''}`}
 							</p>
 						</div>
 					</>

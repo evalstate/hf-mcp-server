@@ -35,14 +35,14 @@ describe('StatelessHttpTransport', () => {
 			expect(result).toBe(false);
 		});
 
-		it('should not handle prompts/list requests', () => {
+		it('should handle prompts/list requests', () => {
 			const result = (transport as any).shouldHandle({ method: 'prompts/list' });
-			expect(result).toBe(false);
+			expect(result).toBe(true);
 		});
 
-		it('should not handle prompts/get requests', () => {
+		it('should handle prompts/get requests', () => {
 			const result = (transport as any).shouldHandle({ method: 'prompts/get' });
-			expect(result).toBe(false);
+			expect(result).toBe(true);
 		});
 
 		it('should not handle resources/list requests', () => {
