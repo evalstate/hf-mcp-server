@@ -1,0 +1,333 @@
+import { z } from 'zod';
+import { HfApiCall } from './hf-api-call.js';
+import { formatDate, formatNumber } from './utilities.js';
+import { ModelSearchTool } from './model-search.js';
+import { DatasetSearchTool } from './dataset-search.js';
+import { SpaceSearchTool } from './space-search.js';
+import { PaperSearchTool } from './paper-search.js';
+
+// User Summary Prompt Configuration
+export const USER_SUMMARY_PROMPT_CONFIG = {
+	name: 'user_summary',
+	description:
+		'Generate a comprehensive summary of a Hugging Face user including their profile, models, datasets, spaces, and papers. ' +
+		'Accepts either a username (e.g., "clem") or a Hugging Face URL (e.g., "hf.co/julien-c" or "huggingface.co/thomwolf").',
+	schema: z.object({
+		user_id: z
+			.string()
+			.min(3, 'User ID must be at least 3 characters long')
+			.describe('Hugging Face user ID or URL (e.g., "evalstate" or "hf.co/evalstate")')
+			.max(30)
+			.describe('Maximum length is 30 characters'),
+	}),
+	annotations: {
+		title: 'User Summary',
+		destructiveHint: false,
+		readOnlyHint: true,
+		openWorldHint: true,
+	},
+} as const;
+
+// Define parameter types
+export type UserSummaryParams = z.infer<typeof USER_SUMMARY_PROMPT_CONFIG.schema>;
+
+// User overview API response interface
+interface UserOverviewResponse {
+	_id: string;
+	avatarUrl: string;
+	isPro: boolean;
+	fullname?: string;
+	numModels: number;
+	numDatasets: number;
+	numSpaces: number;
+	numDiscussions: number;
+	numPapers: number;
+	numUpvotes: number;
+	numLikes: number;
+	numFollowers: number;
+	numFollowing: number;
+	orgs: string[];
+	user: string;
+	type: string;
+	isFollowing: boolean;
+	createdAt: string;
+}
+
+/**
+ * Validates and extracts user ID from either a plain username or HF URL
+ * @param input - The user input (username or URL)
+ * @returns The extracted user ID
+ * @throws Error if input is invalid
+ */
+export function extractUserIdFromInput(input: string): string {
+	// Remove whitespace
+	const trimmed = input.trim();
+
+	// If it doesn't contain a slash, treat as direct username
+	if (!trimmed.includes('/')) {
+		if (trimmed.length < 3) {
+			throw new Error('User ID must be at least 3 characters long');
+		}
+		// Reject obvious domain names
+		if (trimmed.endsWith('.co') || trimmed.endsWith('.com')) {
+			throw new Error('URL must contain only the username (e.g., hf.co/username)');
+		}
+		return trimmed;
+	}
+
+	// Handle URL format
+	let url: URL;
+	try {
+		// Try to parse as URL, adding protocol if missing
+		if (!trimmed.startsWith('http')) {
+			url = new URL(`https://${trimmed}`);
+		} else {
+			url = new URL(trimmed);
+		}
+	} catch {
+		throw new Error('Invalid URL format');
+	}
+
+	// Validate it's a Hugging Face domain
+	const validDomains = ['huggingface.co', 'hf.co'];
+	if (!validDomains.includes(url.hostname)) {
+		throw new Error('URL must be from huggingface.co or hf.co domain');
+	}
+
+	// Check for query parameters or fragments
+	if (url.search || url.hash) {
+		throw new Error('URL must contain only the username (e.g., hf.co/username)');
+	}
+
+	// Extract path segments
+	const pathSegments = url.pathname.split('/').filter((segment) => segment.length > 0);
+
+	// Must have exactly one path segment (the username)
+	if (pathSegments.length !== 1) {
+		throw new Error('URL must contain only the username (e.g., hf.co/username)');
+	}
+
+	const userId = pathSegments[0];
+	if (!userId || userId.length < 3) {
+		throw new Error('User ID must be at least 3 characters long');
+	}
+
+	return userId;
+}
+
+/**
+ * Service for generating comprehensive user summaries
+ */
+export class UserSummaryPrompt extends HfApiCall<Record<string, string>, UserOverviewResponse> {
+	/**
+	 * @param hfToken Optional Hugging Face token for API access
+	 */
+	constructor(hfToken?: string) {
+		super('https://huggingface.co/api/users', hfToken);
+	}
+
+	/**
+	 * Generate a comprehensive user summary
+	 */
+	async generateSummary(params: UserSummaryParams): Promise<string> {
+		try {
+			// Extract and validate user ID
+			const userId = extractUserIdFromInput(params.user_id);
+
+			// Get user overview
+			const userOverview = await this.getUserOverview(userId);
+
+			// Build the summary
+			const sections: string[] = [];
+
+			// User profile section
+			sections.push(this.formatUserProfile(userOverview));
+
+			// Models section (if user has models)
+			if (userOverview.numModels > 0) {
+				const modelsSection = await this.getModelsSection(userId);
+				if (modelsSection) {
+					sections.push(modelsSection);
+				}
+			}
+
+			// Datasets section (if user has datasets)
+			if (userOverview.numDatasets > 0) {
+				const datasetsSection = await this.getDatasetsSection(userId);
+				if (datasetsSection) {
+					sections.push(datasetsSection);
+				}
+			}
+
+			// Spaces section (if user has spaces)
+			if (userOverview.numSpaces > 0) {
+				const spacesSection = await this.getSpacesSection(userId);
+				if (spacesSection) {
+					sections.push(spacesSection);
+				}
+			}
+
+			// Papers section (if user has a full name with >5 characters)
+			if (userOverview.fullname && userOverview.fullname.length > 5) {
+				const papersSection = await this.getPapersSection(userOverview.fullname);
+				if (papersSection) {
+					sections.push(papersSection);
+				}
+			}
+
+			// Add final instruction
+			sections.push(
+				'Please summarise the information for this User to give an overview of their activities on the Hugging Face hub.'
+			);
+
+			return sections.join('\n\n');
+		} catch (error) {
+			if (error instanceof Error) {
+				throw new Error(`Failed to generate user summary: ${error.message}`);
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Get user overview from HF API
+	 */
+	private async getUserOverview(userId: string): Promise<UserOverviewResponse> {
+		const url = new URL(`${this.apiUrl}/${userId}/overview`);
+		return this.fetchFromApi<UserOverviewResponse>(url);
+	}
+
+	/**
+	 * Format user profile information as markdown
+	 */
+	private formatUserProfile(user: UserOverviewResponse): string {
+		const lines: string[] = [];
+
+		lines.push(`# User Profile: ${user.user}`);
+		lines.push('');
+
+		if (user.fullname) {
+			lines.push(`**Full Name:** ${user.fullname}`);
+		}
+
+		lines.push(`**Username:** ${user.user}`);
+		lines.push(`**Account Type:** ${user.isPro ? 'Pro' : 'Free'}`);
+		lines.push(`**Created:** ${formatDate(user.createdAt)}`);
+		lines.push('');
+
+		// Statistics
+		lines.push('## Statistics');
+		lines.push('');
+		lines.push(`- **Models:** ${formatNumber(user.numModels)}`);
+		lines.push(`- **Datasets:** ${formatNumber(user.numDatasets)}`);
+		lines.push(`- **Spaces:** ${formatNumber(user.numSpaces)}`);
+		lines.push(`- **Papers:** ${formatNumber(user.numPapers)}`);
+		lines.push(`- **Discussions:** ${formatNumber(user.numDiscussions)}`);
+		lines.push(`- **Likes Given:** ${formatNumber(user.numLikes)}`);
+		lines.push(`- **Upvotes:** ${formatNumber(user.numUpvotes)}`);
+		lines.push(`- **Followers:** ${formatNumber(user.numFollowers)}`);
+		lines.push(`- **Following:** ${formatNumber(user.numFollowing)}`);
+
+		if (user.orgs && user.orgs.length > 0) {
+			lines.push('');
+			lines.push(`**Organizations:** ${user.orgs.join(', ')}`);
+		}
+
+		lines.push('');
+		lines.push(`**Profile Link:** [https://hf.co/${user.user}](https://hf.co/${user.user})`);
+
+		return lines.join('\n');
+	}
+
+	/**
+	 * Get models section using existing ModelSearchTool
+	 */
+	private async getModelsSection(userId: string): Promise<string | null> {
+		try {
+			const modelSearch = new ModelSearchTool(this.hfToken);
+			const results = await modelSearch.searchWithParams({
+				author: userId,
+				limit: 10,
+				sort: 'downloads',
+			});
+
+			return `## Models\n\n${results}`;
+		} catch (error) {
+			console.warn(`Failed to fetch models for user ${userId}:`, error);
+			return null;
+		}
+	}
+
+	/**
+	 * Get datasets section using existing DatasetSearchTool
+	 */
+	private async getDatasetsSection(userId: string): Promise<string | null> {
+		try {
+			const datasetSearch = new DatasetSearchTool(this.hfToken);
+			const results = await datasetSearch.searchWithParams({
+				author: userId,
+				limit: 10,
+				sort: 'downloads',
+			});
+
+			return `## Datasets\n\n${results}`;
+		} catch (error) {
+			console.warn(`Failed to fetch datasets for user ${userId}:`, error);
+			return null;
+		}
+	}
+
+	/**
+	 * Get spaces section using existing SpaceSearchTool
+	 */
+	private async getSpacesSection(userId: string): Promise<string | null> {
+		try {
+			// Note: SpaceSearchTool doesn't have author filter in semantic search
+			// We'll search for the user ID as a query term instead
+			const spaceSearch = new SpaceSearchTool(this.hfToken);
+			const searchResult = await spaceSearch.search(userId, 10);
+
+			if (searchResult.results.length === 0) {
+				return null;
+			}
+
+			// Filter results to only show spaces by this author
+			const userSpaces = searchResult.results.filter(
+				(space) => space.author === userId || space.id.startsWith(`${userId}/`)
+			);
+
+			if (userSpaces.length === 0) {
+				return null;
+			}
+
+			// Use the existing formatting from space-search.ts
+			const { formatSearchResults } = await import('./space-search.js');
+			const formattedResults = formatSearchResults(userId, userSpaces, userSpaces.length);
+
+			return `## Spaces\n\n${formattedResults}`;
+		} catch (error) {
+			console.warn(`Failed to fetch spaces for user ${userId}:`, error);
+			return null;
+		}
+	}
+
+	/**
+	 * Get papers section using existing PaperSearchTool
+	 */
+	private async getPapersSection(fullname: string): Promise<string | null> {
+		try {
+			const paperSearch = new PaperSearchTool(this.hfToken);
+			const results = await paperSearch.search(fullname, 10, true);
+
+			// Check if results indicate no papers found
+			if (results.includes('No papers found')) {
+				return null;
+			}
+
+			return `## Papers\n\n${results}`;
+		} catch (error) {
+			console.warn(`Failed to fetch papers for ${fullname}:`, error);
+			return null;
+		}
+	}
+}

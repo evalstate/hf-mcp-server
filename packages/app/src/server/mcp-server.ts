@@ -31,6 +31,9 @@ import {
 	SpaceFilesTool,
 	type SpaceFilesParams,
 	type SpaceInfoParams,
+	UserSummaryPrompt,
+	USER_SUMMARY_PROMPT_CONFIG,
+	type UserSummaryParams,
 	CONFIG_GUIDANCE,
 	TOOL_ID_GROUPS,
 } from '@hf-mcp/mcp';
@@ -132,18 +135,21 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		});
 
 		server.prompt(
-			'user_lookup',
-			'Lookup user information by username',
-			{ Username: z.string().describe('The username to look up information for') },
-			(args) => {
+			USER_SUMMARY_PROMPT_CONFIG.name,
+			USER_SUMMARY_PROMPT_CONFIG.description,
+			USER_SUMMARY_PROMPT_CONFIG.schema.shape,
+			async (params: UserSummaryParams) => {
+				const userSummary = new UserSummaryPrompt(hfToken);
+				const summaryText = await userSummary.generateSummary(params);
+				
 				return {
-					description: `User lookup for ${args.Username}`,
+					description: `User summary for ${params.user_id}`,
 					messages: [
 						{
 							role: 'user' as const,
 							content: {
 								type: 'text' as const,
-								text: `Here is the information I found for ${args.Username}`,
+								text: summaryText,
 							},
 						},
 					],

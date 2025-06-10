@@ -13,6 +13,7 @@ import {
 	DUPLICATE_SPACE_TOOL_CONFIG,
 	SPACE_INFO_TOOL_CONFIG,
 	SPACE_FILES_TOOL_CONFIG,
+	USER_SUMMARY_PROMPT_CONFIG,
 } from './index.js';
 
 // Extract tool IDs from their configs (single source of truth)
@@ -25,6 +26,7 @@ export const DATASET_DETAIL_TOOL_ID = DATASET_DETAIL_TOOL_CONFIG.name;
 export const DUPLICATE_SPACE_TOOL_ID = DUPLICATE_SPACE_TOOL_CONFIG.name;
 export const SPACE_INFO_TOOL_ID = SPACE_INFO_TOOL_CONFIG.name;
 export const SPACE_FILES_TOOL_ID = SPACE_FILES_TOOL_CONFIG.name;
+export const USER_SUMMARY_PROMPT_ID = USER_SUMMARY_PROMPT_CONFIG.name;
 
 // Complete list of all built-in tool IDs
 export const ALL_BUILTIN_TOOL_IDS = [
