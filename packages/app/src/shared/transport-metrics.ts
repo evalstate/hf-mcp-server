@@ -46,6 +46,9 @@ export interface TransportMetrics {
 
 	// Method metrics
 	methods: Map<string, MethodMetrics>;
+
+	// Static page hits (for stateless transport)
+	staticPageHits?: number;
 }
 
 /**
@@ -77,6 +80,17 @@ export interface MethodMetrics {
 /**
  * API response format for transport metrics
  */
+export interface SessionData {
+	id: string;
+	connectedAt: string; // ISO date string
+	lastActivity: string; // ISO date string
+	clientInfo?: {
+		name: string;
+		version: string;
+	};
+	isConnected: boolean;
+}
+
 export interface TransportMetricsResponse {
 	transport: TransportType;
 	isStateless: boolean;
@@ -103,6 +117,9 @@ export interface TransportMetricsResponse {
 		total: number;
 		averagePerMinute: number;
 	};
+
+	// Static page hits (stateless transport only)
+	staticPageHits?: number;
 
 	pings?: {
 		sent: number;
@@ -132,6 +149,8 @@ export interface TransportMetricsResponse {
 		totalConnections: number;
 	}>;
 
+	sessions: SessionData[];
+
 	methods: Array<{
 		method: string;
 		count: number;
@@ -149,7 +168,8 @@ export interface TransportMetricsResponse {
 export function formatMetricsForAPI(
 	metrics: TransportMetrics,
 	transport: TransportType,
-	isStateless: boolean
+	isStateless: boolean,
+	sessions: SessionData[] = []
 ): TransportMetricsResponse {
 	const currentTime = new Date();
 	const uptimeSeconds = Math.floor((currentTime.getTime() - metrics.startupTime.getTime()) / 1000);
@@ -180,6 +200,8 @@ export function formatMetricsForAPI(
 			firstSeen: client.firstSeen.toISOString(),
 			lastSeen: client.lastSeen.toISOString(),
 		})),
+		sessions,
+		staticPageHits: metrics.staticPageHits,
 		methods: Array.from(metrics.methods.values()).map((method) => ({
 			...method,
 			firstCalled: method.firstCalled.toISOString(),
@@ -435,6 +457,16 @@ export class MetricsCounter {
 			};
 		}
 		this.metrics.pings.failed++;
+	}
+
+	/**
+	 * Track a static page hit
+	 */
+	trackStaticPageHit(): void {
+		if (this.metrics.staticPageHits === undefined) {
+			this.metrics.staticPageHits = 0;
+		}
+		this.metrics.staticPageHits++;
 	}
 
 	/**

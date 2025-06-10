@@ -217,7 +217,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 
 				this.sessions.set(sessionId, session);
 				// Track the session creation for metrics
-				this.trackSessionCreated();
+				this.trackSessionCreated(sessionId);
 			},
 		});
 

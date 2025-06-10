@@ -97,7 +97,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			this.sessions.set(sessionId, connection);
 
 			// Track the session creation for metrics
-			this.trackSessionCreated();
+			this.trackSessionCreated(sessionId);
 
 			// Set up heartbeat and connection event handlers
 			this.startHeartbeat(sessionId, res);

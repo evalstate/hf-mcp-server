@@ -58,6 +58,9 @@ export class StatelessHttpTransport extends BaseTransport {
 				return;
 			}
 
+			// Track static page hit
+			this.metrics.trackStaticPageHit();
+
 			// Serve the MCP welcome page (always serve the self-contained version)
 			const mcpWelcomePath = path.join(__dirname, '..', '..', 'web', 'mcp-welcome.html');
 			res.sendFile(mcpWelcomePath);

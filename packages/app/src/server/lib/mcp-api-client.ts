@@ -117,7 +117,7 @@ export class McpApiClient extends EventEmitter {
 		if (!settings) {
 			return null;
 		}
-		logger.debug({ settings: settings }, 'Fetched tool settings from API');
+		logger.trace({ settings: settings }, 'Fetched tool settings from API');
 
 		// Update gradio endpoints from external API
 		if (settings.spaceTools && settings.spaceTools.length > 0) {
@@ -127,7 +127,7 @@ export class McpApiClient extends EventEmitter {
 				id: spaceTool._id,
 				emoji: spaceTool.emoji,
 			}));
-			logger.debug({ gradioEndpoints: this.gradioEndpoints }, 'Updated gradio endpoints from external API');
+			logger.trace({ gradioEndpoints: this.gradioEndpoints }, 'Updated gradio endpoints from external API');
 		}
 
 		// Create tool states: enabled tools = true, rest = false

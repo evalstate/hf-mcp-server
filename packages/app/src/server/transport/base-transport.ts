@@ -94,7 +94,9 @@ export abstract class BaseTransport {
 	 * Get all active sessions with their metadata
 	 * Returns an array of session metadata for connection dashboard
 	 */
-	abstract getSessions(): SessionMetadata[];
+	getSessions(): SessionMetadata[] {
+		return [];
+	}
 
 	/**
 	 * Get current transport metrics
@@ -106,7 +108,13 @@ export abstract class BaseTransport {
 	/**
 	 * Get configuration settings (only relevant for stateful transports)
 	 */
-	getConfiguration(): { heartbeatInterval?: number; staleCheckInterval?: number; staleTimeout?: number; pingEnabled?: boolean; pingInterval?: number } {
+	getConfiguration(): {
+		heartbeatInterval?: number;
+		staleCheckInterval?: number;
+		staleTimeout?: number;
+		pingEnabled?: boolean;
+		pingInterval?: number;
+	} {
 		return {};
 	}
 
@@ -158,7 +166,9 @@ export abstract class BaseTransport {
 	 * Returns null for responses (which should not be tracked as methods)
 	 */
 	protected extractMethodForTracking(requestBody: unknown): string | null {
-		const body = requestBody as { method?: string; params?: { name?: string }; id?: unknown; result?: unknown; error?: unknown } | undefined;
+		const body = requestBody as
+			| { method?: string; params?: { name?: string }; id?: unknown; result?: unknown; error?: unknown }
+			| undefined;
 
 		// If this is a JSON-RPC response (has id and result/error but no method), don't track it
 		if (body && 'id' in body && !('method' in body)) {
@@ -255,8 +265,12 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 				const clientCapabilities = session.server.server.getClientCapabilities();
 
 				if (clientInfo) {
+					// Disconnect the old client info if it exists
+					if (session.metadata.clientInfo) {
+						this.metrics.disconnectClient(session.metadata.clientInfo);
+					}
 					session.metadata.clientInfo = clientInfo;
-					// Associate session with client for metrics tracking
+					// Associate session with real client for metrics tracking
 					this.metrics.associateSessionWithClient(clientInfo);
 				}
 
@@ -299,20 +313,21 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 		this.metrics.trackPingSent();
 
 		// Fire ping and handle result asynchronously
-		session.server.server.ping()
+		session.server.server
+			.ping()
 			.then(() => {
 				// SUCCESS: Update lastActivity timestamp
 				// This prevents the stale checker from removing this session
 				this.updateSessionActivity(sessionId);
 				this.metrics.trackPingSuccess();
-				logger.debug({ sessionId }, 'Ping succeeded');
+				logger.trace({ sessionId }, 'Ping succeeded');
 			})
 			.catch((error: unknown) => {
 				// FAILURE: Do nothing
 				// No activity update means stale checker will eventually remove it
 				const errorMessage = error instanceof Error ? error.message : String(error);
 				this.metrics.trackPingFailed();
-				logger.debug({ sessionId, error: errorMessage }, 'Ping failed');
+				logger.trace({ sessionId, error: errorMessage }, 'Ping failed');
 			})
 			.finally(() => {
 				// Always remove from tracking set
@@ -408,17 +423,6 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	}
 
 	/**
-	 * Get all active sessions with their metadata
-	 */
-	override getSessions(): SessionMetadata[] {
-		const sessions: SessionMetadata[] = [];
-		for (const session of this.sessions.values()) {
-			sessions.push({ ...session.metadata });
-		}
-		return sessions;
-	}
-
-	/**
 	 * Check if server is accepting new connections
 	 */
 	isAcceptingConnections(): boolean {
@@ -439,9 +443,15 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	/**
 	 * Track a new session created (called when session is added to sessions map)
 	 */
-	protected trackSessionCreated(): void {
+	protected trackSessionCreated(sessionId: string): void {
 		this.trackNewConnection();
 		this.metrics.updateActiveConnections(this.sessions.size);
+		// Track as unknown client initially - will be updated when client info is available
+		const session = this.sessions.get(sessionId);
+		if (session) {
+			session.metadata.clientInfo = { name: 'unknown', version: 'unknown' };
+			this.metrics.associateSessionWithClient(session.metadata.clientInfo);
+		}
 	}
 
 	/**
@@ -458,9 +468,22 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	}
 
 	/**
+	 * Get all active sessions with their metadata
+	 */
+	override getSessions(): SessionMetadata[] {
+		return Array.from(this.sessions.values()).map((session) => session.metadata);
+	}
+
+	/**
 	 * Get configuration settings for stateful transports
 	 */
-	override getConfiguration(): { heartbeatInterval: number; staleCheckInterval: number; staleTimeout: number; pingEnabled: boolean; pingInterval: number } {
+	override getConfiguration(): {
+		heartbeatInterval: number;
+		staleCheckInterval: number;
+		staleTimeout: number;
+		pingEnabled: boolean;
+		pingInterval: number;
+	} {
 		return {
 			heartbeatInterval: this.HEARTBEAT_INTERVAL,
 			staleCheckInterval: this.STALE_CHECK_INTERVAL,
@@ -503,7 +526,10 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	/**
 	 * Set up standard SSE connection event handlers
 	 */
-	protected setupSseEventHandlers(sessionId: string, response: { on: (event: string, handler: (...args: unknown[]) => void) => void }): void {
+	protected setupSseEventHandlers(
+		sessionId: string,
+		response: { on: (event: string, handler: (...args: unknown[]) => void) => void }
+	): void {
 		response.on('close', () => {
 			logger.info({ sessionId }, 'SSE connection closed by client');
 			void this.removeStaleSession(sessionId);
@@ -546,8 +572,8 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 			}
 
 			// Remove from map and track cleanup
-			this.trackSessionCleaned(session);
 			this.sessions.delete(sessionId);
+			this.trackSessionCleaned(session);
 
 			logger.debug({ sessionId }, 'Session cleaned up');
 		} catch (error) {
@@ -591,12 +617,12 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	 * Returns validation result with error response if invalid
 	 */
 	protected validateSessionRequest(
-		sessionId: string | undefined, 
+		sessionId: string | undefined,
 		requestBody: unknown,
 		allowMissingSession: boolean = false
 	): { isValid: boolean; errorResponse?: object; statusCode?: number; trackingName: string | null } {
 		const trackingName = this.extractMethodForTracking(requestBody);
-		
+
 		// Check if server is shutting down
 		if (this.isShuttingDown) {
 			this.trackError(503);
@@ -605,25 +631,22 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 				isValid: false,
 				errorResponse: JsonRpcErrors.serverShuttingDown(extractJsonRpcId(requestBody)),
 				statusCode: 503,
-				trackingName
+				trackingName,
 			};
 		}
-		
+
 		// Check session ID requirements
 		if (!sessionId && !allowMissingSession) {
 			this.trackError(400);
 			this.metrics.trackMethod(trackingName, undefined, true);
 			return {
 				isValid: false,
-				errorResponse: JsonRpcErrors.invalidParams(
-					'sessionId is required', 
-					extractJsonRpcId(requestBody)
-				),
+				errorResponse: JsonRpcErrors.invalidParams('sessionId is required', extractJsonRpcId(requestBody)),
 				statusCode: 400,
-				trackingName
+				trackingName,
 			};
 		}
-		
+
 		// Check session existence
 		if (sessionId && !this.sessions.has(sessionId)) {
 			this.trackError(404);
@@ -632,10 +655,10 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 				isValid: false,
 				errorResponse: JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(requestBody)),
 				statusCode: 404,
-				trackingName
+				trackingName,
 			};
 		}
-		
+
 		return { isValid: true, trackingName };
 	}
 }
