@@ -23,6 +23,7 @@ SSE and StreamableHTTP services are available at `/sse` and `/mcp` respectively.
 > [!TIP]
 > The Web Application allows you to switch tools on and off. For STDIO, SSE and StreamableHTTP this will send a ToolListChangedNotification to the MCP Client. In StreamableHTTPJSON mode the tool will not be listed when the client next requests the tool lists.
 
+
 ## Development
 
 This project uses `pnpm` for build and development. 
