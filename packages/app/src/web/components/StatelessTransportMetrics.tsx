@@ -188,6 +188,23 @@ export function StatelessTransportMetrics({ metrics }: StatelessTransportMetrics
 									<TableCell className="text-sm font-mono"></TableCell>
 								</TableRow>
 							)}
+							{/* API Metrics (shown in external API mode) */}
+							{metrics.apiMetrics && (
+								<>
+									<TableRow>
+										<TableCell className="font-medium text-sm">Anonymous Users</TableCell>
+										<TableCell className="text-sm font-mono">{metrics.apiMetrics.anonymous}</TableCell>
+										<TableCell className="font-medium text-sm">Authenticated Users</TableCell>
+										<TableCell className="text-sm font-mono">{metrics.apiMetrics.authenticated}</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell className="font-medium text-sm">401 Unauthorized Users</TableCell>
+										<TableCell className="text-sm font-mono">{metrics.apiMetrics.unauthorized}</TableCell>
+										<TableCell className="font-medium text-sm">403 Forbidden Users</TableCell>
+										<TableCell className="text-sm font-mono">{metrics.apiMetrics.forbidden}</TableCell>
+									</TableRow>
+								</>
+							)}
 						</TableBody>
 					</Table>
 				</div>
@@ -203,7 +220,7 @@ export function StatelessTransportMetrics({ metrics }: StatelessTransportMetrics
 							searchColumn="name"
 							searchPlaceholder="Filter clients..."
 							pageSize={50}
-							defaultSorting={[{ id: "lastSeen", desc: true }]}
+							defaultSorting={[{ id: 'lastSeen', desc: true }]}
 						/>
 					</div>
 				</>

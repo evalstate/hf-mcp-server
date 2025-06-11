@@ -129,6 +129,34 @@ export class DatasetSearchTool extends HfApiCall<DatasetApiParams, DatasetApiRes
 			throw error;
 		}
 	}
+
+	/**
+	 * Search for datasets with a specific filter (e.g., arxiv:XXXX.XXXXX)
+	 */
+	async searchWithFilter(filter: string, limit: number = 10): Promise<string> {
+		try {
+			const apiParams: DatasetApiParams = {
+				filter: filter,
+				limit: limit.toString(),
+				sort: 'downloads',
+				direction: '-1',
+			};
+
+			// Call the API
+			const datasets = await this.callApi<DatasetApiResult[]>(apiParams);
+
+			if (datasets.length === 0) {
+				return `No datasets found referencing ${filter}.`;
+			}
+
+			return formatSearchResults(datasets, { limit });
+		} catch (error) {
+			if (error instanceof Error) {
+				throw new Error(`Failed to search for datasets: ${error.message}`);
+			}
+			throw error;
+		}
+	}
 }
 
 // Formatting Function

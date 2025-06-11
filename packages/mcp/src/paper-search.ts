@@ -19,7 +19,7 @@ export const DEFAULT_AUTHORS_TO_SHOW = 8;
 const RESULTS_TO_RETURN = 10;
 
 export const PAPER_SEARCH_TOOL_CONFIG = {
-	name: 'paper_search',
+	name: 'Paper Search',
 	description:
 		'Find Machine Learning research papers on the Hugging Face hub. ' +
 		"Include 'Link to paper' When presenting the results. " +
@@ -47,7 +47,7 @@ export const PAPER_SEARCH_TOOL_CONFIG = {
 	},
 } as const;
 
-interface Author {
+export interface Author {
 	name?: string;
 	user?: {
 		user: string;

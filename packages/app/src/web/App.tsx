@@ -392,8 +392,8 @@ function App() {
 														) : (
 															<>
 																<strong>Shared Mode:</strong> Tool toggles in this interface affect{' '}
-																<strong>all connected MCP server instances</strong> and control actual tool availability
-																for all users and connected AI assistants.
+																<strong>all connected MCP server instances</strong> and control tool availability for
+																all connected Hosts.
 															</>
 														)}
 													</p>

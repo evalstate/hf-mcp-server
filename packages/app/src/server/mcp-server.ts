@@ -1,5 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
+import type { z } from 'zod';
 import { createRequire } from 'module';
 import { whoAmI, type WhoAmI } from '@huggingface/hub';
 
@@ -34,6 +34,9 @@ import {
 	UserSummaryPrompt,
 	USER_SUMMARY_PROMPT_CONFIG,
 	type UserSummaryParams,
+	PaperSummaryPrompt,
+	PAPER_SUMMARY_PROMPT_CONFIG,
+	type PaperSummaryParams,
 	CONFIG_GUIDANCE,
 	TOOL_ID_GROUPS,
 } from '@hf-mcp/mcp';
@@ -144,6 +147,29 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				
 				return {
 					description: `User summary for ${params.user_id}`,
+					messages: [
+						{
+							role: 'user' as const,
+							content: {
+								type: 'text' as const,
+								text: summaryText,
+							},
+						},
+					],
+				};
+			}
+		);
+
+		server.prompt(
+			PAPER_SUMMARY_PROMPT_CONFIG.name,
+			PAPER_SUMMARY_PROMPT_CONFIG.description,
+			PAPER_SUMMARY_PROMPT_CONFIG.schema.shape,
+			async (params: PaperSummaryParams) => {
+				const paperSummary = new PaperSummaryPrompt(hfToken);
+				const summaryText = await paperSummary.generateSummary(params);
+				
+				return {
+					description: `Paper summary for ${params.paper_id}`,
 					messages: [
 						{
 							role: 'user' as const,

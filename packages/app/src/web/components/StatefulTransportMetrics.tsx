@@ -99,36 +99,39 @@ export function StatefulTransportMetrics({ metrics }: StatefulTransportMetricsPr
 	// Define columns for the sessions table
 	const createSessionColumns = (): ColumnDef<SessionData>[] => [
 		{
-			accessorKey: "clientInfo",
-			header: createSortableHeader("Client"),
+			accessorKey: 'clientInfo',
+			header: createSortableHeader('Client'),
 			cell: ({ row }) => {
 				const session = row.original;
-				const clientDisplay = session.clientInfo 
+				const clientDisplay = session.clientInfo
 					? `${truncateClientName(session.clientInfo.name)}@${session.clientInfo.version}`
 					: 'unknown';
 				return (
-					<div className="font-mono text-sm" title={session.clientInfo ? `${session.clientInfo.name}@${session.clientInfo.version}` : 'unknown'}>
+					<div
+						className="font-mono text-sm"
+						title={session.clientInfo ? `${session.clientInfo.name}@${session.clientInfo.version}` : 'unknown'}
+					>
 						{clientDisplay}
 					</div>
 				);
 			},
 		},
 		{
-			accessorKey: "id",
-			header: createSortableHeader("Session ID"),
+			accessorKey: 'id',
+			header: createSortableHeader('Session ID'),
 			cell: ({ row }) => (
-				<div className="font-mono text-sm" title={row.getValue<string>("id")}>
-					{truncateSessionId(row.getValue<string>("id"))}
+				<div className="font-mono text-sm" title={row.getValue<string>('id')}>
+					{truncateSessionId(row.getValue<string>('id'))}
 				</div>
 			),
 		},
 		{
-			accessorKey: "connectionStatus",
-			header: createSortableHeader("Status"),
+			accessorKey: 'connectionStatus',
+			header: createSortableHeader('Status'),
 			cell: ({ row }) => {
 				const session = row.original;
 				const status = session.connectionStatus || (session.isConnected ? 'Connected' : 'Disconnected');
-				
+
 				if (status === 'Connected') {
 					return (
 						<Badge variant="success" className="gap-1">
@@ -154,31 +157,19 @@ export function StatefulTransportMetrics({ metrics }: StatefulTransportMetricsPr
 			},
 		},
 		{
-			accessorKey: "connectedAt",
-			header: createSortableHeader("Connected"),
-			cell: ({ row }) => (
-				<div className="text-sm">
-					{formatRelativeTime(row.getValue<string>("connectedAt"))}
-				</div>
-			),
+			accessorKey: 'connectedAt',
+			header: createSortableHeader('Connected'),
+			cell: ({ row }) => <div className="text-sm">{formatRelativeTime(row.getValue<string>('connectedAt'))}</div>,
 		},
 		{
-			accessorKey: "requestCount",
-			header: createSortableHeader("Requests", "right"),
-			cell: ({ row }) => (
-				<div className="text-right font-mono text-sm">
-					{row.getValue<number>("requestCount")}
-				</div>
-			),
+			accessorKey: 'requestCount',
+			header: createSortableHeader('Requests', 'right'),
+			cell: ({ row }) => <div className="text-right font-mono text-sm">{row.getValue<number>('requestCount')}</div>,
 		},
 		{
-			accessorKey: "lastActivity",
-			header: createSortableHeader("Last Activity"),
-			cell: ({ row }) => (
-				<div className="text-sm">
-					{formatRelativeTime(row.getValue<string>("lastActivity"))}
-				</div>
-			),
+			accessorKey: 'lastActivity',
+			header: createSortableHeader('Last Activity'),
+			cell: ({ row }) => <div className="text-sm">{formatRelativeTime(row.getValue<string>('lastActivity'))}</div>,
 		},
 	];
 
@@ -216,23 +207,23 @@ export function StatefulTransportMetrics({ metrics }: StatefulTransportMetricsPr
 									<div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
 										{metrics.pings.sent > 0 && (
 											<p>
-												<span className="font-medium">Ping Status:</span>{' '}
-												{metrics.pings.successful}/{metrics.pings.sent} successful 
-												({metrics.pings.sent > 0 
-													? Math.round((metrics.pings.successful / metrics.pings.sent) * 100)
-													: 0}%)
+												<span className="font-medium">Ping Status:</span> {metrics.pings.successful}/
+												{metrics.pings.sent} successful (
+												{metrics.pings.sent > 0 ? Math.round((metrics.pings.successful / metrics.pings.sent) * 100) : 0}
+												%)
 											</p>
 										)}
 									</div>
 								)}
 							</div>
 							<p className="text-xs text-muted-foreground mt-2">
-								SSE connections checked every {formatMilliseconds(metrics.configuration.heartbeatInterval || 30000)}, 
-								sessions swept every {formatMilliseconds(metrics.configuration.staleCheckInterval)}, 
-								removed after {formatMilliseconds(metrics.configuration.staleTimeout)} inactive
-								{metrics.configuration.pingEnabled && metrics.configuration.pingInterval && 
+								SSE connections checked every {formatMilliseconds(metrics.configuration.heartbeatInterval || 30000)},
+								sessions swept every {formatMilliseconds(metrics.configuration.staleCheckInterval)}, removed after{' '}
+								{formatMilliseconds(metrics.configuration.staleTimeout)} inactive
+								{metrics.configuration.pingEnabled &&
+									metrics.configuration.pingInterval &&
 									`, pings sent every ${formatMilliseconds(metrics.configuration.pingInterval)}`}
-								{metrics.configuration.pingEnabled && 
+								{metrics.configuration.pingEnabled &&
 									`, marked distressed after ${metrics.configuration.pingFailureThreshold || 1} failed ping${(metrics.configuration.pingFailureThreshold || 1) !== 1 ? 's' : ''}`}
 							</p>
 						</div>
@@ -269,11 +260,28 @@ export function StatefulTransportMetrics({ metrics }: StatefulTransportMetricsPr
 									<TableCell className="text-sm font-mono">{metrics.pings.sent}</TableCell>
 									<TableCell className="font-medium text-sm">Ping Success Rate</TableCell>
 									<TableCell className="text-sm font-mono">
-										{metrics.pings.sent > 0 
+										{metrics.pings.sent > 0
 											? `${Math.round((metrics.pings.successful / metrics.pings.sent) * 100)}%`
 											: '-'}
 									</TableCell>
 								</TableRow>
+							)}
+							{/* API Metrics (shown in external API mode) */}
+							{metrics.apiMetrics && (
+								<>
+									<TableRow>
+										<TableCell className="font-medium text-sm">Anonymous Users</TableCell>
+										<TableCell className="text-sm font-mono">{metrics.apiMetrics.anonymous}</TableCell>
+										<TableCell className="font-medium text-sm">Authenticated Users</TableCell>
+										<TableCell className="text-sm font-mono">{metrics.apiMetrics.authenticated}</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell className="font-medium text-sm">401 Unauthorized Users</TableCell>
+										<TableCell className="text-sm font-mono">{metrics.apiMetrics.unauthorized}</TableCell>
+										<TableCell className="font-medium text-sm">403 Forbidden Users</TableCell>
+										<TableCell className="text-sm font-mono">{metrics.apiMetrics.forbidden}</TableCell>
+									</TableRow>
+								</>
 							)}
 						</TableBody>
 					</Table>
@@ -284,15 +292,16 @@ export function StatefulTransportMetrics({ metrics }: StatefulTransportMetricsPr
 					<Separator />
 					<div>
 						<h3 className="text-sm font-semibold text-foreground mb-3">
-							Sessions ({sessionData.filter(s => s.isConnected).length} active, {sessionData.filter(s => !s.isConnected).length} disconnected)
+							Sessions ({sessionData.filter((s) => s.isConnected).length} active,{' '}
+							{sessionData.filter((s) => !s.isConnected).length} disconnected)
 						</h3>
-						<DataTable 
-							columns={createSessionColumns()} 
-							data={sessionData} 
+						<DataTable
+							columns={createSessionColumns()}
+							data={sessionData}
 							searchColumn="id"
 							searchPlaceholder="Filter sessions..."
 							pageSize={10}
-							defaultSorting={[{ id: "lastActivity", desc: true }]}
+							defaultSorting={[{ id: 'lastActivity', desc: true }]}
 						/>
 					</div>
 				</>

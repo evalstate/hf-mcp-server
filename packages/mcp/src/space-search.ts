@@ -94,6 +94,35 @@ export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SpaceSearchRes
 			throw error;
 		}
 	}
+
+	/**
+	 * Search for spaces with a specific filter (e.g., arxiv:XXXX.XXXXX)
+	 * Note: For spaces, we need to use the regular API endpoint with filter parameter
+	 */
+	async searchWithFilter(filter: string, limit: number = 10): Promise<string> {
+		try {
+			// For spaces, we need to use the regular spaces API endpoint with filter
+			const url = new URL('https://huggingface.co/api/spaces');
+			url.searchParams.append('filter', filter);
+			url.searchParams.append('limit', limit.toString());
+			url.searchParams.append('sort', 'likes');
+			url.searchParams.append('direction', '-1');
+
+			const results = await this.fetchFromApi<SpaceSearchResult[]>(url);
+
+			if (results.length === 0) {
+				return `No matching Hugging Face Spaces found referencing ${filter}.`;
+			}
+
+			// Format results using the existing formatter
+			return formatSearchResults(filter, results, results.length);
+		} catch (error) {
+			if (error instanceof Error) {
+				throw new Error(`Failed to search for spaces: ${error.message}`);
+			}
+			throw error;
+		}
+	}
 }
 
 // Create a schema validator for search parameters

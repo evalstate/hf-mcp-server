@@ -3,7 +3,7 @@ import { logger } from './logger.js';
 import type { AppSettings } from '../../shared/settings.js';
 import type { TransportInfo } from '../../shared/transport-info.js';
 import { BOUQUET_FALLBACK } from '../mcp-server.js';
-import { ALL_BUILTIN_TOOL_IDS } from '@hf-mcp/mcp';
+import { ALL_BUILTIN_TOOL_IDS, apiMetrics } from '@hf-mcp/mcp';
 
 export interface ToolStateChangeCallback {
 	(toolId: string, enabled: boolean): void;
@@ -75,12 +75,18 @@ export class McpApiClient extends EventEmitter {
 					return BOUQUET_FALLBACK;
 				}
 				try {
-					const headers: Record<string, string> = {};
 					const token = overrideToken || this.config.hfToken;
-
-					if (token) {
-						headers['Authorization'] = `Bearer ${token}`;
+					if (!token) {
+						// Record anonymous access (successful fallback usage)
+						apiMetrics.recordCall(false, 200);
+						logger.debug('No HF token available for external config API - using fallback');
+						return BOUQUET_FALLBACK;
 					}
+
+					const headers: Record<string, string> = {};
+					const hasToken = true; // We know we have a token at this point
+
+					headers['Authorization'] = `Bearer ${token}`;
 
 					// Add timeout using HF_API_TIMEOUT or default to 12.5 seconds
 					headers['accept'] = 'application/json';
@@ -94,12 +100,24 @@ export class McpApiClient extends EventEmitter {
 						signal: controller.signal,
 					});
 					clearTimeout(timeoutId);
+					
 					if (!response.ok) {
-						logger.warn(
+						// Record metrics for error responses
+						apiMetrics.recordCall(hasToken, response.status);
+						
+						// Debug level logging for auth errors
+						if (response.status === 401 || response.status === 403) {
+							logger.debug(`External config API ${response.status} ${response.statusText}: ${this.config.externalUrl}`);
+						}
+						
+						logger.debug(
 							`Failed to fetch external settings: ${response.status.toString()} ${response.statusText} - using fallback bouquet`
 						);
 						return BOUQUET_FALLBACK;
 					}
+					
+					// Record metrics for successful responses
+					apiMetrics.recordCall(hasToken, response.status);
 					return (await response.json()) as AppSettings;
 				} catch (error) {
 					logger.warn({ error }, 'Error fetching settings from external API - defaulting to fallback bouquet');

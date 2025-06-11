@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { HfApiCall } from './hf-api-call.js';
+import { HfApiCall, HfApiError } from './hf-api-call.js';
 import { formatDate, formatNumber } from './utilities.js';
 import { ModelSearchTool } from './model-search.js';
 import { DatasetSearchTool } from './dataset-search.js';
@@ -8,10 +8,10 @@ import { PaperSearchTool } from './paper-search.js';
 
 // User Summary Prompt Configuration
 export const USER_SUMMARY_PROMPT_CONFIG = {
-	name: 'user_summary',
+	name: 'User Summary',
 	description:
-		'Generate a comprehensive summary of a Hugging Face user including their profile, models, datasets, spaces, and papers. ' +
-		'Accepts either a username (e.g., "clem") or a Hugging Face URL (e.g., "hf.co/julien-c" or "huggingface.co/thomwolf").',
+		'Generate a summary of a Hugging Face user including their profile, models, datasets, spaces, and papers. ' +
+		'Enter either a username (e.g., "clem") or a Hugging Face profile URL (e.g., "hf.co/julien-c" or "huggingface.co/thomwolf").',
 	schema: z.object({
 		user_id: z
 			.string()
@@ -20,16 +20,18 @@ export const USER_SUMMARY_PROMPT_CONFIG = {
 			.max(30)
 			.describe('Maximum length is 30 characters'),
 	}),
-	annotations: {
-		title: 'User Summary',
-		destructiveHint: false,
-		readOnlyHint: true,
-		openWorldHint: true,
-	},
 } as const;
 
 // Define parameter types
 export type UserSummaryParams = z.infer<typeof USER_SUMMARY_PROMPT_CONFIG.schema>;
+
+// Organization interface
+interface Organization {
+	id: string;
+	name: string;
+	fullname: string;
+	avatarUrl?: string;
+}
 
 // User overview API response interface
 interface UserOverviewResponse {
@@ -46,11 +48,13 @@ interface UserOverviewResponse {
 	numLikes: number;
 	numFollowers: number;
 	numFollowing: number;
-	orgs: string[];
+	orgs: Organization[];
 	user: string;
 	type: string;
 	isFollowing: boolean;
 	createdAt: string;
+	details?: string; // Present for organizations
+	name?: string; // Present for organizations
 }
 
 /**
@@ -190,11 +194,52 @@ export class UserSummaryPrompt extends HfApiCall<Record<string, string>, UserOve
 	}
 
 	/**
-	 * Get user overview from HF API
+	 * Get user overview from HF API, with organization fallback
 	 */
 	private async getUserOverview(userId: string): Promise<UserOverviewResponse> {
-		const url = new URL(`${this.apiUrl}/${userId}/overview`);
-		return this.fetchFromApi<UserOverviewResponse>(url);
+		try {
+			const url = new URL(`${this.apiUrl}/${userId}/overview`);
+			return await this.fetchFromApi<UserOverviewResponse>(url);
+		} catch (error) {
+			// Check if error indicates user doesn't exist (404 with specific error message)
+			if (error instanceof HfApiError && error.status === 404 && error.responseBody) {
+				try {
+					const errorData = JSON.parse(error.responseBody) as { error?: string };
+					if (errorData.error === 'This user does not exist') {
+						// Try organization API
+						try {
+							const orgUrl = new URL(`https://huggingface.co/api/organizations/${userId}/overview`);
+							const orgResponse = await this.fetchFromApi<UserOverviewResponse>(orgUrl);
+							
+							// Map organization response to user response format
+							return {
+								...orgResponse,
+								user: orgResponse.name || 'unknown',
+								_id: orgResponse.name || 'unknown',
+								isPro: false,
+								orgs: [],
+								type: 'organization',
+								createdAt: new Date().toISOString(),
+							};
+						} catch {
+							throw new Error(`Neither user nor organization found for ID: ${userId}`);
+						}
+					}
+				} catch {
+					// If we can't parse the response body, fall through to throw original error
+				}
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Helper function to add a statistic line if the value is present
+	 */
+	private addStatIfPresent(lines: string[], label: string, value: number | undefined): void {
+		if (value !== undefined && value !== null) {
+			lines.push(`- **${label}:** ${formatNumber(value)}`);
+		}
 	}
 
 	/**
@@ -203,34 +248,77 @@ export class UserSummaryPrompt extends HfApiCall<Record<string, string>, UserOve
 	private formatUserProfile(user: UserOverviewResponse): string {
 		const lines: string[] = [];
 
-		lines.push(`# User Profile: ${user.user}`);
-		lines.push('');
+		// Check if this is an organization
+		const isOrganization = user.type === 'organization';
 
-		if (user.fullname) {
-			lines.push(`**Full Name:** ${user.fullname}`);
+		if (isOrganization) {
+			lines.push(`# Organization Profile: ${user.user}`);
+			lines.push('');
+			lines.push('**Note:** That user ID refers to an Organization.');
+			lines.push('');
+
+			if (user.fullname) {
+				lines.push(`**Full Name:** ${user.fullname}`);
+			}
+
+			lines.push(`**Username:** ${user.user}`);
+			if (user.details) {
+				lines.push(`**Description:** ${user.details}`);
+			}
+
+			// Organization-specific fields
+			const orgData = user as unknown as Record<string, unknown>;
+			if (typeof orgData.isEnterprise === 'boolean') {
+				lines.push(`**Enterprise:** ${orgData.isEnterprise ? 'Yes' : 'No'}`);
+			}
+			if (typeof orgData.isVerified === 'boolean') {
+				lines.push(`**Verified:** ${orgData.isVerified ? 'Yes' : 'No'}`);
+			}
+		} else {
+			lines.push(`# User Profile: ${user.user}`);
+			lines.push('');
+
+			if (user.fullname) {
+				lines.push(`**Full Name:** ${user.fullname}`);
+			}
+
+			lines.push(`**Username:** ${user.user}`);
+			lines.push(`**Account Type:** ${user.isPro ? 'Pro' : 'Free'}`);
+			lines.push(`**Created:** ${formatDate(user.createdAt)}`);
 		}
 
-		lines.push(`**Username:** ${user.user}`);
-		lines.push(`**Account Type:** ${user.isPro ? 'Pro' : 'Free'}`);
-		lines.push(`**Created:** ${formatDate(user.createdAt)}`);
 		lines.push('');
 
 		// Statistics
 		lines.push('## Statistics');
 		lines.push('');
-		lines.push(`- **Models:** ${formatNumber(user.numModels)}`);
-		lines.push(`- **Datasets:** ${formatNumber(user.numDatasets)}`);
-		lines.push(`- **Spaces:** ${formatNumber(user.numSpaces)}`);
-		lines.push(`- **Papers:** ${formatNumber(user.numPapers)}`);
-		lines.push(`- **Discussions:** ${formatNumber(user.numDiscussions)}`);
-		lines.push(`- **Likes Given:** ${formatNumber(user.numLikes)}`);
-		lines.push(`- **Upvotes:** ${formatNumber(user.numUpvotes)}`);
-		lines.push(`- **Followers:** ${formatNumber(user.numFollowers)}`);
-		lines.push(`- **Following:** ${formatNumber(user.numFollowing)}`);
 
-		if (user.orgs && user.orgs.length > 0) {
+		this.addStatIfPresent(lines, 'Models', user.numModels);
+		this.addStatIfPresent(lines, 'Datasets', user.numDatasets);
+		this.addStatIfPresent(lines, 'Spaces', user.numSpaces);
+
+		if (!isOrganization) {
+			this.addStatIfPresent(lines, 'Papers', user.numPapers);
+			this.addStatIfPresent(lines, 'Discussions', user.numDiscussions);
+			this.addStatIfPresent(lines, 'Likes Given', user.numLikes);
+			this.addStatIfPresent(lines, 'Upvotes', user.numUpvotes);
+			this.addStatIfPresent(lines, 'Following', user.numFollowing);
+		}
+
+		this.addStatIfPresent(lines, 'Followers', user.numFollowers);
+
+		// Organization-specific field
+		if (isOrganization) {
+			const orgData = user as unknown as Record<string, unknown>;
+			if (typeof orgData.numUsers === 'number') {
+				this.addStatIfPresent(lines, 'Members', orgData.numUsers);
+			}
+		}
+
+		if (!isOrganization && user.orgs && user.orgs.length > 0) {
 			lines.push('');
-			lines.push(`**Organizations:** ${user.orgs.join(', ')}`);
+			const orgNames = user.orgs.map((org) => `[${org.fullname}](https://hf.co/${org.name})`);
+			lines.push(`**Organizations:** ${orgNames.join(', ')}`);
 		}
 
 		lines.push('');
@@ -317,7 +405,7 @@ export class UserSummaryPrompt extends HfApiCall<Record<string, string>, UserOve
 	private async getPapersSection(fullname: string): Promise<string | null> {
 		try {
 			const paperSearch = new PaperSearchTool(this.hfToken);
-			const results = await paperSearch.search(fullname, 10, true);
+			const results = await paperSearch.search(fullname, 10, false);
 
 			// Check if results indicate no papers found
 			if (results.includes('No papers found')) {

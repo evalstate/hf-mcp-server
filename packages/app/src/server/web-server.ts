@@ -8,7 +8,7 @@ import { logger } from './lib/logger.js';
 import type { BaseTransport } from './transport/base-transport.js';
 import type { McpApiClient } from './lib/mcp-api-client.js';
 import { formatMetricsForAPI } from '../shared/transport-metrics.js';
-import { ALL_BUILTIN_TOOL_IDS } from '@hf-mcp/mcp';
+import { ALL_BUILTIN_TOOL_IDS, apiMetrics } from '@hf-mcp/mcp';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -231,6 +231,11 @@ export class WebServer {
 						pingInterval: config.pingInterval,
 						pingFailureThreshold: config.pingFailureThreshold || 1,
 					};
+				}
+
+				// Add API metrics if in external API mode
+				if (this.transportInfo.externalApiMode) {
+					formattedMetrics.apiMetrics = apiMetrics.getMetrics();
 				}
 
 				res.json(formattedMetrics);

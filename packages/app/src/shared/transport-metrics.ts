@@ -78,6 +78,16 @@ export interface MethodMetrics {
 }
 
 /**
+ * API call metrics for external HuggingFace API calls
+ */
+export interface ApiCallMetrics {
+	anonymous: number;
+	authenticated: number;
+	unauthorized: number; // 401
+	forbidden: number; // 403
+}
+
+/**
  * API response format for transport metrics
  */
 export interface SessionData {
@@ -164,6 +174,9 @@ export interface TransportMetricsResponse {
 		errors: number;
 		errorRate: number; // percentage
 	}>;
+
+	// API call metrics (only shown in external API mode)
+	apiMetrics?: ApiCallMetrics;
 }
 
 /**
