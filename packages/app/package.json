@@ -1,6 +1,6 @@
 {
 	"name": "@hf-mcp/app",
-	"version": "0.1.4",
+	"version": "0.1.5",
 	"type": "module",
 	"bin": {
 		"hf-mcp-server": "./dist/server/streamableHttp.js"
