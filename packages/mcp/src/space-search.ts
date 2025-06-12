@@ -35,7 +35,7 @@ export const SEMANTIC_SEARCH_TOOL_CONFIG = {
 	description:
 		'Find Hugging Face Spaces using semantic search. ' + 'Include links to the Space when presenting the results.',
 	schema: z.object({
-		query: z.string().min(1, 'Query is required').max(50, 'Query too long').describe('Semantic Search Query'),
+		query: z.string().min(1, 'Query is required').max(100, 'Query too long').describe('Semantic Search Query'),
 		limit: z.number().optional().default(RESULTS_TO_RETURN).describe('Number of results to return'),
 		mcp: z.boolean().optional().default(false).describe('Only return MCP Server enabled Spaces'),
 	}),

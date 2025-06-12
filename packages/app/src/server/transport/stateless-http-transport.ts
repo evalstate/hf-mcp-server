@@ -24,22 +24,22 @@ export class StatelessHttpTransport extends BaseTransport {
 	private shouldHandle(requestBody: unknown): boolean {
 		const body = requestBody as { method?: string } | undefined;
 		const method = body?.method;
-		
+
 		// Always handle tool-related requests
 		if (method === 'tools/list' || method === 'tools/call') {
 			return true;
 		}
-		
+
 		// Always handle prompt-related requests
 		if (method === 'prompts/list' || method === 'prompts/get') {
 			return true;
 		}
-		
+
 		// Handle initialize to set up client tracking
 		if (method === 'initialize') {
 			return true;
 		}
-		
+
 		// All other requests can be handled by stub responder
 		return false;
 	}
@@ -52,19 +52,19 @@ export class StatelessHttpTransport extends BaseTransport {
 		});
 
 		// Serve the MCP welcome page on GET requests (or 405 if strict compliance is enabled)
-		this.app.get('/mcp', (_req: Request, res: Response) => {
-			// Check for strict compliance mode
-			if (process.env.MCP_STRICT_COMPLIANCE === 'true') {
-				this.trackError(405);
-				logger.debug('Rejected GET request to /mcp in strict compliance mode');
+		this.app.get('/mcp', (req: Request, res: Response) => {
+			// Check for strict compliance mode or Node.js user-agent
+			if (process.env.MCP_STRICT_COMPLIANCE === 'true' || req.headers['user-agent'] === 'node') {
+				this.metrics.trackStaticPageHit(405);
+				logger.debug('Rejected GET request to /mcp in strict compliance mode or from Node.js client');
 				res
 					.status(405)
 					.json(JsonRpcErrors.methodNotAllowed(null, 'Method not allowed. Use POST for stateless JSON-RPC requests.'));
 				return;
 			}
 
-			// Track static page hit
-			this.metrics.trackStaticPageHit();
+			// Track successful static page hit
+			this.metrics.trackStaticPageHit(200);
 
 			// Serve the MCP welcome page (always serve the self-contained version)
 			const mcpWelcomePath = path.join(__dirname, '..', '..', 'web', 'mcp-welcome.html');
@@ -126,7 +126,7 @@ export class StatelessHttpTransport extends BaseTransport {
 
 			// Determine which server to use
 			const useFullServer = this.shouldHandle(requestBody);
-			
+
 			if (useFullServer) {
 				// Create new server instance using factory with request headers and bouquet
 				logger.debug({ headerCount: Object.keys(req.headers).length }, 'Request received');

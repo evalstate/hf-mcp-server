@@ -17,7 +17,7 @@ export const USER_SUMMARY_PROMPT_CONFIG = {
 			.string()
 			.min(3, 'User ID must be at least 3 characters long')
 			.describe('Hugging Face user ID or URL (e.g., "evalstate" or "hf.co/evalstate")')
-			.max(30)
+			.max(60)
 			.describe('Maximum length is 30 characters'),
 	}),
 } as const;
@@ -210,7 +210,7 @@ export class UserSummaryPrompt extends HfApiCall<Record<string, string>, UserOve
 						try {
 							const orgUrl = new URL(`https://huggingface.co/api/organizations/${userId}/overview`);
 							const orgResponse = await this.fetchFromApi<UserOverviewResponse>(orgUrl);
-							
+
 							// Map organization response to user response format
 							return {
 								...orgResponse,

@@ -175,15 +175,17 @@ export function StatelessTransportMetrics({ metrics }: StatelessTransportMetrics
 								<TableCell className="font-medium text-sm">Server Errors (5xx)</TableCell>
 								<TableCell className="text-sm font-mono">{metrics.errors.unexpected}</TableCell>
 							</TableRow>
-							{metrics.staticPageHits !== undefined && (
+							{(metrics.staticPageHits200 !== undefined || metrics.staticPageHits405 !== undefined) && (
 								<TableRow>
 									<TableCell className="font-medium text-sm">
 										<div className="flex items-center gap-1">
 											<Globe className="h-3 w-3" />
-											hf.co/mcp
+											hf.co/mcp (200/405)
 										</div>
 									</TableCell>
-									<TableCell className="text-sm font-mono">{metrics.staticPageHits}</TableCell>
+									<TableCell className="text-sm font-mono">
+										{metrics.staticPageHits200 || 0}/{metrics.staticPageHits405 || 0}
+									</TableCell>
 									<TableCell className="font-medium text-sm"></TableCell>
 									<TableCell className="text-sm font-mono"></TableCell>
 								</TableRow>

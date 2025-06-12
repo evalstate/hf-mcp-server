@@ -48,7 +48,8 @@ export interface TransportMetrics {
 	methods: Map<string, MethodMetrics>;
 
 	// Static page hits (for stateless transport)
-	staticPageHits?: number;
+	staticPageHits200?: number;
+	staticPageHits405?: number;
 }
 
 /**
@@ -133,7 +134,8 @@ export interface TransportMetricsResponse {
 	};
 
 	// Static page hits (stateless transport only)
-	staticPageHits?: number;
+	staticPageHits200?: number;
+	staticPageHits405?: number;
 
 	pings?: {
 		sent: number;
@@ -218,7 +220,8 @@ export function formatMetricsForAPI(
 			lastSeen: client.lastSeen.toISOString(),
 		})),
 		sessions,
-		staticPageHits: metrics.staticPageHits,
+		staticPageHits200: metrics.staticPageHits200,
+		staticPageHits405: metrics.staticPageHits405,
 		methods: Array.from(metrics.methods.values()).map((method) => ({
 			...method,
 			firstCalled: method.firstCalled.toISOString(),
@@ -258,6 +261,8 @@ export function createEmptyMetrics(): TransportMetrics {
 		},
 		clients: new Map(),
 		methods: new Map(),
+		staticPageHits200: 0,
+		staticPageHits405: 0,
 	};
 }
 
@@ -477,13 +482,14 @@ export class MetricsCounter {
 	}
 
 	/**
-	 * Track a static page hit
+	 * Track a static page hit with status code
 	 */
-	trackStaticPageHit(): void {
-		if (this.metrics.staticPageHits === undefined) {
-			this.metrics.staticPageHits = 0;
+	trackStaticPageHit(statusCode: number): void {
+		if (statusCode === 200) {
+			this.metrics.staticPageHits200!++;
+		} else if (statusCode === 405) {
+			this.metrics.staticPageHits405!++;
 		}
-		this.metrics.staticPageHits++;
 	}
 
 	/**

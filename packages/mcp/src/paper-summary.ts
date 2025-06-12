@@ -8,7 +8,7 @@ import { authors, type Author } from './paper-search.js';
 
 // Paper Summary Prompt Configuration
 export const PAPER_SUMMARY_PROMPT_CONFIG = {
-	name: 'paper_summary',
+	name: 'Paper Summary',
 	description:
 		'Generate a comprehensive summary of an arXiv paper including its details and related models, datasets, and spaces on Hugging Face. ' +
 		'Accepts various formats: "2502.16161", "arxiv:2502.16161", "https://arxiv.org/abs/2502.16161", or Hugging Face paper URLs.',
@@ -17,7 +17,7 @@ export const PAPER_SUMMARY_PROMPT_CONFIG = {
 			.string()
 			.min(1, 'Paper ID is required')
 			.describe('arXiv paper ID in various formats (e.g., "2502.16161", "arxiv:2502.16161", or full URL)')
-			.max(100)
+			.max(60)
 			.describe('Maximum length is 100 characters'),
 	}),
 } as const;
@@ -192,13 +192,11 @@ export class PaperSummaryPrompt extends HfApiCall<Record<string, string>, PaperD
 			// Add reminder about tags
 			sections.push(
 				'\n**Note:** Tags and paper references on Hugging Face are not always complete or up-to-date. ' +
-					'Please validate these results with your own manual searches if important.'
+					'-- validate information if necessary'
 			);
 
 			// Add final instruction
-			sections.push(
-				'\nPlease summarise this paper and its impact on the Hugging Face ecosystem, highlighting key related resources.'
-			);
+			sections.push('\nPlease provide a summary of this paper and any associated resources.');
 
 			return sections.join('\n\n');
 		} catch (error) {
