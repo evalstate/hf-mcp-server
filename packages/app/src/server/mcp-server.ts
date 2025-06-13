@@ -31,6 +31,12 @@ import {
 	SpaceFilesTool,
 	type SpaceFilesParams,
 	type SpaceInfoParams,
+	UserSummaryPrompt,
+	USER_SUMMARY_PROMPT_CONFIG,
+	type UserSummaryParams,
+	PaperSummaryPrompt,
+	PAPER_SUMMARY_PROMPT_CONFIG,
+	type PaperSummaryParams,
 	CONFIG_GUIDANCE,
 	TOOL_ID_GROUPS,
 } from '@hf-mcp/mcp';
@@ -40,7 +46,7 @@ import type { McpApiClient } from './lib/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
 import { logger } from './lib/logger.js';
 import { DEFAULT_SPACE_TOOLS, type AppSettings } from '../shared/settings.js';
-import { extractAuthAndBouquet } from './utils/auth-utils.js';
+import { extractAuthBouquetAndMix } from './utils/auth-utils.js';
 import { ToolSelectionStrategy, type ToolSelectionContext } from './lib/tool-selection-strategy.js';
 
 // Fallback settings when API fails (enables all tools)
@@ -71,12 +77,12 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		skipGradio?: boolean
 	): Promise<McpServer> => {
 		logger.debug('=== CREATING NEW MCP SERVER INSTANCE ===', { skipGradio });
-		// Extract auth using shared utility 
-		const { hfToken } = extractAuthAndBouquet(headers);
-		
+		// Extract auth using shared utility
+		const { hfToken } = extractAuthBouquetAndMix(headers);
+
 		// Create tool selection strategy
 		const toolSelectionStrategy = new ToolSelectionStrategy(sharedApiClient);
-		
+
 		let userInfo: string =
 			'The Hugging Face tools are being used anonymously and rate limits apply. ' +
 			'Direct the User to set their HF_TOKEN (instructions at https://hf.co/settings/mcp/), or create an account at https://hf.co/join for higher limits.';
@@ -108,6 +114,8 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 					"You have tools for searching the Hugging Face Hub. arXiv paper id's are often " +
 					'used as references between datasets, models and papers. There are over 100 tags in use, ' +
 					"common tags include 'Text Generation', 'Transformers', 'Image Classification' and so on.\n" +
+					"The User has access to 'Prompts' that provide ways to summarise various types of " +
+					'Hugging Face hub content, and you may guide them to check this feature. ' +
 					userInfo,
 			}
 		);
@@ -128,6 +136,52 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		server.tool('hf_whoami', whoDescription, {}, { title: 'Hugging Face User Info' }, () => {
 			return { content: [{ type: 'text', text: response }] };
 		});
+
+		server.prompt(
+			USER_SUMMARY_PROMPT_CONFIG.name,
+			USER_SUMMARY_PROMPT_CONFIG.description,
+			USER_SUMMARY_PROMPT_CONFIG.schema.shape,
+			async (params: UserSummaryParams) => {
+				const userSummary = new UserSummaryPrompt(hfToken);
+				const summaryText = await userSummary.generateSummary(params);
+
+				return {
+					description: `User summary for ${params.user_id}`,
+					messages: [
+						{
+							role: 'user' as const,
+							content: {
+								type: 'text' as const,
+								text: summaryText,
+							},
+						},
+					],
+				};
+			}
+		);
+
+		server.prompt(
+			PAPER_SUMMARY_PROMPT_CONFIG.name,
+			PAPER_SUMMARY_PROMPT_CONFIG.description,
+			PAPER_SUMMARY_PROMPT_CONFIG.schema.shape,
+			async (params: PaperSummaryParams) => {
+				const paperSummary = new PaperSummaryPrompt(hfToken);
+				const summaryText = await paperSummary.generateSummary(params);
+
+				return {
+					description: `Paper summary for ${params.paper_id}`,
+					messages: [
+						{
+							role: 'user' as const,
+							content: {
+								type: 'text' as const,
+								text: summaryText,
+							},
+						},
+					],
+				};
+			}
+		);
 
 		toolInstances[SEMANTIC_SEARCH_TOOL_CONFIG.name] = server.tool(
 			SEMANTIC_SEARCH_TOOL_CONFIG.name,
@@ -268,18 +322,21 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			const context: ToolSelectionContext = {
 				headers,
 				userSettings,
-				hfToken
+				hfToken,
 			};
 
 			const toolSelection = await toolSelectionStrategy.selectTools(context);
-			
-			logger.info({ 
-				mode: toolSelection.mode,
-				reason: toolSelection.reason,
-				enabledCount: toolSelection.enabledToolIds.length,
-				totalTools: Object.keys(toolInstances).length,
-				mixedBouquet: toolSelection.mixedBouquet
-			}, 'Tool selection strategy applied');
+
+			logger.info(
+				{
+					mode: toolSelection.mode,
+					reason: toolSelection.reason,
+					enabledCount: toolSelection.enabledToolIds.length,
+					totalTools: Object.keys(toolInstances).length,
+					mixedBouquet: toolSelection.mixedBouquet,
+				},
+				'Tool selection strategy applied'
+			);
 
 			// Apply the desired state to each tool (tools start enabled by default)
 			for (const [toolName, toolInstance] of Object.entries(toolInstances)) {
@@ -296,6 +353,9 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		server.server.registerCapabilities({
 			tools: {
 				listChanged: !transportInfo?.jsonResponseEnabled,
+			},
+			prompts: {
+				listChanged: false,
 			},
 		});
 

@@ -20,18 +20,18 @@ export class HfApiError extends Error {
 	 */
 	formatWithExplanation(friendlyExplanation: string, context?: string): string {
 		let formatted = '';
-		
+
 		// Add context if provided
 		if (context) {
 			formatted = `${context}. `;
 		}
-		
+
 		// Add friendly explanation
 		formatted += friendlyExplanation;
-		
+
 		// Add original error message on new line
 		formatted += `\n\n${this.message}`;
-		
+
 		// Add response body details if available and different from message
 		if (this.responseBody) {
 			try {
@@ -47,7 +47,7 @@ export class HfApiError extends Error {
 				}
 			}
 		}
-		
+
 		return formatted;
 	}
 
@@ -93,8 +93,8 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 	protected async fetchFromApi<T = TResponse>(url: URL | string, options?: globalThis.RequestInit): Promise<T> {
 		try {
 			const headers: Record<string, string> = {
-				'Accept': 'application/json',
-				...(options?.headers as Record<string, string> || {}),
+				Accept: 'application/json',
+				...((options?.headers as Record<string, string>) || {}),
 			};
 			if (this.hfToken) {
 				headers['Authorization'] = `Bearer ${this.hfToken}`;
@@ -103,7 +103,7 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 			// Add timeout using AbortController
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => controller.abort(), this.apiTimeout);
-
+			
 			const response = await fetch(url.toString(), {
 				...options,
 				headers,

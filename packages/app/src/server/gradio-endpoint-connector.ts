@@ -21,6 +21,13 @@ interface JsonSchema {
 	[key: string]: unknown;
 }
 
+// Define type for array format schema
+interface ArrayFormatTool {
+	name: string;
+	description?: string;
+	inputSchema: JsonSchema;
+}
+
 
 interface EndpointConnection {
 	endpointId: string;
@@ -55,6 +62,81 @@ function createTimeout(ms: number): Promise<never> {
 			reject(new Error(`Connection timeout after ${ms.toString()}ms`));
 		}, ms);
 	});
+}
+
+/**
+ * Parses schema response and extracts tools based on format (array or object)
+ */
+export function parseSchemaResponse(
+	schemaResponse: unknown,
+	endpointId: string,
+	subdomain: string
+): { name: string; description?: string; inputSchema: JsonSchema } {
+	// Handle both array and object schema formats
+	let tools: Array<{ name: string; description?: string; inputSchema: JsonSchema }> = [];
+	
+	if (Array.isArray(schemaResponse)) {
+		// Array format: [{ name: "toolName", description: "...", inputSchema: {...} }, ...]
+		tools = (schemaResponse as ArrayFormatTool[]).filter((tool): tool is ArrayFormatTool => 
+			typeof tool === 'object' && 
+			tool !== null && 
+			'name' in tool && 
+			typeof tool.name === 'string' &&
+			'inputSchema' in tool
+		);
+		logger.debug(
+			{
+				endpointId,
+				toolCount: tools.length,
+				tools: tools.map(t => t.name),
+			},
+			'Retrieved schema (array format)'
+		);
+	} else if (typeof schemaResponse === 'object' && schemaResponse !== null) {
+		// Object format: { "toolName": { properties: {...}, required: [...] }, ... }
+		const schema = schemaResponse as Record<string, JsonSchema>;
+		tools = Object.entries(schema).map(([name, toolSchema]) => ({
+			name,
+			description: typeof toolSchema.description === 'string' ? toolSchema.description : undefined,
+			inputSchema: toolSchema,
+		}));
+		logger.debug(
+			{
+				endpointId,
+				toolCount: tools.length,
+				tools: tools.map(t => t.name),
+			},
+			'Retrieved schema (object format)'
+		);
+	} else {
+		logger.error({ endpointId, subdomain, schemaType: typeof schemaResponse }, 'Invalid schema format');
+		throw new Error('Invalid schema format: expected array or object');
+	}
+
+	if (tools.length === 0) {
+		logger.error({ endpointId, subdomain }, 'No tools found in schema');
+		throw new Error('No tools found in schema');
+	}
+
+	// Select which tool to use based on the algorithm:
+	// 1. Find a tool containing "infer" (case-insensitive)
+	// 2. Otherwise, use the last tool
+	let selectedTool = tools[tools.length - 1];
+	if (!selectedTool) {
+		logger.error({ endpointId, subdomain }, 'No tool selected from available tools');
+		throw new Error('No tool selected from available tools');
+	}
+	
+	const inferTool = tools.find((tool) => tool.name.toLowerCase().includes('infer'));
+
+	if (inferTool) {
+		selectedTool = inferTool;
+		logger.debug({ endpointId, toolName: selectedTool.name }, 'Selected tool containing "infer"');
+	} else {
+		logger.debug({ endpointId, toolName: selectedTool.name }, 'Selected last tool (no "infer" tool found)');
+	}
+
+	return selectedTool;
 }
 
 /**
@@ -103,53 +185,20 @@ async function fetchEndpointSchema(
 		throw new Error(`Failed to fetch schema: ${response.status} ${response.statusText}`);
 	}
 
-	const schema = await response.json() as Record<string, JsonSchema>;
-	logger.debug(
-		{
-			endpointId,
-			toolCount: Object.keys(schema).length,
-			tools: Object.keys(schema),
-		},
-		'Retrieved schema'
-	);
-
-	// Select which tool to use based on the algorithm:
-	// 1. Find a tool containing "infer" (case-insensitive)
-	// 2. Otherwise, use the last tool
-	const toolNames = Object.keys(schema);
-	if (toolNames.length === 0) {
-		logger.error({ endpointId, subdomain: endpoint.subdomain }, 'No tools found in schema');
-		throw new Error('No tools found in schema');
-	}
-
-	let selectedToolName = toolNames[toolNames.length - 1];
-	if (!selectedToolName) {
-		throw new Error('No tools found in schema');
-	}
-	const inferToolName = toolNames.find((name) => name.toLowerCase().includes('infer'));
-
-	if (inferToolName) {
-		selectedToolName = inferToolName;
-		logger.debug({ endpointId, toolName: selectedToolName }, 'Selected tool containing "infer"');
-	} else {
-		logger.debug({ endpointId, toolName: selectedToolName }, 'Selected last tool (no "infer" tool found)');
-	}
-
-	const selectedSchema = schema[selectedToolName];
-	if (!selectedSchema) {
-		logger.error({ endpointId, subdomain: endpoint.subdomain, toolName: selectedToolName }, 'Selected tool not found in schema');
-		throw new Error('No tool selected from schema');
-	}
+	const schemaResponse = await response.json() as unknown;
+	
+	// Parse the schema response
+	const selectedTool = parseSchemaResponse(schemaResponse, endpointId, endpoint.subdomain);
 
 	// Create tool with raw JSON schema (conversion to Zod happens in registerRemoteTool)
 	const tool: Tool = {
-		name: selectedToolName,
-		description: typeof selectedSchema.description === 'string' ? selectedSchema.description : `${selectedToolName} tool`,
+		name: selectedTool.name,
+		description: selectedTool.description || `${selectedTool.name} tool`,
 		inputSchema: {
 			type: 'object',
-			properties: selectedSchema.properties || {},
-			required: selectedSchema.required || [],
-			description: selectedSchema.description,
+			properties: selectedTool.inputSchema.properties || {},
+			required: selectedTool.inputSchema.required || [],
+			description: selectedTool.inputSchema.description,
 		},
 	};
 
@@ -406,7 +455,7 @@ export function registerRemoteTool(
  * @param jsonSchemaProperty - The JSON schema property to convert
  * @param skipDefault - If true, won't apply default values (useful for required fields)
  */
-function convertJsonSchemaToZod(jsonSchemaProperty: JsonSchemaProperty, skipDefault = false): z.ZodTypeAny {
+export function convertJsonSchemaToZod(jsonSchemaProperty: JsonSchemaProperty, skipDefault = false): z.ZodTypeAny {
 	let zodSchema: z.ZodTypeAny;
 
 	// Special handling for FileData types

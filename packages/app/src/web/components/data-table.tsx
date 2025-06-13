@@ -41,6 +41,7 @@ interface DataTableProps<TData, TValue> {
   searchPlaceholder?: string
   defaultColumnVisibility?: VisibilityState
   pageSize?: number
+  defaultSorting?: SortingState
 }
 
 export function DataTable<TData, TValue>({
@@ -50,8 +51,9 @@ export function DataTable<TData, TValue>({
   searchPlaceholder = "Filter...",
   defaultColumnVisibility = {},
   pageSize = 25,
+  defaultSorting = [],
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [sorting, setSorting] = React.useState<SortingState>(defaultSorting)
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   )

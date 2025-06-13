@@ -277,12 +277,30 @@ function App() {
 				<div className="max-w-4xl mx-auto">
 					<Tabs defaultValue="metrics" className="w-full">
 						<TabsList className="mb-6 w-full overflow-x-auto flex-nowrap">
-							<TabsTrigger value="metrics" className="whitespace-nowrap">📊 Metrics</TabsTrigger>
-							<TabsTrigger value="mcp" className="whitespace-nowrap">🔧 MCP</TabsTrigger>
-							<TabsTrigger value="search" className="whitespace-nowrap">🔍 Search</TabsTrigger>
-							<TabsTrigger value="spaces" className="whitespace-nowrap">🚀 Spaces</TabsTrigger>
-							<TabsTrigger value="gradio" className="whitespace-nowrap">🚀 Gradio</TabsTrigger>
-							<TabsTrigger value="home" className="whitespace-nowrap">🏠 Home</TabsTrigger>
+							<TabsTrigger value="metrics" className="whitespace-nowrap">
+								📊 Metrics
+							</TabsTrigger>
+							<TabsTrigger value="mcp" className="whitespace-nowrap">
+								🔧 MCP
+							</TabsTrigger>
+							{!transportInfo?.externalApiMode && (
+								<TabsTrigger value="search" className="whitespace-nowrap">
+									🔍 Search
+								</TabsTrigger>
+							)}
+							{!transportInfo?.externalApiMode && (
+								<TabsTrigger value="spaces" className="whitespace-nowrap">
+									🚀 Spaces
+								</TabsTrigger>
+							)}
+							{!transportInfo?.externalApiMode && (
+								<TabsTrigger value="gradio" className="whitespace-nowrap">
+									🚀 Gradio
+								</TabsTrigger>
+							)}
+							<TabsTrigger value="home" className="whitespace-nowrap">
+								🏠 Home
+							</TabsTrigger>
 						</TabsList>
 						<TabsContent value="metrics" className="mt-0">
 							<TransportMetricsCard />
@@ -290,32 +308,38 @@ function App() {
 						<TabsContent value="mcp" className="mt-0">
 							<McpMethodsCard />
 						</TabsContent>
-						<TabsContent value="search" className="mt-0">
-							<ToolsCard
-								title="🤗 Hugging Face Search Tools (MCP)"
-								description="Find and use Hugging Face and Community content."
-								tools={searchTools}
-								onToolToggle={handleToolToggle}
-							/>
-						</TabsContent>
-						<TabsContent value="spaces" className="mt-0">
-							<ToolsCard
-								title="🤗 Hugging Face Space Tools (MCP)"
-								description="Manage and duplicate Hugging Face Spaces."
-								tools={spaceTools}
-								onToolToggle={handleToolToggle}
-							/>
-						</TabsContent>
-						<TabsContent value="gradio" className="mt-0">
-							<GradioEndpointsCard
-								spaceNames={spaceNames}
-								spaceSubdomains={spaceSubdomains}
-								enabledSpaces={enabledSpaces}
-								onSpaceToolToggle={handleSpaceToolToggle}
-								onSpaceToolNameChange={handleSpaceToolNameChange}
-								onSpaceToolSubdomainChange={handleSpaceToolSubdomainChange}
-							/>
-						</TabsContent>
+						{!transportInfo?.externalApiMode && (
+							<TabsContent value="search" className="mt-0">
+								<ToolsCard
+									title="🤗 Hugging Face Search Tools (MCP)"
+									description="Find and use Hugging Face and Community content."
+									tools={searchTools}
+									onToolToggle={handleToolToggle}
+								/>
+							</TabsContent>
+						)}
+						{!transportInfo?.externalApiMode && (
+							<TabsContent value="spaces" className="mt-0">
+								<ToolsCard
+									title="🤗 Hugging Face Space Tools (MCP)"
+									description="Manage and duplicate Hugging Face Spaces."
+									tools={spaceTools}
+									onToolToggle={handleToolToggle}
+								/>
+							</TabsContent>
+						)}
+						{!transportInfo?.externalApiMode && (
+							<TabsContent value="gradio" className="mt-0">
+								<GradioEndpointsCard
+									spaceNames={spaceNames}
+									spaceSubdomains={spaceSubdomains}
+									enabledSpaces={enabledSpaces}
+									onSpaceToolToggle={handleSpaceToolToggle}
+									onSpaceToolNameChange={handleSpaceToolNameChange}
+									onSpaceToolSubdomainChange={handleSpaceToolSubdomainChange}
+								/>
+							</TabsContent>
+						)}
 						<TabsContent value="home" className="mt-0">
 							{/* HF MCP Server Card */}
 							<Card>
@@ -362,15 +386,14 @@ function App() {
 													<p className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed">
 														{transportInfo?.externalApiMode ? (
 															<>
-																<strong>External API Mode:</strong> Tool toggles in this interface only affect the{' '}
-																<strong>web interface display</strong> and have no effect on the actual MCP server
-																configuration. Configure tools on the external API endpoint.
+																<strong>External API Mode:</strong> Tools are managed by an external API. Tool Selection
+																Tabs are not available.
 															</>
 														) : (
 															<>
 																<strong>Shared Mode:</strong> Tool toggles in this interface affect{' '}
-																<strong>all connected MCP server instances</strong> and control actual tool availability
-																for all users and connected AI assistants.
+																<strong>all connected MCP server instances</strong> and control tool availability for
+																all connected Hosts.
 															</>
 														)}
 													</p>
@@ -391,7 +414,12 @@ function App() {
 											<Copy className="mr-2 h-5 w-5" />
 											Copy MCP URL
 										</Button>
-										<Button size="xl" variant="outline" onClick={handleGoToSettings} className="w-full touch-manipulation">
+										<Button
+											size="xl"
+											variant="outline"
+											onClick={handleGoToSettings}
+											className="w-full touch-manipulation"
+										>
 											<Settings className="mr-2 h-5 w-5" />
 											Go to Settings
 										</Button>

@@ -39,15 +39,3 @@ export function extractAuthBouquetAndMix(headers: Record<string, string> | null)
 
 	return { hfToken, bouquet, mix };
 }
-
-/**
- * Legacy function for backward compatibility
- * @deprecated Use extractAuthBouquetAndMix instead
- */
-export function extractAuthAndBouquet(headers: Record<string, string> | null): {
-	hfToken: string | undefined;
-	bouquet: string | undefined;
-} {
-	const { hfToken, bouquet } = extractAuthBouquetAndMix(headers);
-	return { hfToken, bouquet };
-}

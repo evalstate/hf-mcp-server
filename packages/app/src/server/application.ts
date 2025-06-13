@@ -71,7 +71,7 @@ export class Application {
 			apiClientConfig = {
 				type: 'external',
 				externalUrl: userConfigApi,
-				hfToken: process.env.HF_TOKEN || process.env.DEFAULT_HF_TOKEN,
+				hfToken: process.env.DEFAULT_HF_TOKEN,
 			};
 			logger.info(`Using external API client with user config API: ${userConfigApi}`);
 		} else {

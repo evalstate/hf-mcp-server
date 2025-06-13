@@ -35,7 +35,7 @@ export const SEMANTIC_SEARCH_TOOL_CONFIG = {
 	description:
 		'Find Hugging Face Spaces using semantic search. ' + 'Include links to the Space when presenting the results.',
 	schema: z.object({
-		query: z.string().min(1, 'Query is required').max(50, 'Query too long').describe('Semantic Search Query'),
+		query: z.string().min(1, 'Query is required').max(100, 'Query too long').describe('Semantic Search Query'),
 		limit: z.number().optional().default(RESULTS_TO_RETURN).describe('Number of results to return'),
 		mcp: z.boolean().optional().default(false).describe('Only return MCP Server enabled Spaces'),
 	}),
@@ -87,6 +87,35 @@ export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SpaceSearchRes
 			const results = await this.callApi<SpaceSearchResult[]>(params);
 
 			return { results: results.slice(0, limit), totalCount: results.length };
+		} catch (error) {
+			if (error instanceof Error) {
+				throw new Error(`Failed to search for spaces: ${error.message}`);
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Search for spaces with a specific filter (e.g., arxiv:XXXX.XXXXX)
+	 * Note: For spaces, we need to use the regular API endpoint with filter parameter
+	 */
+	async searchWithFilter(filter: string, limit: number = 10): Promise<string> {
+		try {
+			// For spaces, we need to use the regular spaces API endpoint with filter
+			const url = new URL('https://huggingface.co/api/spaces');
+			url.searchParams.append('filter', filter);
+			url.searchParams.append('limit', limit.toString());
+			url.searchParams.append('sort', 'likes');
+			url.searchParams.append('direction', '-1');
+
+			const results = await this.fetchFromApi<SpaceSearchResult[]>(url);
+
+			if (results.length === 0) {
+				return `No matching Hugging Face Spaces found referencing ${filter}.`;
+			}
+
+			// Format results using the existing formatter
+			return formatSearchResults(filter, results, results.length);
 		} catch (error) {
 			if (error instanceof Error) {
 				throw new Error(`Failed to search for spaces: ${error.message}`);

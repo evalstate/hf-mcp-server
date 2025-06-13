@@ -2,6 +2,7 @@ import { logger } from './logger.js';
 import type { AppSettings } from '../../shared/settings.js';
 import { ALL_BUILTIN_TOOL_IDS, TOOL_ID_GROUPS } from '@hf-mcp/mcp';
 import type { McpApiClient } from './mcp-api-client.js';
+import { extractAuthBouquetAndMix } from '../utils/auth-utils.js';
 
 export enum ToolSelectionMode {
 	BOUQUET_OVERRIDE = 'bouquet_override',
@@ -45,30 +46,6 @@ export const BOUQUETS: Record<string, AppSettings> = {
 };
 
 /**
- * Extracts bouquet and mix parameters from headers
- */
-export function extractBouquetAndMix(headers: Record<string, string> | null): {
-	bouquet: string | undefined;
-	mix: string | undefined;
-} {
-	if (!headers) {
-		return { bouquet: undefined, mix: undefined };
-	}
-
-	const bouquet = headers['x-mcp-bouquet'];
-	const mix = headers['x-mcp-mix'];
-
-	if (bouquet) {
-		logger.info({ bouquet }, 'Bouquet parameter received');
-	}
-	if (mix) {
-		logger.info({ mix }, 'Mix parameter received');
-	}
-
-	return { bouquet, mix };
-}
-
-/**
  * Tool Selection Strategy - implements clear precedence rules for tool selection
  */
 export class ToolSelectionStrategy {
@@ -86,7 +63,7 @@ export class ToolSelectionStrategy {
 	 * 4. Fallback (all tools)
 	 */
 	async selectTools(context: ToolSelectionContext): Promise<ToolSelectionResult> {
-		const { bouquet, mix } = extractBouquetAndMix(context.headers);
+		const { bouquet, mix } = extractAuthBouquetAndMix(context.headers);
 
 		// 1. Bouquet override (highest precedence)
 		if (bouquet && BOUQUETS[bouquet]) {

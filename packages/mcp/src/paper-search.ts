@@ -47,7 +47,7 @@ export const PAPER_SEARCH_TOOL_CONFIG = {
 	},
 } as const;
 
-interface Author {
+export interface Author {
 	name?: string;
 	user?: {
 		user: string;

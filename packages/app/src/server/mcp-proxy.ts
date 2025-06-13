@@ -4,8 +4,8 @@ import type { McpApiClient } from './lib/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
 import type { AppSettings } from '../shared/settings.js';
 import { logger } from './lib/logger.js';
-import { extractAuthAndBouquet } from './utils/auth-utils.js';
 import { connectToGradioEndpoints, registerRemoteTool } from './gradio-endpoint-connector.js';
+import { extractAuthBouquetAndMix } from './utils/auth-utils.js';
 
 /**
  * Creates a proxy ServerFactory that adds remote tools to the original server.
@@ -15,11 +15,15 @@ export const createProxyServerFactory = (
 	sharedApiClient: McpApiClient,
 	originalServerFactory: ServerFactory
 ): ServerFactory => {
-	return async (headers: Record<string, string> | null, userSettings?: AppSettings, skipGradio?: boolean): Promise<McpServer> => {
+	return async (
+		headers: Record<string, string> | null,
+		userSettings?: AppSettings,
+		skipGradio?: boolean
+	): Promise<McpServer> => {
 		logger.debug('=== PROXY FACTORY CALLED ===', { skipGradio });
 
 		// Extract auth and bouquet using shared utility
-		const { hfToken, bouquet } = extractAuthAndBouquet(headers);
+		const { hfToken, bouquet } = extractAuthBouquetAndMix(headers);
 
 		// Skip expensive operations for requests that skip Gradio
 		let settings = userSettings;

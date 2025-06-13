@@ -90,6 +90,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 					id: sessionId,
 					connectedAt: new Date(),
 					lastActivity: new Date(),
+					requestCount: 0,
 					capabilities: {},
 				},
 			};
@@ -144,6 +145,14 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 
 			// Update last activity using base class helper
 			this.updateSessionActivity(sessionId);
+
+			// Increment request count only for actual method calls (not responses or pings)
+			if (trackingName) {
+				const session = this.sessions.get(sessionId);
+				if (session) {
+					session.metadata.requestCount++;
+				}
+			}
 
 			// Handle message with the transport
 			await connection.transport.handlePostMessage(req, res, req.body);

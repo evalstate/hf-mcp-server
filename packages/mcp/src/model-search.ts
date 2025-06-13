@@ -131,6 +131,34 @@ export class ModelSearchTool extends HfApiCall<ModelApiParams, ModelApiResult[]>
 			throw error;
 		}
 	}
+
+	/**
+	 * Search for models with a specific filter (e.g., arxiv:XXXX.XXXXX)
+	 */
+	async searchWithFilter(filter: string, limit: number = 10): Promise<string> {
+		try {
+			const apiParams: ModelApiParams = {
+				filter: filter,
+				limit: limit.toString(),
+				sort: 'downloads',
+				direction: '-1',
+			};
+
+			// Call the API
+			const models = await this.callApi<ModelApiResult[]>(apiParams);
+
+			if (models.length === 0) {
+				return `No models found referencing ${filter}.`;
+			}
+
+			return formatSearchResults(models, { limit });
+		} catch (error) {
+			if (error instanceof Error) {
+				throw new Error(`Failed to search for models: ${error.message}`);
+			}
+			throw error;
+		}
+	}
 }
 
 // Formatting Function

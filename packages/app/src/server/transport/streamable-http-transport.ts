@@ -88,6 +88,14 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 	private async handlePostRequest(req: Request, res: Response, sessionId?: string): Promise<void> {
 		const trackingName = this.extractMethodForTracking(req.body);
 
+		// Increment request count only for actual method calls (not responses or pings)
+		if (trackingName && sessionId && this.sessions.has(sessionId)) {
+			const session = this.sessions.get(sessionId);
+			if (session) {
+				session.metadata.requestCount++;
+			}
+		}
+
 		try {
 			// Reject new connections during shutdown
 			if (!sessionId && this.isShuttingDown) {
@@ -211,6 +219,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 						id: sessionId,
 						connectedAt: new Date(),
 						lastActivity: new Date(),
+						requestCount: 0,
 						capabilities: {},
 					},
 				};
