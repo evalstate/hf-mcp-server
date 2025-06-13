@@ -76,7 +76,7 @@ export class McpApiClient extends EventEmitter {
 				}
 				try {
 					const token = overrideToken || this.config.hfToken;
-					if (!token) {
+					if (!token || token.trim() === '') {
 						// Record anonymous access (successful fallback usage)
 						apiMetrics.recordCall(false, 200);
 						logger.debug('No HF token available for external config API - using fallback');
@@ -100,22 +100,22 @@ export class McpApiClient extends EventEmitter {
 						signal: controller.signal,
 					});
 					clearTimeout(timeoutId);
-					
+
 					if (!response.ok) {
 						// Record metrics for error responses
 						apiMetrics.recordCall(hasToken, response.status);
-						
+
 						// Debug level logging for auth errors
 						if (response.status === 401 || response.status === 403) {
 							logger.debug(`External config API ${response.status} ${response.statusText}: ${this.config.externalUrl}`);
 						}
-						
+
 						logger.debug(
 							`Failed to fetch external settings: ${response.status.toString()} ${response.statusText} - using fallback bouquet`
 						);
 						return BOUQUET_FALLBACK;
 					}
-					
+
 					// Record metrics for successful responses
 					apiMetrics.recordCall(hasToken, response.status);
 					return (await response.json()) as AppSettings;
