@@ -46,7 +46,7 @@ import type { McpApiClient } from './lib/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
 import { logger } from './lib/logger.js';
 import { DEFAULT_SPACE_TOOLS, type AppSettings } from '../shared/settings.js';
-import { extractAuthAndBouquet } from './utils/auth-utils.js';
+import { extractAuthBouquetAndMix } from './utils/auth-utils.js';
 import { ToolSelectionStrategy, type ToolSelectionContext } from './lib/tool-selection-strategy.js';
 
 // Fallback settings when API fails (enables all tools)
@@ -78,7 +78,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 	): Promise<McpServer> => {
 		logger.debug('=== CREATING NEW MCP SERVER INSTANCE ===', { skipGradio });
 		// Extract auth using shared utility
-		const { hfToken } = extractAuthAndBouquet(headers);
+		const { hfToken } = extractAuthBouquetAndMix(headers);
 
 		// Create tool selection strategy
 		const toolSelectionStrategy = new ToolSelectionStrategy(sharedApiClient);
@@ -144,7 +144,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			async (params: UserSummaryParams) => {
 				const userSummary = new UserSummaryPrompt(hfToken);
 				const summaryText = await userSummary.generateSummary(params);
-				
+
 				return {
 					description: `User summary for ${params.user_id}`,
 					messages: [
@@ -167,7 +167,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			async (params: PaperSummaryParams) => {
 				const paperSummary = new PaperSummaryPrompt(hfToken);
 				const summaryText = await paperSummary.generateSummary(params);
-				
+
 				return {
 					description: `Paper summary for ${params.paper_id}`,
 					messages: [

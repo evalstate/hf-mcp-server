@@ -1,3 +1,5 @@
+import { logger } from '../lib/logger.js';
+
 /**
  * API call metrics tracking for external HuggingFace API calls
  */
@@ -22,6 +24,7 @@ class ApiMetricsCollector {
 	 * @param status - HTTP status code (200 for success, 401/403 for auth errors)
 	 */
 	recordCall(hasToken: boolean, status: number): void {
+		logger.debug(`Recording API call: hasToken=${hasToken}, status=${status}`);
 		if (status === 200) {
 			if (hasToken) {
 				this.metrics.authenticated++;

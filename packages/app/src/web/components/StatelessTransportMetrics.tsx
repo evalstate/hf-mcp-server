@@ -194,15 +194,15 @@ export function StatelessTransportMetrics({ metrics }: StatelessTransportMetrics
 							{metrics.apiMetrics && (
 								<>
 									<TableRow>
-										<TableCell className="font-medium text-sm">Anonymous Users</TableCell>
+										<TableCell className="font-medium text-sm">Tool API - Anonymous</TableCell>
 										<TableCell className="text-sm font-mono">{metrics.apiMetrics.anonymous}</TableCell>
-										<TableCell className="font-medium text-sm">Authenticated Users</TableCell>
+										<TableCell className="font-medium text-sm">Tool API - Authenticated</TableCell>
 										<TableCell className="text-sm font-mono">{metrics.apiMetrics.authenticated}</TableCell>
 									</TableRow>
 									<TableRow>
-										<TableCell className="font-medium text-sm">401 Unauthorized Users</TableCell>
+										<TableCell className="font-medium text-sm">Tool API - 401 Unauthorized</TableCell>
 										<TableCell className="text-sm font-mono">{metrics.apiMetrics.unauthorized}</TableCell>
-										<TableCell className="font-medium text-sm">403 Forbidden Users</TableCell>
+										<TableCell className="font-medium text-sm">Tool API - 403 Forbidden</TableCell>
 										<TableCell className="text-sm font-mono">{metrics.apiMetrics.forbidden}</TableCell>
 									</TableRow>
 								</>

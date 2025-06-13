@@ -1,54 +1,54 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { 
-	ToolSelectionStrategy, 
-	ToolSelectionMode, 
-	BOUQUETS, 
-	extractBouquetAndMix,
-	type ToolSelectionContext
+import {
+	ToolSelectionStrategy,
+	ToolSelectionMode,
+	BOUQUETS,
+	type ToolSelectionContext,
 } from './tool-selection-strategy.js';
 import { McpApiClient, type ApiClientConfig } from './mcp-api-client.js';
 import type { AppSettings } from '../../shared/settings.js';
 import type { TransportInfo } from '../../shared/transport-info.js';
 import { ALL_BUILTIN_TOOL_IDS, TOOL_ID_GROUPS } from '@hf-mcp/mcp';
+import { extractAuthBouquetAndMix } from '../utils/auth-utils.js';
 
 describe('extractBouquetAndMix', () => {
 	it('should extract bouquet from headers', () => {
 		const headers = { 'x-mcp-bouquet': 'search' };
-		const result = extractBouquetAndMix(headers);
-		
-		expect(result.bouquet).toBe('search');
-		expect(result.mix).toBeUndefined();
+		const { bouquet, mix } = extractAuthBouquetAndMix(headers);
+
+		expect(bouquet).toBe('search');
+		expect(mix).toBeUndefined();
 	});
 
 	it('should extract mix from headers', () => {
 		const headers = { 'x-mcp-mix': 'hf_api' };
-		const result = extractBouquetAndMix(headers);
-		
+		const result = extractAuthBouquetAndMix(headers);
+
 		expect(result.bouquet).toBeUndefined();
 		expect(result.mix).toBe('hf_api');
 	});
 
 	it('should extract both bouquet and mix from headers', () => {
-		const headers = { 
+		const headers = {
 			'x-mcp-bouquet': 'search',
-			'x-mcp-mix': 'hf_api'
+			'x-mcp-mix': 'hf_api',
 		};
-		const result = extractBouquetAndMix(headers);
-		
+		const result = extractAuthBouquetAndMix(headers);
+
 		expect(result.bouquet).toBe('search');
 		expect(result.mix).toBe('hf_api');
 	});
 
 	it('should handle null headers', () => {
-		const result = extractBouquetAndMix(null);
-		
+		const result = extractAuthBouquetAndMix(null);
+
 		expect(result.bouquet).toBeUndefined();
 		expect(result.mix).toBeUndefined();
 	});
 
 	it('should handle empty headers', () => {
-		const result = extractBouquetAndMix({});
-		
+		const result = extractAuthBouquetAndMix({});
+
 		expect(result.bouquet).toBeUndefined();
 		expect(result.mix).toBeUndefined();
 	});
@@ -102,16 +102,16 @@ describe('ToolSelectionStrategy', () => {
 			type: 'polling',
 			baseUrl: 'http://localhost:3000',
 			pollInterval: 5000,
-			staticGradioEndpoints: []
+			staticGradioEndpoints: [],
 		};
-		
+
 		const transportInfo: TransportInfo = {
 			transport: 'streamableHttpJson',
 			port: 3000,
 			defaultHfTokenSet: false,
 			jsonResponseEnabled: true,
 			externalApiMode: false,
-			stdioClient: null
+			stdioClient: null,
 		};
 
 		mockApiClient = new McpApiClient(config, transportInfo);
@@ -122,7 +122,7 @@ describe('ToolSelectionStrategy', () => {
 		it('should use bouquet override for search bouquet', async () => {
 			const context: ToolSelectionContext = {
 				headers: { 'x-mcp-bouquet': 'search' },
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
@@ -137,7 +137,7 @@ describe('ToolSelectionStrategy', () => {
 		it('should use bouquet override for hf_api bouquet', async () => {
 			const context: ToolSelectionContext = {
 				headers: { 'x-mcp-bouquet': 'hf_api' },
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
@@ -150,7 +150,7 @@ describe('ToolSelectionStrategy', () => {
 		it('should use bouquet override for spaces bouquet', async () => {
 			const context: ToolSelectionContext = {
 				headers: { 'x-mcp-bouquet': 'spaces' },
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
@@ -163,7 +163,7 @@ describe('ToolSelectionStrategy', () => {
 		it('should use bouquet override for all bouquet', async () => {
 			const context: ToolSelectionContext = {
 				headers: { 'x-mcp-bouquet': 'all' },
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
@@ -176,7 +176,7 @@ describe('ToolSelectionStrategy', () => {
 		it('should ignore invalid bouquet names', async () => {
 			const context: ToolSelectionContext = {
 				headers: { 'x-mcp-bouquet': 'invalid_bouquet' },
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
@@ -189,16 +189,16 @@ describe('ToolSelectionStrategy', () => {
 		it('should prefer bouquet over mix when both are present', async () => {
 			const userSettings: AppSettings = {
 				builtInTools: ['hf_semantic_search'],
-				spaceTools: []
+				spaceTools: [],
 			};
 
 			const context: ToolSelectionContext = {
-				headers: { 
+				headers: {
 					'x-mcp-bouquet': 'search',
-					'x-mcp-mix': 'hf_api'
+					'x-mcp-mix': 'hf_api',
 				},
 				userSettings,
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
@@ -213,13 +213,13 @@ describe('ToolSelectionStrategy', () => {
 		it('should mix hf_api tools with user settings', async () => {
 			const userSettings: AppSettings = {
 				builtInTools: ['hf_semantic_search', 'hf_dataset_search'],
-				spaceTools: []
+				spaceTools: [],
 			};
 
 			const context: ToolSelectionContext = {
 				headers: { 'x-mcp-mix': 'hf_api' },
 				userSettings,
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
@@ -228,55 +228,49 @@ describe('ToolSelectionStrategy', () => {
 			expect(result.reason).toBe('User settings + mix(hf_api)');
 			expect(result.baseSettings).toEqual(userSettings);
 			expect(result.mixedBouquet).toBe('hf_api');
-			
+
 			// Should contain user tools + hf_api tools (deduplicated)
-			const expectedTools = [...new Set([
-				...userSettings.builtInTools,
-				...TOOL_ID_GROUPS.hf_api
-			])];
+			const expectedTools = [...new Set([...userSettings.builtInTools, ...TOOL_ID_GROUPS.hf_api])];
 			expect(result.enabledToolIds).toEqual(expectedTools);
 		});
 
 		it('should mix search tools with user settings', async () => {
 			const userSettings: AppSettings = {
 				builtInTools: ['hf_whoami', 'hf_duplicate_space'],
-				spaceTools: []
+				spaceTools: [],
 			};
 
 			const context: ToolSelectionContext = {
 				headers: { 'x-mcp-mix': 'search' },
 				userSettings,
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
 
 			expect(result.mode).toBe(ToolSelectionMode.MIX);
 			expect(result.reason).toBe('User settings + mix(search)');
-			
-			const expectedTools = [...new Set([
-				...userSettings.builtInTools,
-				...TOOL_ID_GROUPS.search
-			])];
+
+			const expectedTools = [...new Set([...userSettings.builtInTools, ...TOOL_ID_GROUPS.search])];
 			expect(result.enabledToolIds).toEqual(expectedTools);
 		});
 
 		it('should deduplicate tools when mixing', async () => {
 			const userSettings: AppSettings = {
 				builtInTools: ['hf_semantic_search', 'hf_model_search'], // Already has some search tools
-				spaceTools: []
+				spaceTools: [],
 			};
 
 			const context: ToolSelectionContext = {
 				headers: { 'x-mcp-mix': 'search' },
 				userSettings,
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
 
 			expect(result.mode).toBe(ToolSelectionMode.MIX);
-			
+
 			// Should not have duplicates
 			const uniqueTools = [...new Set(result.enabledToolIds)];
 			expect(result.enabledToolIds).toEqual(uniqueTools);
@@ -286,7 +280,7 @@ describe('ToolSelectionStrategy', () => {
 		it('should ignore mix when no user settings available', async () => {
 			const context: ToolSelectionContext = {
 				headers: { 'x-mcp-mix': 'hf_api' },
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
@@ -299,13 +293,13 @@ describe('ToolSelectionStrategy', () => {
 		it('should ignore invalid mix bouquet names', async () => {
 			const userSettings: AppSettings = {
 				builtInTools: ['hf_semantic_search'],
-				spaceTools: []
+				spaceTools: [],
 			};
 
 			const context: ToolSelectionContext = {
 				headers: { 'x-mcp-mix': 'invalid_mix' },
 				userSettings,
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
@@ -320,13 +314,13 @@ describe('ToolSelectionStrategy', () => {
 		it('should use provided user settings in internal API mode', async () => {
 			const userSettings: AppSettings = {
 				builtInTools: ['hf_semantic_search', 'hf_model_search'],
-				spaceTools: []
+				spaceTools: [],
 			};
 
 			const context: ToolSelectionContext = {
 				headers: {},
 				userSettings,
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
@@ -342,16 +336,16 @@ describe('ToolSelectionStrategy', () => {
 			const externalConfig: ApiClientConfig = {
 				type: 'external',
 				externalUrl: 'https://api.example.com/settings',
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
-			
+
 			const externalTransportInfo: TransportInfo = {
 				transport: 'streamableHttpJson',
 				port: 3000,
 				defaultHfTokenSet: false,
 				jsonResponseEnabled: true,
 				externalApiMode: true,
-				stdioClient: null
+				stdioClient: null,
 			};
 
 			const externalApiClient = new McpApiClient(externalConfig, externalTransportInfo);
@@ -359,13 +353,13 @@ describe('ToolSelectionStrategy', () => {
 
 			const userSettings: AppSettings = {
 				builtInTools: ['hf_paper_search'],
-				spaceTools: []
+				spaceTools: [],
 			};
 
 			const context: ToolSelectionContext = {
 				headers: {},
 				userSettings,
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await externalStrategy.selectTools(context);
@@ -380,7 +374,7 @@ describe('ToolSelectionStrategy', () => {
 		it('should use fallback when no configuration is available', async () => {
 			const context: ToolSelectionContext = {
 				headers: {},
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
@@ -394,7 +388,7 @@ describe('ToolSelectionStrategy', () => {
 		it('should use fallback when headers are null', async () => {
 			const context: ToolSelectionContext = {
 				headers: null,
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
@@ -408,13 +402,13 @@ describe('ToolSelectionStrategy', () => {
 		it('should handle empty user settings', async () => {
 			const userSettings: AppSettings = {
 				builtInTools: [],
-				spaceTools: []
+				spaceTools: [],
 			};
 
 			const context: ToolSelectionContext = {
 				headers: {},
 				userSettings,
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
@@ -427,13 +421,13 @@ describe('ToolSelectionStrategy', () => {
 		it('should handle mix with empty user settings', async () => {
 			const userSettings: AppSettings = {
 				builtInTools: [],
-				spaceTools: []
+				spaceTools: [],
 			};
 
 			const context: ToolSelectionContext = {
 				headers: { 'x-mcp-mix': 'search' },
 				userSettings,
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
@@ -446,7 +440,7 @@ describe('ToolSelectionStrategy', () => {
 		it('should handle all possible tool types in mix', async () => {
 			const userSettings: AppSettings = {
 				builtInTools: ['hf_whoami'], // Start with one tool
-				spaceTools: []
+				spaceTools: [],
 			};
 
 			// Test mixing with each bouquet type
@@ -454,18 +448,15 @@ describe('ToolSelectionStrategy', () => {
 				const context: ToolSelectionContext = {
 					headers: { 'x-mcp-mix': bouquetName },
 					userSettings,
-					hfToken: 'test-token'
+					hfToken: 'test-token',
 				};
 
 				const result = await strategy.selectTools(context);
 
 				expect(result.mode).toBe(ToolSelectionMode.MIX);
 				expect(result.mixedBouquet).toBe(bouquetName);
-				
-				const expectedTools = [...new Set([
-					...userSettings.builtInTools,
-					...bouquetConfig.builtInTools
-				])];
+
+				const expectedTools = [...new Set([...userSettings.builtInTools, ...bouquetConfig.builtInTools])];
 				expect(result.enabledToolIds).toEqual(expectedTools);
 			}
 		});
@@ -478,21 +469,21 @@ describe('ToolSelectionStrategy', () => {
 						name: 'My Custom GPT',
 						subdomain: 'user123-my-custom-gpt',
 						_id: 'custom-1',
-						emoji: '🤖'
+						emoji: '🤖',
 					},
 					{
 						name: 'Company Analytics',
 						subdomain: 'corp-analytics-tool',
-						_id: 'custom-2', 
-						emoji: '📊'
-					}
-				]
+						_id: 'custom-2',
+						emoji: '📊',
+					},
+				],
 			};
 
 			const context: ToolSelectionContext = {
 				headers: { 'x-mcp-mix': 'all' },
 				userSettings,
-				hfToken: 'test-token'
+				hfToken: 'test-token',
 			};
 
 			const result = await strategy.selectTools(context);
@@ -500,14 +491,11 @@ describe('ToolSelectionStrategy', () => {
 			expect(result.mode).toBe(ToolSelectionMode.MIX);
 			expect(result.mixedBouquet).toBe('all');
 			expect(result.reason).toBe('User settings + mix(all)');
-			
+
 			// Should get user's minimal tools + ALL built-in tools (deduplicated)
-			const expectedBuiltInTools = [...new Set([
-				...userSettings.builtInTools,
-				...ALL_BUILTIN_TOOL_IDS
-			])];
+			const expectedBuiltInTools = [...new Set([...userSettings.builtInTools, ...ALL_BUILTIN_TOOL_IDS])];
 			expect(result.enabledToolIds).toEqual(expectedBuiltInTools);
-			
+
 			// Should preserve base settings including gradio endpoints
 			expect(result.baseSettings).toEqual(userSettings);
 			expect(result.baseSettings?.spaceTools).toHaveLength(2);
@@ -516,14 +504,14 @@ describe('ToolSelectionStrategy', () => {
 					name: 'My Custom GPT',
 					subdomain: 'user123-my-custom-gpt',
 					_id: 'custom-1',
-					emoji: '🤖'
+					emoji: '🤖',
 				},
 				{
 					name: 'Company Analytics',
 					subdomain: 'corp-analytics-tool',
 					_id: 'custom-2',
-					emoji: '📊'
-				}
+					emoji: '📊',
+				},
 			]);
 		});
 	});
