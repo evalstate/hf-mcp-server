@@ -8,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { isJSONRPCNotification } from '@modelcontextprotocol/sdk/types.js';
 import { extractQueryParamsToHeaders } from '../utils/query-params.js';
+import { isBrowser } from '../utils/browser-detection.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,10 +54,10 @@ export class StatelessHttpTransport extends BaseTransport {
 
 		// Serve the MCP welcome page on GET requests (or 405 if strict compliance is enabled)
 		this.app.get('/mcp', (req: Request, res: Response) => {
-			// Check for strict compliance mode or Node.js user-agent
-			if (process.env.MCP_STRICT_COMPLIANCE === 'true' || req.headers['user-agent'] === 'node') {
+			// Check for strict compliance mode or non-browser client
+			if (process.env.MCP_STRICT_COMPLIANCE === 'true' || !isBrowser(req.headers)) {
 				this.metrics.trackStaticPageHit(405);
-				logger.debug('Rejected GET request to /mcp in strict compliance mode or from Node.js client');
+				logger.debug('Rejected GET request to /mcp in strict compliance mode or from non-browser client');
 				res
 					.status(405)
 					.json(JsonRpcErrors.methodNotAllowed(null, 'Method not allowed. Use POST for stateless JSON-RPC requests.'));
