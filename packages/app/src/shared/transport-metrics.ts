@@ -13,6 +13,7 @@ export interface TransportMetrics {
 		authenticated: number;
 		denied: number;
 		anonymous: number;
+		unauthorized?: number; // 401 errors
 		cleaned?: number; // Only for stateful transports
 	};
 
@@ -486,10 +487,34 @@ export class MetricsCounter {
 	 */
 	trackStaticPageHit(statusCode: number): void {
 		if (statusCode === 200) {
-			this.metrics.staticPageHits200!++;
+			this.metrics.staticPageHits200 = (this.metrics.staticPageHits200 || 0) + 1;
 		} else if (statusCode === 405) {
-			this.metrics.staticPageHits405!++;
+			this.metrics.staticPageHits405 = (this.metrics.staticPageHits405 || 0) + 1;
 		}
+	}
+
+	/**
+	 * Track authenticated connection
+	 */
+	trackAuthenticatedConnection(): void {
+		this.metrics.connections.authenticated++;
+	}
+
+	/**
+	 * Track anonymous connection
+	 */
+	trackAnonymousConnection(): void {
+		this.metrics.connections.anonymous++;
+	}
+
+	/**
+	 * Track unauthorized connection (401)
+	 */
+	trackUnauthorizedConnection(): void {
+		if (!this.metrics.connections.unauthorized) {
+			this.metrics.connections.unauthorized = 0;
+		}
+		this.metrics.connections.unauthorized++;
 	}
 
 	/**

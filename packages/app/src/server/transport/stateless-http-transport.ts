@@ -91,6 +91,14 @@ export class StatelessHttpTransport extends BaseTransport {
 		let server: McpServer | null = null;
 		let transport: StreamableHTTPServerTransport | null = null;
 
+		// Check HF token validity if present
+		const headers = req.headers as Record<string, string>;
+		const authResult = await this.validateAuthAndTrackMetrics(headers);
+		if (!authResult.shouldContinue) {
+			res.status(authResult.statusCode || 401).send('Unauthorized');
+			return;
+		}
+
 		// Track new connection for metrics (each request is a "connection" in stateless mode)
 		this.trackNewConnection();
 
@@ -130,8 +138,6 @@ export class StatelessHttpTransport extends BaseTransport {
 
 			if (useFullServer) {
 				// Create new server instance using factory with request headers and bouquet
-				logger.debug({ headerCount: Object.keys(req.headers).length }, 'Request received');
-				const headers = req.headers as Record<string, string>;
 				extractQueryParamsToHeaders(req, headers);
 
 				// Skip Gradio endpoints for initialize requests or non-Gradio tool calls
