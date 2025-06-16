@@ -1,5 +1,15 @@
 # hf-mcp-server packages
 
+
+## Getting Started
+
+This repository contains the offical Hugging Face MCP Server source. The server supports multiple deployment and configuration options, and is deployable locally as well as on your own infrastructure.
+
+The easiest way to access Hugging Face MCP Services is via `https://hf.co/mcp` which offers a number of Tools, Prompts and access to Gradio Spaces which are configurable at `https://hf.co/settings/mcp`. 
+
+(ADD SCREENSHOT)
+
+
 ## Quick Guide
 
 This repo contains:

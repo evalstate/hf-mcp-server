@@ -8,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { isJSONRPCNotification } from '@modelcontextprotocol/sdk/types.js';
 import { extractQueryParamsToHeaders } from '../utils/query-params.js';
+import { isBrowser } from '../utils/browser-detection.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,10 +54,10 @@ export class StatelessHttpTransport extends BaseTransport {
 
 		// Serve the MCP welcome page on GET requests (or 405 if strict compliance is enabled)
 		this.app.get('/mcp', (req: Request, res: Response) => {
-			// Check for strict compliance mode or Node.js user-agent
-			if (process.env.MCP_STRICT_COMPLIANCE === 'true' || req.headers['user-agent'] === 'node') {
+			// Check for strict compliance mode or non-browser client
+			if (process.env.MCP_STRICT_COMPLIANCE === 'true' || !isBrowser(req.headers)) {
 				this.metrics.trackStaticPageHit(405);
-				logger.debug('Rejected GET request to /mcp in strict compliance mode or from Node.js client');
+				logger.debug('Rejected GET request to /mcp in strict compliance mode or from non-browser client');
 				res
 					.status(405)
 					.json(JsonRpcErrors.methodNotAllowed(null, 'Method not allowed. Use POST for stateless JSON-RPC requests.'));
@@ -89,6 +90,14 @@ export class StatelessHttpTransport extends BaseTransport {
 		const startTime = Date.now();
 		let server: McpServer | null = null;
 		let transport: StreamableHTTPServerTransport | null = null;
+
+		// Check HF token validity if present
+		const headers = req.headers as Record<string, string>;
+		const authResult = await this.validateAuthAndTrackMetrics(headers);
+		if (!authResult.shouldContinue) {
+			res.status(authResult.statusCode || 401).send('Unauthorized');
+			return;
+		}
 
 		// Track new connection for metrics (each request is a "connection" in stateless mode)
 		this.trackNewConnection();
@@ -129,8 +138,6 @@ export class StatelessHttpTransport extends BaseTransport {
 
 			if (useFullServer) {
 				// Create new server instance using factory with request headers and bouquet
-				logger.debug({ headerCount: Object.keys(req.headers).length }, 'Request received');
-				const headers = req.headers as Record<string, string>;
 				extractQueryParamsToHeaders(req, headers);
 
 				// Skip Gradio endpoints for initialize requests or non-Gradio tool calls

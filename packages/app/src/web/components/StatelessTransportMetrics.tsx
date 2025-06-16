@@ -186,8 +186,14 @@ export function StatelessTransportMetrics({ metrics }: StatelessTransportMetrics
 									<TableCell className="text-sm font-mono">
 										{metrics.staticPageHits200 || 0}/{metrics.staticPageHits405 || 0}
 									</TableCell>
-									<TableCell className="font-medium text-sm"></TableCell>
-									<TableCell className="text-sm font-mono"></TableCell>
+									<TableCell className="font-medium text-sm">
+										<div className="flex items-center gap-1">
+											Auth Status (Anon/Auth/401)
+										</div>
+									</TableCell>
+									<TableCell className="text-sm font-mono">
+										{metrics.connections.anonymous}/{metrics.connections.authenticated}/{metrics.connections.unauthorized || 0}
+									</TableCell>
 								</TableRow>
 							)}
 							{/* API Metrics (shown in external API mode) */}

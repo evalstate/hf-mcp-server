@@ -5,6 +5,8 @@ import type { TransportMetrics } from '../../shared/transport-metrics.js';
 import { MetricsCounter } from '../../shared/transport-metrics.js';
 import type { AppSettings } from '../../shared/settings.js';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
+import { whoAmI, HubApiError } from '@huggingface/hub';
+import { extractAuthBouquetAndMix } from '../utils/auth-utils.js';
 
 /**
  * Factory function to create server instances
@@ -233,6 +235,51 @@ export abstract class BaseTransport {
 	protected trackMethodCall(methodName: string | null, startTime: number, isError: boolean = false): void {
 		const duration = Date.now() - startTime;
 		this.metrics.trackMethod(methodName, duration, isError);
+	}
+
+	/**
+	 * TODO -- UPDATE THIS WHEN WE ADD OAUTH; we can avoid multiple calls to whoami etc.
+	 * Validate HF token and track authentication metrics
+	 * Returns true if request should continue, false if 401 should be returned
+	 */
+	protected async validateAuthAndTrackMetrics(
+		headers: Record<string, string>
+	): Promise<{ shouldContinue: boolean; statusCode?: number }> {
+		const { hfToken } = extractAuthBouquetAndMix(headers);
+
+		if (hfToken) {
+			try {
+				await whoAmI({ credentials: { accessToken: hfToken } });
+				// Track authenticated connection
+				this.metrics.trackAuthenticatedConnection();
+				return { shouldContinue: true };
+			} catch (error) {
+				// Check for 401 status in multiple possible locations
+				const errorObj = error as { statusCode?: number; status?: number };
+				const isUnauthorized =
+					(error instanceof HubApiError && error.statusCode === 401) ||
+					errorObj.statusCode === 401 ||
+					errorObj.status === 401 ||
+					(error instanceof Error && error.message.includes('401')) ||
+					(error instanceof TypeError && error.message.includes('Your access token must start with'));
+
+				if (isUnauthorized) {
+					logger.debug('Invalid HF token - returning 401');
+					// Track unauthorized connection
+					this.metrics.trackUnauthorizedConnection();
+					return { shouldContinue: false, statusCode: 401 };
+				}
+				// For other errors (network issues, 500s, etc.), continue processing
+				// but don't track as authenticated since we couldn't validate
+				logger.debug({ error }, 'Non-401 error from whoAmI, continuing without auth tracking');
+				// Don't track any auth metrics for this case - token exists but validation failed for non-auth reasons
+				return { shouldContinue: true };
+			}
+		} else {
+			// Track anonymous connection
+			this.metrics.trackAnonymousConnection();
+			return { shouldContinue: true };
+		}
 	}
 }
 

@@ -121,7 +121,17 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 				// Create new session only for initialization requests
 				const headers = req.headers as Record<string, string>;
 				extractQueryParamsToHeaders(req, headers);
-				transport = await this.createSession(headers);
+				try {
+					transport = await this.createSession(headers);
+				} catch (error) {
+					if (error instanceof Error && error.message.includes('Authentication failed with status 401')) {
+						this.trackError(401);
+						this.metrics.trackMethod(trackingName, undefined, true);
+						res.status(401).send('Unauthorized');
+						return;
+					}
+					throw error;
+				}
 			} else if (!sessionId) {
 				// No session ID and not an initialization request
 				this.trackError(400);
@@ -203,6 +213,13 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 	}
 
 	private async createSession(requestHeaders?: Record<string, string>): Promise<StreamableHTTPServerTransport> {
+		// Validate auth and track metrics
+		const headers = requestHeaders || {};
+		const authResult = await this.validateAuthAndTrackMetrics(headers);
+		if (!authResult.shouldContinue) {
+			throw new Error(`Authentication failed with status ${authResult.statusCode}`);
+		}
+
 		// Create server instance using factory with request headers
 		const server = await this.serverFactory(requestHeaders || null);
 

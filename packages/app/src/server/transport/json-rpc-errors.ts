@@ -13,6 +13,7 @@ export const JSON_RPC_ERROR_CODES = {
 	SERVER_SHUTTING_DOWN: -32002,
 	SESSION_ALREADY_EXISTS: -32003,
 	STALE_CONNECTION: -32004,
+	AUTHENTICATION_FAILED: -32005,
 } as const;
 
 export type JsonRpcErrorCode = (typeof JSON_RPC_ERROR_CODES)[keyof typeof JSON_RPC_ERROR_CODES];
@@ -95,4 +96,7 @@ export const JsonRpcErrors = {
 
 	invalidRequest: (id: string | number | null = null, message: string = 'Invalid request') =>
 		createJsonRpcError(JSON_RPC_ERROR_CODES.INVALID_REQUEST, message, id),
+
+	authenticationFailed: (id: string | number | null = null, message: string = 'Authentication failed') =>
+		createJsonRpcError(JSON_RPC_ERROR_CODES.AUTHENTICATION_FAILED, message, id),
 } as const;
