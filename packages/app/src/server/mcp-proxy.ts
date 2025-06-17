@@ -105,8 +105,7 @@ export const createProxyServerFactory = (
 		for (const result of connections) {
 			if (!result.success) continue;
 
-			const { endpointId, originalIndex, client, tool, name, emoji, sseUrl } = result.connection;
-			registerRemoteTool(server, endpointId, originalIndex, client, tool, name, emoji, sseUrl, hfToken);
+			registerRemoteTool(server, result.connection, hfToken);
 		}
 
 		logger.debug('Server ready with local and remote tools');

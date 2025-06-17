@@ -5,6 +5,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { logger } from './lib/logger.js';
 import { z } from 'zod';
 import type { GradioEndpoint } from './lib/mcp-api-client.js';
+import { spaceInfo } from '@huggingface/hub';
 
 // Define types for JSON Schema
 interface JsonSchemaProperty {
@@ -28,7 +29,6 @@ interface ArrayFormatTool {
 	inputSchema: JsonSchema;
 }
 
-
 interface EndpointConnection {
 	endpointId: string;
 	originalIndex: number;
@@ -37,6 +37,7 @@ interface EndpointConnection {
 	name?: string;
 	emoji?: string;
 	sseUrl?: string; // Store the SSE URL for lazy connection during tool calls
+	isPrivate?: boolean;
 }
 
 type EndpointConnectionResult =
@@ -74,21 +75,22 @@ export function parseSchemaResponse(
 ): { name: string; description?: string; inputSchema: JsonSchema } {
 	// Handle both array and object schema formats
 	let tools: Array<{ name: string; description?: string; inputSchema: JsonSchema }> = [];
-	
+
 	if (Array.isArray(schemaResponse)) {
 		// Array format: [{ name: "toolName", description: "...", inputSchema: {...} }, ...]
-		tools = (schemaResponse as ArrayFormatTool[]).filter((tool): tool is ArrayFormatTool => 
-			typeof tool === 'object' && 
-			tool !== null && 
-			'name' in tool && 
-			typeof tool.name === 'string' &&
-			'inputSchema' in tool
+		tools = (schemaResponse as ArrayFormatTool[]).filter(
+			(tool): tool is ArrayFormatTool =>
+				typeof tool === 'object' &&
+				tool !== null &&
+				'name' in tool &&
+				typeof tool.name === 'string' &&
+				'inputSchema' in tool
 		);
 		logger.debug(
 			{
 				endpointId,
 				toolCount: tools.length,
-				tools: tools.map(t => t.name),
+				tools: tools.map((t) => t.name),
 			},
 			'Retrieved schema (array format)'
 		);
@@ -104,7 +106,7 @@ export function parseSchemaResponse(
 			{
 				endpointId,
 				toolCount: tools.length,
-				tools: tools.map(t => t.name),
+				tools: tools.map((t) => t.name),
 			},
 			'Retrieved schema (object format)'
 		);
@@ -126,7 +128,7 @@ export function parseSchemaResponse(
 		logger.error({ endpointId, subdomain }, 'No tool selected from available tools');
 		throw new Error('No tool selected from available tools');
 	}
-	
+
 	const inferTool = tools.find((tool) => tool.name.toLowerCase().includes('infer'));
 
 	if (inferTool) {
@@ -140,6 +142,20 @@ export function parseSchemaResponse(
 }
 
 /**
+ * Check if a space is private by fetching its info
+ */
+async function isSpacePrivate(spaceName: string, hfToken?: string): Promise<boolean> {
+	try {
+		if (!hfToken) return false; // anonymous requests don't have a token to forward
+		const info = await spaceInfo({ name: spaceName, credentials: { accessToken: hfToken } });
+		return info.private;
+	} catch (error) {
+		// If we can't fetch space info, assume it might be private to be safe
+		logger.warn({ spaceName, error }, 'Failed to fetch space info, assuming public');
+		return false;
+	}
+}
+/**
  * Fetches schema from a single Gradio endpoint without establishing SSE connection
  */
 async function fetchEndpointSchema(
@@ -150,13 +166,16 @@ async function fetchEndpointSchema(
 	const endpointId = `endpoint${(originalIndex + 1).toString()}`;
 	const schemaUrl = `https://${endpoint.subdomain}.hf.space/gradio_api/mcp/schema`;
 
-	logger.debug({ url: schemaUrl, endpointId }, 'Fetching schema from endpoint');
+	const isPrivateSpace = await isSpacePrivate(endpoint.name, hfToken);
+	logger.debug({ url: schemaUrl, endpointId, isPrivateSpace }, 'Fetching schema from endpoint');
 
 	// Prepare headers
 	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
 	};
-	if (hfToken) {
+
+	// only send the Token if the space is private
+	if (hfToken && isPrivateSpace) {
 		headers.Authorization = `Bearer ${hfToken}`;
 		logger.debug({ endpointId }, 'Including HF token in schema request');
 	}
@@ -176,17 +195,20 @@ async function fetchEndpointSchema(
 	clearTimeout(timeoutId);
 
 	if (!response.ok) {
-		logger.error({ 
-			endpointId, 
-			subdomain: endpoint.subdomain, 
-			status: response.status, 
-			statusText: response.statusText 
-		}, 'Failed to fetch schema from endpoint');
+		logger.error(
+			{
+				endpointId,
+				subdomain: endpoint.subdomain,
+				status: response.status,
+				statusText: response.statusText,
+			},
+			'Failed to fetch schema from endpoint'
+		);
 		throw new Error(`Failed to fetch schema: ${response.status} ${response.statusText}`);
 	}
 
-	const schemaResponse = await response.json() as unknown;
-	
+	const schemaResponse = (await response.json()) as unknown;
+
 	// Parse the schema response
 	const selectedTool = parseSchemaResponse(schemaResponse, endpointId, endpoint.subdomain);
 
@@ -210,6 +232,7 @@ async function fetchEndpointSchema(
 		name: endpoint.name,
 		emoji: endpoint.emoji,
 		sseUrl: `https://${endpoint.subdomain}.hf.space/gradio_api/mcp/sse`, // Store SSE URL for later
+		isPrivate: isPrivateSpace,
 	};
 }
 
@@ -235,10 +258,7 @@ export async function connectToGradioEndpoints(
 	const schemaFetchTasks = validWithIndex.map(({ endpoint, originalIndex }) => {
 		const endpointId = `endpoint${(originalIndex + 1).toString()}`;
 
-		return Promise.race([
-			fetchEndpointSchema(endpoint, originalIndex, hfToken),
-			createTimeout(CONNECTION_TIMEOUT_MS),
-		])
+		return Promise.race([fetchEndpointSchema(endpoint, originalIndex, hfToken), createTimeout(CONNECTION_TIMEOUT_MS)])
 			.then(
 				(connection): EndpointConnectionResult => ({
 					success: true,
@@ -246,20 +266,21 @@ export async function connectToGradioEndpoints(
 					connection,
 				})
 			)
-			.catch(
-				(error: unknown): EndpointConnectionResult => {
-					logger.error({
+			.catch((error: unknown): EndpointConnectionResult => {
+				logger.error(
+					{
 						endpointId,
 						subdomain: endpoint.subdomain,
 						error: error instanceof Error ? error.message : String(error),
-					}, 'Failed to fetch schema from endpoint');
-					return {
-						success: false,
-						endpointId,
-						error: error instanceof Error ? error : new Error(String(error)),
-					};
-				}
-			);
+					},
+					'Failed to fetch schema from endpoint'
+				);
+				return {
+					success: false,
+					endpointId,
+					error: error instanceof Error ? error : new Error(String(error)),
+				};
+			});
 	});
 
 	// Execute all schema fetches in parallel
@@ -281,10 +302,13 @@ export async function connectToGradioEndpoints(
 	// Log failed endpoints separately for debugging
 	if (failed.length > 0) {
 		failed.forEach((f) => {
-			logger.error({
-				endpointId: f.endpointId,
-				error: f.error.message,
-			}, 'Endpoint schema fetch failed');
+			logger.error(
+				{
+					endpointId: f.endpointId,
+					error: f.error.message,
+				},
+				'Endpoint schema fetch failed'
+			);
 		});
 	}
 
@@ -294,10 +318,7 @@ export async function connectToGradioEndpoints(
 /**
  * Creates SSE connection to endpoint when needed for tool execution
  */
-async function createLazyConnection(
-	sseUrl: string,
-	hfToken: string | undefined
-): Promise<Client> {
+async function createLazyConnection(sseUrl: string, hfToken: string | undefined): Promise<Client> {
 	logger.debug({ url: sseUrl }, 'Creating lazy SSE connection for tool execution');
 
 	// Create MCP client
@@ -348,27 +369,17 @@ async function createLazyConnection(
 /**
  * Registers a remote tool from a Gradio endpoint
  */
-export function registerRemoteTool(
-	server: McpServer,
-	endpointId: string,
-	originalIndex: number,
-	_client: Client | null,
-	tool: Tool,
-	name?: string,
-	emoji?: string,
-	sseUrl?: string,
-	hfToken?: string
-): void {
+export function registerRemoteTool(server: McpServer, connection: EndpointConnection, hfToken?: string): void {
 	// Use new naming convention: gr<index>_<sanitized_name>
 	// Convert "evalstate/flux1_schnell" to "evalstate_flux1_schnell"
-	const sanitizedName = name ? name.replace(/[/\-\s]+/g, '_').toLowerCase() : 'unknown';
-	const remoteName = `gr${(originalIndex + 1).toString()}_${sanitizedName}`;
+	const sanitizedName = connection.name ? connection.name.replace(/[/\-\s]+/g, '_').toLowerCase() : 'unknown';
+	const remoteName = `gr${(connection.originalIndex + 1).toString()}_${sanitizedName}`;
 	logger.debug(
 		{
-			endpointId,
-			originalName: tool.name,
+			endpointId: connection.endpointId,
+			originalName: connection.tool.name,
 			remoteName,
-			description: tool.description,
+			description: connection.tool.description,
 		},
 		'Registering remote tool'
 	);
@@ -376,8 +387,8 @@ export function registerRemoteTool(
 	// Log the exact structure we're getting
 	logger.debug(
 		{
-			toolName: tool.name,
-			inputSchema: tool.inputSchema,
+			toolName: connection.tool.name,
+			inputSchema: connection.tool.inputSchema,
 		},
 		'Remote tool inputSchema structure'
 	);
@@ -385,8 +396,8 @@ export function registerRemoteTool(
 	// Convert JSON Schema to Zod schema
 	const schemaShape: Record<string, z.ZodTypeAny> = {};
 
-	if (typeof tool.inputSchema === 'object' && 'properties' in tool.inputSchema) {
-		const jsonSchema = tool.inputSchema as JsonSchema;
+	if (typeof connection.tool.inputSchema === 'object' && 'properties' in connection.tool.inputSchema) {
+		const jsonSchema = connection.tool.inputSchema as JsonSchema;
 		const props = jsonSchema.properties || {};
 		const required = jsonSchema.required || [];
 
@@ -406,44 +417,44 @@ export function registerRemoteTool(
 	}
 
 	// Create user-friendly title and description
-	const displayName = name || 'Unknown Space';
-	const toolTitle = `${displayName} - ${tool.name}${emoji ? ` ${emoji}` : ''}`;
-	const toolDescription = tool.description 
-		? `${tool.description} (from ${displayName})`
-		: `${tool.name} tool from ${displayName}`;
+	const displayName = connection.name || 'Unknown Space';
+	const toolTitle = `${displayName} - ${connection.tool.name}${connection.emoji ? ` ${connection.emoji}` : ''}`;
+	const toolDescription = connection.tool.description
+		? `${connection.tool.description} (from ${displayName})`
+		: `${connection.tool.name} tool from ${displayName}`;
 
 	server.tool(
 		remoteName,
 		toolDescription,
 		schemaShape,
-		{ 
+		{
 			openWorldHint: true,
-			title: toolTitle 
+			title: toolTitle,
 		}, // annotations parameter
 		async (params: Record<string, unknown>) => {
-			logger.info({ tool: tool.name, params }, 'Calling remote tool');
+			logger.info({ tool: connection.tool.name, params }, 'Calling remote tool');
 			try {
 				// Since we use schema fetch, we always need to create SSE connection for tool execution
-				if (!sseUrl) {
+				if (!connection.sseUrl) {
 					throw new Error('No SSE URL available for tool execution');
 				}
-				logger.debug({ tool: tool.name }, 'Creating SSE connection for tool execution');
-				const activeClient = await createLazyConnection(sseUrl, hfToken);
+				logger.debug({ tool: connection.tool.name }, 'Creating SSE connection for tool execution');
+				const activeClient = await createLazyConnection(connection.sseUrl, connection.isPrivate ? hfToken : undefined);
 
 				const result = await activeClient.request(
 					{
 						method: 'tools/call',
 						params: {
-							name: tool.name,
+							name: connection.tool.name,
 							arguments: params,
 						},
 					},
 					CallToolResultSchema
 				);
-				logger.debug({ tool: tool.name }, 'Remote tool call successful');
+				logger.debug({ tool: connection.tool.name }, 'Remote tool call successful');
 				return result;
 			} catch (error) {
-				logger.error({ tool: tool.name, error }, 'Remote tool call failed');
+				logger.error({ tool: connection.tool.name, error }, 'Remote tool call failed');
 				throw error;
 			}
 		}

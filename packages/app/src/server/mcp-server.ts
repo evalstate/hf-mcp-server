@@ -317,7 +317,12 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			}
 		);
 
-		// Apply tool states using the new strategy
+		// Declare the function to apply tool states (we only need to call it if we are
+		// applying the tool states either because we have a Gradio tool call (grNN_) or
+		// we are responding to a ListToolsRequest). This also helps if there is a
+		// mismatch between Client cache state and desired states for these specific tools.
+		// NB: That may not always be the case, consider carefully whether you want a tool
+		// included in the skipGradio check.
 		const applyToolStates = async () => {
 			const context: ToolSelectionContext = {
 				headers,
@@ -360,7 +365,6 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		});
 
 		if (!skipGradio) {
-			// Apply initial tool states (fetch from API)
 			void applyToolStates();
 
 			if (!transportInfo?.jsonResponseEnabled && !transportInfo?.externalApiMode) {

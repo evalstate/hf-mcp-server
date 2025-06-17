@@ -14,6 +14,7 @@ export interface GradioEndpoint {
 	subdomain: string;
 	id?: string;
 	emoji?: string;
+	isPrivate?: boolean;
 }
 
 export interface ApiClientConfig {
