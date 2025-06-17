@@ -177,7 +177,15 @@ async function fetchEndpointSchema(
 	// only send the Token if the space is private
 	if (hfToken && isPrivateSpace) {
 		headers.Authorization = `Bearer ${hfToken}`;
-		logger.debug({ endpointId }, 'Including HF token in schema request');
+		logger.debug(
+			{ endpointId },
+			`Including HF token in schema request private==${isPrivateSpace}, token defined?==${!!hfToken}`
+		);
+	} else {
+		logger.debug(
+			{ endpointId },
+			`Excluding HF token in schema request private==${isPrivateSpace}, token defined?==${!!hfToken}`
+		);
 	}
 
 	// Add timeout using AbortController (same pattern as HfApiCall)
@@ -354,9 +362,8 @@ async function createLazyConnection(sseUrl: string, hfToken: string | undefined)
 				return fetch(url.toString(), { ...init, headers });
 			},
 		};
-
-		logger.debug('Including HF token in lazy SSE connection');
 	}
+	logger.debug(`MCP Client connection contains token? (${undefined != hfToken})`);
 	const transport = new SSEClientTransport(new URL(sseUrl), transportOptions);
 
 	// Connect the client to the transport
