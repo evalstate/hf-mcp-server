@@ -28,7 +28,6 @@ interface ArrayFormatTool {
 	inputSchema: JsonSchema;
 }
 
-
 interface EndpointConnection {
 	endpointId: string;
 	originalIndex: number;
@@ -74,21 +73,22 @@ export function parseSchemaResponse(
 ): { name: string; description?: string; inputSchema: JsonSchema } {
 	// Handle both array and object schema formats
 	let tools: Array<{ name: string; description?: string; inputSchema: JsonSchema }> = [];
-	
+
 	if (Array.isArray(schemaResponse)) {
 		// Array format: [{ name: "toolName", description: "...", inputSchema: {...} }, ...]
-		tools = (schemaResponse as ArrayFormatTool[]).filter((tool): tool is ArrayFormatTool => 
-			typeof tool === 'object' && 
-			tool !== null && 
-			'name' in tool && 
-			typeof tool.name === 'string' &&
-			'inputSchema' in tool
+		tools = (schemaResponse as ArrayFormatTool[]).filter(
+			(tool): tool is ArrayFormatTool =>
+				typeof tool === 'object' &&
+				tool !== null &&
+				'name' in tool &&
+				typeof tool.name === 'string' &&
+				'inputSchema' in tool
 		);
 		logger.debug(
 			{
 				endpointId,
 				toolCount: tools.length,
-				tools: tools.map(t => t.name),
+				tools: tools.map((t) => t.name),
 			},
 			'Retrieved schema (array format)'
 		);
@@ -104,7 +104,7 @@ export function parseSchemaResponse(
 			{
 				endpointId,
 				toolCount: tools.length,
-				tools: tools.map(t => t.name),
+				tools: tools.map((t) => t.name),
 			},
 			'Retrieved schema (object format)'
 		);
@@ -126,7 +126,7 @@ export function parseSchemaResponse(
 		logger.error({ endpointId, subdomain }, 'No tool selected from available tools');
 		throw new Error('No tool selected from available tools');
 	}
-	
+
 	const inferTool = tools.find((tool) => tool.name.toLowerCase().includes('infer'));
 
 	if (inferTool) {
@@ -176,17 +176,20 @@ async function fetchEndpointSchema(
 	clearTimeout(timeoutId);
 
 	if (!response.ok) {
-		logger.error({ 
-			endpointId, 
-			subdomain: endpoint.subdomain, 
-			status: response.status, 
-			statusText: response.statusText 
-		}, 'Failed to fetch schema from endpoint');
+		logger.error(
+			{
+				endpointId,
+				subdomain: endpoint.subdomain,
+				status: response.status,
+				statusText: response.statusText,
+			},
+			'Failed to fetch schema from endpoint'
+		);
 		throw new Error(`Failed to fetch schema: ${response.status} ${response.statusText}`);
 	}
 
-	const schemaResponse = await response.json() as unknown;
-	
+	const schemaResponse = (await response.json()) as unknown;
+
 	// Parse the schema response
 	const selectedTool = parseSchemaResponse(schemaResponse, endpointId, endpoint.subdomain);
 
@@ -235,10 +238,7 @@ export async function connectToGradioEndpoints(
 	const schemaFetchTasks = validWithIndex.map(({ endpoint, originalIndex }) => {
 		const endpointId = `endpoint${(originalIndex + 1).toString()}`;
 
-		return Promise.race([
-			fetchEndpointSchema(endpoint, originalIndex, hfToken),
-			createTimeout(CONNECTION_TIMEOUT_MS),
-		])
+		return Promise.race([fetchEndpointSchema(endpoint, originalIndex, hfToken), createTimeout(CONNECTION_TIMEOUT_MS)])
 			.then(
 				(connection): EndpointConnectionResult => ({
 					success: true,
@@ -246,20 +246,21 @@ export async function connectToGradioEndpoints(
 					connection,
 				})
 			)
-			.catch(
-				(error: unknown): EndpointConnectionResult => {
-					logger.error({
+			.catch((error: unknown): EndpointConnectionResult => {
+				logger.error(
+					{
 						endpointId,
 						subdomain: endpoint.subdomain,
 						error: error instanceof Error ? error.message : String(error),
-					}, 'Failed to fetch schema from endpoint');
-					return {
-						success: false,
-						endpointId,
-						error: error instanceof Error ? error : new Error(String(error)),
-					};
-				}
-			);
+					},
+					'Failed to fetch schema from endpoint'
+				);
+				return {
+					success: false,
+					endpointId,
+					error: error instanceof Error ? error : new Error(String(error)),
+				};
+			});
 	});
 
 	// Execute all schema fetches in parallel
@@ -281,10 +282,13 @@ export async function connectToGradioEndpoints(
 	// Log failed endpoints separately for debugging
 	if (failed.length > 0) {
 		failed.forEach((f) => {
-			logger.error({
-				endpointId: f.endpointId,
-				error: f.error.message,
-			}, 'Endpoint schema fetch failed');
+			logger.error(
+				{
+					endpointId: f.endpointId,
+					error: f.error.message,
+				},
+				'Endpoint schema fetch failed'
+			);
 		});
 	}
 
@@ -294,10 +298,7 @@ export async function connectToGradioEndpoints(
 /**
  * Creates SSE connection to endpoint when needed for tool execution
  */
-async function createLazyConnection(
-	sseUrl: string,
-	hfToken: string | undefined
-): Promise<Client> {
+async function createLazyConnection(sseUrl: string, hfToken: string | undefined): Promise<Client> {
 	logger.debug({ url: sseUrl }, 'Creating lazy SSE connection for tool execution');
 
 	// Create MCP client
@@ -333,9 +334,8 @@ async function createLazyConnection(
 				return fetch(url.toString(), { ...init, headers });
 			},
 		};
-
-		logger.debug('Including HF token in lazy SSE connection');
 	}
+	logger.debug(`MCP Client connection contains token? (${undefined != hfToken})`);
 	const transport = new SSEClientTransport(new URL(sseUrl), transportOptions);
 
 	// Connect the client to the transport
@@ -408,7 +408,7 @@ export function registerRemoteTool(
 	// Create user-friendly title and description
 	const displayName = name || 'Unknown Space';
 	const toolTitle = `${displayName} - ${tool.name}${emoji ? ` ${emoji}` : ''}`;
-	const toolDescription = tool.description 
+	const toolDescription = tool.description
 		? `${tool.description} (from ${displayName})`
 		: `${tool.name} tool from ${displayName}`;
 
@@ -416,9 +416,9 @@ export function registerRemoteTool(
 		remoteName,
 		toolDescription,
 		schemaShape,
-		{ 
+		{
 			openWorldHint: true,
-			title: toolTitle 
+			title: toolTitle,
 		}, // annotations parameter
 		async (params: Record<string, unknown>) => {
 			logger.info({ tool: tool.name, params }, 'Calling remote tool');
