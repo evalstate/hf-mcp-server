@@ -271,6 +271,7 @@ export function McpMethodsCard() {
 									method: true,
 									count: true,
 									errors: false,
+									gradioMetrics: false,
 									errorRate: true,
 									averageResponseTime: metrics.transport === 'streamableHttpJson',
 									lastCalled: true,
