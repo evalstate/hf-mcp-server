@@ -6,6 +6,7 @@ import { logger } from './lib/logger.js';
 import { z } from 'zod';
 import type { GradioEndpoint } from './lib/mcp-api-client.js';
 import { spaceInfo } from '@huggingface/hub';
+import { gradioMetrics } from './utils/gradio-metrics.js';
 
 // Define types for JSON Schema
 interface JsonSchemaProperty {
@@ -458,10 +459,18 @@ export function registerRemoteTool(server: McpServer, connection: EndpointConnec
 					},
 					CallToolResultSchema
 				);
-				logger.debug({ tool: connection.tool.name }, 'Remote tool call successful');
+				if (result.isError) {
+					logger.warn({ tool: connection.tool.name, error: result.error }, 'Tool call returned an error');
+					gradioMetrics.recordFailure(connection.tool.name);
+				} else {
+					logger.debug({ tool: connection.tool.name }, 'Remote tool call successful');
+					gradioMetrics.recordSuccess(connection.tool.name);
+				}
 				return result;
 			} catch (error) {
+				// this is a
 				logger.error({ tool: connection.tool.name, error }, 'Remote tool call failed');
+				gradioMetrics.recordFailure(connection.tool.name);
 				throw error;
 			}
 		}

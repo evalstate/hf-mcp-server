@@ -213,6 +213,17 @@ export function StatelessTransportMetrics({ metrics }: StatelessTransportMetrics
 									</TableRow>
 								</>
 							)}
+							{/* Gradio Metrics */}
+							{metrics.gradioMetrics && (
+								<>
+									<TableRow>
+										<TableCell className="font-medium text-sm">Gradio Tool - Success</TableCell>
+										<TableCell className="text-sm font-mono">{metrics.gradioMetrics.success}</TableCell>
+										<TableCell className="font-medium text-sm">Gradio Tool - Failure</TableCell>
+										<TableCell className="text-sm font-mono">{metrics.gradioMetrics.failure}</TableCell>
+									</TableRow>
+								</>
+							)}
 						</TableBody>
 					</Table>
 				</div>
