@@ -55,16 +55,14 @@ export function McpMethodsCard() {
 
 		// Check if this is a tool call and we have Gradio metrics
 		if (method.method.startsWith('tools/call:') && metrics?.gradioMetrics) {
+			// Extract tool name from method (tools/call:toolName -> toolName)
+			const toolName = method.method.replace('tools/call:', '');
 			const gradioByTool = metrics.gradioMetrics.byTool;
 			
-			// Try to find matching Gradio metrics
-			for (const [toolName, toolMetrics] of Object.entries(gradioByTool)) {
-				// Check if this method corresponds to this tool
-				if (method.method.includes(toolName) || method.method.endsWith(`_${toolName}`)) {
-					methodData.gradioSuccess = toolMetrics.success;
-					methodData.gradioFailure = toolMetrics.failure;
-					break;
-				}
+			// Look for exact match in Gradio metrics
+			if (gradioByTool[toolName]) {
+				methodData.gradioSuccess = gradioByTool[toolName].success;
+				methodData.gradioFailure = gradioByTool[toolName].failure;
 			}
 		}
 

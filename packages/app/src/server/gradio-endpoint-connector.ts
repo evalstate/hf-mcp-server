@@ -460,17 +460,17 @@ export function registerRemoteTool(server: McpServer, connection: EndpointConnec
 					CallToolResultSchema
 				);
 				if (result.isError) {
-					logger.warn({ tool: connection.tool.name, error: result.error }, 'Tool call returned an error');
-					gradioMetrics.recordFailure(connection.tool.name);
+					logger.warn({ tool: connection.tool.name, error: result.content }, 'Gradio tool call returned error');
+					gradioMetrics.recordFailure(remoteName);
 				} else {
-					logger.debug({ tool: connection.tool.name }, 'Remote tool call successful');
-					gradioMetrics.recordSuccess(connection.tool.name);
+					logger.debug({ tool: connection.tool.name }, 'Gradio tool call returned error');
+					gradioMetrics.recordSuccess(remoteName);
 				}
 				return result;
 			} catch (error) {
 				// this is a
 				logger.error({ tool: connection.tool.name, error }, 'Remote tool call failed');
-				gradioMetrics.recordFailure(connection.tool.name);
+				gradioMetrics.recordFailure(remoteName);
 				throw error;
 			}
 		}
