@@ -10,6 +10,7 @@ import type { McpApiClient } from './lib/mcp-api-client.js';
 import { formatMetricsForAPI } from '../shared/transport-metrics.js';
 import { ALL_BUILTIN_TOOL_IDS } from '@hf-mcp/mcp';
 import { apiMetrics } from './utils/api-metrics.js';
+import { gradioMetrics } from './utils/gradio-metrics.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -237,6 +238,9 @@ export class WebServer {
 				if (this.transportInfo.externalApiMode) {
 					formattedMetrics.apiMetrics = apiMetrics.getMetrics();
 				}
+
+				// Add Gradio metrics
+				formattedMetrics.gradioMetrics = gradioMetrics.getMetrics();
 
 				res.json(formattedMetrics);
 			} catch (error) {

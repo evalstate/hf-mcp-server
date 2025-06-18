@@ -90,6 +90,15 @@ export interface ApiCallMetrics {
 }
 
 /**
+ * Gradio tool call metrics
+ */
+export interface GradioToolMetrics {
+	success: number;
+	failure: number;
+	byTool: Record<string, { success: number; failure: number }>;
+}
+
+/**
  * API response format for transport metrics
  */
 export interface SessionData {
@@ -180,6 +189,9 @@ export interface TransportMetricsResponse {
 
 	// API call metrics (only shown in external API mode)
 	apiMetrics?: ApiCallMetrics;
+
+	// Gradio tool call metrics
+	gradioMetrics?: GradioToolMetrics;
 }
 
 /**
