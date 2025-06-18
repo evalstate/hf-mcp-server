@@ -6,7 +6,7 @@ This repository contains the offical Hugging Face MCP Server source. The server 
 
 The easiest way to access Hugging Face MCP Services is via `https://hf.co/mcp` which offers a number of Tools, Prompts and access to Gradio Spaces which are configurable at `https://hf.co/settings/mcp`. 
 
-(ADD SCREENSHOT)
+![hf_mcp_server_small](https://github.com/user-attachments/assets/d30f9f56-b08c-4dfc-a68f-a164a93db564)
 
 Anonymous access is supported with a default set of Tools and Prompts, or use a Hugging Face READ token to customize your settings:
 
