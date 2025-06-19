@@ -1,5 +1,4 @@
 import type { Request } from 'express';
-import { logger } from '../lib/logger.js';
 
 /**
  * Extracts supported query parameters from the request and sets corresponding headers
@@ -20,6 +19,5 @@ export function extractQueryParamsToHeaders(req: Request, headers: Record<string
 
 	if (forceauth) {
 		headers['x-mcp-force-auth'] = 'true';
-		logger.error('FORCED AUTH TRUE');
 	}
 }

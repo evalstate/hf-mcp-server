@@ -278,10 +278,8 @@ export abstract class BaseTransport {
 		} else {
 			// Track anonymous connection
 			this.metrics.trackAnonymousConnection();
-			logger.error('NO TOKEN SUPPLIED');
-			logger.error(`FORCE AUTH? ${headers['x-mcp-force-auth']}`);
 			const shouldContinue: boolean = !headers['x-mcp-force-auth'];
-			if (!shouldContinue) logger.error('NO TOKEN, FORCING AUTH');
+			if (!shouldContinue) logger.trace(`NO TOKEN, FORCE AUTH? ${headers['x-mcp-force-auth']}`);
 			return { shouldContinue };
 		}
 	}
