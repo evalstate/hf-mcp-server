@@ -5,8 +5,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { logger } from './lib/logger.js';
 import { z } from 'zod';
 import type { GradioEndpoint } from './lib/mcp-api-client.js';
-import { spaceInfo } from '@huggingface/hub';
 import { gradioMetrics } from './utils/gradio-metrics.js';
+import { spaceInfo } from '@huggingface/hub';
 
 // Define types for JSON Schema
 interface JsonSchemaProperty {
@@ -145,6 +145,7 @@ export function parseSchemaResponse(
 /**
  * Check if a space is private by fetching its info
  */
+
 async function isSpacePrivate(spaceName: string, hfToken?: string): Promise<boolean> {
 	try {
 		if (!hfToken) return false; // anonymous requests don't have a token to forward
@@ -156,6 +157,7 @@ async function isSpacePrivate(spaceName: string, hfToken?: string): Promise<bool
 		return false;
 	}
 }
+
 /**
  * Fetches schema from a single Gradio endpoint without establishing SSE connection
  */
@@ -167,26 +169,17 @@ async function fetchEndpointSchema(
 	const endpointId = `endpoint${(originalIndex + 1).toString()}`;
 	const schemaUrl = `https://${endpoint.subdomain}.hf.space/gradio_api/mcp/schema`;
 
+	// TODO -- leaving this commented out for now -- i may want this again very shortly
 	const isPrivateSpace = await isSpacePrivate(endpoint.name, hfToken);
-	logger.debug({ url: schemaUrl, endpointId, isPrivateSpace }, 'Fetching schema from endpoint');
+	logger.debug({ url: schemaUrl, endpointId }, 'Fetching schema from endpoint');
 
 	// Prepare headers
 	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
 	};
 
-	// only send the Token if the space is private
-	if (hfToken && isPrivateSpace) {
+	if (isPrivateSpace && hfToken) {
 		headers.Authorization = `Bearer ${hfToken}`;
-		logger.debug(
-			{ endpointId },
-			`Including HF token in schema request private==${isPrivateSpace}, token defined?==${!!hfToken}`
-		);
-	} else {
-		logger.debug(
-			{ endpointId },
-			`Excluding HF token in schema request private==${isPrivateSpace}, token defined?==${!!hfToken}`
-		);
 	}
 
 	// Add timeout using AbortController (same pattern as HfApiCall)
@@ -327,7 +320,11 @@ export async function connectToGradioEndpoints(
 /**
  * Creates SSE connection to endpoint when needed for tool execution
  */
-async function createLazyConnection(sseUrl: string, hfToken: string | undefined): Promise<Client> {
+async function createLazyConnection(
+	sseUrl: string,
+	hfToken: string | undefined,
+	isPrivate: boolean = false
+): Promise<Client> {
 	logger.debug({ url: sseUrl }, 'Creating lazy SSE connection for tool execution');
 
 	// Create MCP client
@@ -344,10 +341,11 @@ async function createLazyConnection(sseUrl: string, hfToken: string | undefined)
 	// Create SSE transport with HF token if available
 	const transportOptions: SSEClientTransportOptions = {};
 	if (hfToken) {
+		const headerName = isPrivate ? 'Authorization' : 'X-HF-Authorization';
 		const customHeaders = {
-			Authorization: `Bearer ${hfToken}`,
+			[headerName]: `Bearer ${hfToken}`,
 		};
-
+		logger.trace(`connection to gradio endpoint with ${headerName} header`);
 		// Headers for POST requests
 		transportOptions.requestInit = {
 			headers: customHeaders,
@@ -447,7 +445,7 @@ export function registerRemoteTool(server: McpServer, connection: EndpointConnec
 					throw new Error('No SSE URL available for tool execution');
 				}
 				logger.debug({ tool: connection.tool.name }, 'Creating SSE connection for tool execution');
-				const activeClient = await createLazyConnection(connection.sseUrl, connection.isPrivate ? hfToken : undefined);
+				const activeClient = await createLazyConnection(connection.sseUrl, hfToken, connection.isPrivate);
 
 				const result = await activeClient.request(
 					{
