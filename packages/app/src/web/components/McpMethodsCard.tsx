@@ -44,14 +44,9 @@ export function McpMethodsCard() {
 
 	// Process methods and enrich with Gradio metrics
 	const processedMethods: MethodData[] = (metrics?.methods || []).map(method => {
-		const methodData: MethodData = {
-			method: method.method,
-			count: method.count,
-			errors: method.errors,
-			errorRate: method.errorRate,
-			averageResponseTime: method.averageResponseTime,
-			lastCalled: method.lastCalled,
-		};
+		let totalErrors = method.errors;
+		let gradioSuccess: number | undefined;
+		let gradioFailure: number | undefined;
 
 		// Check if this is a tool call and we have Gradio metrics
 		if (method.method.startsWith('tools/call:') && metrics?.gradioMetrics) {
@@ -61,10 +56,27 @@ export function McpMethodsCard() {
 			
 			// Look for exact match in Gradio metrics
 			if (gradioByTool[toolName]) {
-				methodData.gradioSuccess = gradioByTool[toolName].success;
-				methodData.gradioFailure = gradioByTool[toolName].failure;
+				gradioSuccess = gradioByTool[toolName].success;
+				gradioFailure = gradioByTool[toolName].failure;
+				
+				// Add Gradio failures to total error count
+				totalErrors += gradioFailure;
 			}
 		}
+
+		// Recalculate error rate with the updated error count
+		const errorRate = method.count > 0 ? (totalErrors / method.count) * 100 : 0;
+
+		const methodData: MethodData = {
+			method: method.method,
+			count: method.count,
+			errors: totalErrors,
+			errorRate: errorRate,
+			averageResponseTime: method.averageResponseTime,
+			lastCalled: method.lastCalled,
+			gradioSuccess,
+			gradioFailure,
+		};
 
 		return methodData;
 	});

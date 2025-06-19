@@ -93,8 +93,14 @@ export class StatelessHttpTransport extends BaseTransport {
 
 		// Check HF token validity if present
 		const headers = req.headers as Record<string, string>;
+		extractQueryParamsToHeaders(req, headers);
+
 		const authResult = await this.validateAuthAndTrackMetrics(headers);
 		if (!authResult.shouldContinue) {
+			res.set(
+				'WWW-Authenticate',
+				'Bearer resource_metadata="https://huggingface.co/.well-known/oauth-protected-resources/mcp"'
+			);
 			res.status(authResult.statusCode || 401).send('Unauthorized');
 			return;
 		}
