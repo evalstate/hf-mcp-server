@@ -58,11 +58,22 @@ interface ModelMetadata {
 	fineTunedFrom?: string;
 }
 
+// Inference providers information
+interface InferenceProvider {
+	provider: string;
+	url?: string;
+	pricing?: {
+		input?: number;
+		output?: number;
+	};
+}
+
 // Complete model information structure
 interface ModelInformation extends ModelBasicInfo {
 	extended?: ModelExtendedInfo;
 	technical?: ModelTechnicalDetails;
 	metadata?: ModelMetadata;
+	inferenceProviders?: InferenceProvider[];
 	spaces?: Array<{
 		id: string;
 		name: string;
@@ -88,6 +99,53 @@ export class ModelDetailTool {
 	}
 
 	/**
+	 * Fetch inference providers for a model using the HF API with expand parameter
+	 * @param modelId The model ID to get inference providers for
+	 * @returns Array of inference providers or undefined if not available
+	 */
+	private async fetchInferenceProviders(modelId: string): Promise<InferenceProvider[] | undefined> {
+		try {
+			// Use the HfApiCall to make a direct API request with expand parameter
+			const url = new URL(`https://huggingface.co/api/models/${modelId}`);
+			url.searchParams.append('expand[]', 'inferenceProviderMapping');
+			
+			const headers: Record<string, string> = {
+				'Accept': 'application/json',
+			};
+			if (this.accessToken) {
+				headers['Authorization'] = `Bearer ${this.accessToken}`;
+			}
+
+			const response = await fetch(url, { headers });
+			
+			if (!response.ok) {
+				// Silently fail if inference providers aren't available
+				return undefined;
+			}
+
+			const data = await response.json() as any;
+			
+			// Check if inferenceProviderMapping exists in the response
+			if (data.inferenceProviderMapping && Array.isArray(data.inferenceProviderMapping)) {
+				return data.inferenceProviderMapping.map((provider: any) => ({
+					provider: provider.provider || provider.name || 'Unknown',
+					url: provider.url,
+					pricing: provider.pricing ? {
+						input: provider.pricing.input,
+						output: provider.pricing.output,
+					} : undefined,
+				}));
+			}
+
+			return undefined;
+		} catch (error) {
+			// Silently fail if inference providers can't be fetched
+			console.error(`Failed to fetch inference providers for ${modelId}:`, error);
+			return undefined;
+		}
+	}
+
+	/**
 	 * Get detailed information about a specific model
 	 *
 	 * @param modelId The model ID to get details for (e.g., microsoft/DialoGPT-large)
@@ -108,12 +166,15 @@ export class ModelDetailTool {
 				'spaces',
 			] as const;
 
-			const modelData = await modelInfo<(typeof additionalFields)[number]>({
-				name: modelId,
-				additionalFields: Array.from(additionalFields),
-				...(this.accessToken && { credentials: { accessToken: this.accessToken } }),
-				...(this.hubUrl && { hubUrl: this.hubUrl }),
-			});
+			const [modelData, inferenceProviders] = await Promise.all([
+				modelInfo<(typeof additionalFields)[number]>({
+					name: modelId,
+					additionalFields: Array.from(additionalFields),
+					...(this.accessToken && { credentials: { accessToken: this.accessToken } }),
+					...(this.hubUrl && { hubUrl: this.hubUrl }),
+				}),
+				this.fetchInferenceProviders(modelId),
+			]);
 
 			// Build the structured model information
 			const modelDetails: ModelInformation = {
@@ -134,6 +195,9 @@ export class ModelDetailTool {
 					downloadsAllTime: modelData.downloadsAllTime,
 					tags: modelData.tags,
 				},
+
+				// Inference providers (if available)
+				...(inferenceProviders && inferenceProviders.length > 0 && { inferenceProviders }),
 			};
 
 			// Technical details (requires validation)
@@ -292,6 +356,36 @@ function formatModelDetails(model: ModelInformation): string {
 			r.push(`- **Vocab Size:** ${formatNumber(model.technical.vocabSize)}`);
 		}
 
+		r.push('');
+	}
+
+	// Inference Providers - if available
+	if (model.inferenceProviders && model.inferenceProviders.length > 0) {
+		r.push('## Inference Providers');
+		
+		for (const provider of model.inferenceProviders) {
+			let providerLine = `- **${provider.provider}**`;
+			
+			if (provider.url) {
+				providerLine += ` - [${provider.url}](${provider.url})`;
+			}
+			
+			if (provider.pricing) {
+				const pricing = [];
+				if (provider.pricing.input !== undefined) {
+					pricing.push(`Input: $${provider.pricing.input}`);
+				}
+				if (provider.pricing.output !== undefined) {
+					pricing.push(`Output: $${provider.pricing.output}`);
+				}
+				if (pricing.length > 0) {
+					providerLine += ` (${pricing.join(', ')})`;
+				}
+			}
+			
+			r.push(providerLine);
+		}
+		
 		r.push('');
 	}
 
