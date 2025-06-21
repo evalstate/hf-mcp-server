@@ -61,11 +61,9 @@ interface ModelMetadata {
 // Inference providers information
 interface InferenceProvider {
 	provider: string;
-	url?: string;
-	pricing?: {
-		input?: number;
-		output?: number;
-	};
+	status?: string;
+	providerId?: string;
+	task?: string;
 }
 
 // Complete model information structure
@@ -130,14 +128,13 @@ export class ModelDetailTool {
 
 			// Extract inference providers from modelData if available
 			let inferenceProviders: InferenceProvider[] | undefined;
-			if (modelData.inferenceProviderMapping && Array.isArray(modelData.inferenceProviderMapping)) {
-				inferenceProviders = modelData.inferenceProviderMapping.map((provider: any) => ({
-					provider: provider.provider || provider.name || 'Unknown',
-					url: provider.url,
-					pricing: provider.pricing ? {
-						input: provider.pricing.input,
-						output: provider.pricing.output,
-					} : undefined,
+			
+			if (modelData.inferenceProviderMapping && typeof modelData.inferenceProviderMapping === 'object') {
+				inferenceProviders = Object.entries(modelData.inferenceProviderMapping).map(([providerName, providerData]: [string, any]) => ({
+					provider: providerName,
+					status: providerData.status,
+					providerId: providerData.providerId,
+					task: providerData.task,
 				}));
 			}
 
@@ -331,23 +328,20 @@ function formatModelDetails(model: ModelInformation): string {
 		for (const provider of model.inferenceProviders) {
 			let providerLine = `- **${provider.provider}**`;
 			
-			if (provider.url) {
-				providerLine += ` - [${provider.url}](${provider.url})`;
+			// Add status if available
+			if (provider.status) {
+				providerLine += ` (${provider.status})`;
 			}
-			
-			if (provider.pricing) {
-				const pricing = [];
-				if (provider.pricing.input !== undefined) {
-					pricing.push(`Input: $${provider.pricing.input}`);
-				}
-				if (provider.pricing.output !== undefined) {
-					pricing.push(`Output: $${provider.pricing.output}`);
-				}
-				if (pricing.length > 0) {
-					providerLine += ` (${pricing.join(', ')})`;
-				}
+
+			// Add provider ID if available
+			if (provider.providerId) {
+				providerLine += ` | Provider ID: ${provider.providerId}`;
 			}
-			
+
+			// Add task if available
+			if (provider.task) {
+				providerLine += ` | Task: ${provider.task}`;
+			}
 			r.push(providerLine);
 		}
 		
