@@ -1,5 +1,5 @@
-import { z } from 'zod';
 import { modelInfo } from '@huggingface/hub';
+import { z } from 'zod';
 import { formatDate, formatNumber } from './utilities.js';
 
 const SPACES_TO_INCLUDE = 12;
@@ -98,52 +98,6 @@ export class ModelDetailTool {
 		this.hubUrl = hubUrl;
 	}
 
-	/**
-	 * Fetch inference providers for a model using the HF API with expand parameter
-	 * @param modelId The model ID to get inference providers for
-	 * @returns Array of inference providers or undefined if not available
-	 */
-	private async fetchInferenceProviders(modelId: string): Promise<InferenceProvider[] | undefined> {
-		try {
-			// Use the HfApiCall to make a direct API request with expand parameter
-			const url = new URL(`https://huggingface.co/api/models/${modelId}`);
-			url.searchParams.append('expand[]', 'inferenceProviderMapping');
-			
-			const headers: Record<string, string> = {
-				'Accept': 'application/json',
-			};
-			if (this.accessToken) {
-				headers['Authorization'] = `Bearer ${this.accessToken}`;
-			}
-
-			const response = await fetch(url, { headers });
-			
-			if (!response.ok) {
-				// Silently fail if inference providers aren't available
-				return undefined;
-			}
-
-			const data = await response.json() as any;
-			
-			// Check if inferenceProviderMapping exists in the response
-			if (data.inferenceProviderMapping && Array.isArray(data.inferenceProviderMapping)) {
-				return data.inferenceProviderMapping.map((provider: any) => ({
-					provider: provider.provider || provider.name || 'Unknown',
-					url: provider.url,
-					pricing: provider.pricing ? {
-						input: provider.pricing.input,
-						output: provider.pricing.output,
-					} : undefined,
-				}));
-			}
-
-			return undefined;
-		} catch (error) {
-			// Silently fail if inference providers can't be fetched
-			console.error(`Failed to fetch inference providers for ${modelId}:`, error);
-			return undefined;
-		}
-	}
 
 	/**
 	 * Get detailed information about a specific model
@@ -164,17 +118,28 @@ export class ModelDetailTool {
 				'safetensors',
 				'cardData',
 				'spaces',
+				'inferenceProviderMapping',
 			] as const;
 
-			const [modelData, inferenceProviders] = await Promise.all([
-				modelInfo<(typeof additionalFields)[number]>({
-					name: modelId,
-					additionalFields: Array.from(additionalFields),
-					...(this.accessToken && { credentials: { accessToken: this.accessToken } }),
-					...(this.hubUrl && { hubUrl: this.hubUrl }),
-				}),
-				this.fetchInferenceProviders(modelId),
-			]);
+			const modelData = await modelInfo<(typeof additionalFields)[number]>({
+				name: modelId,
+				additionalFields: Array.from(additionalFields),
+				...(this.accessToken && { credentials: { accessToken: this.accessToken } }),
+				...(this.hubUrl && { hubUrl: this.hubUrl }),
+			});
+
+			// Extract inference providers from modelData if available
+			let inferenceProviders: InferenceProvider[] | undefined;
+			if (modelData.inferenceProviderMapping && Array.isArray(modelData.inferenceProviderMapping)) {
+				inferenceProviders = modelData.inferenceProviderMapping.map((provider: any) => ({
+					provider: provider.provider || provider.name || 'Unknown',
+					url: provider.url,
+					pricing: provider.pricing ? {
+						input: provider.pricing.input,
+						output: provider.pricing.output,
+					} : undefined,
+				}));
+			}
 
 			// Build the structured model information
 			const modelDetails: ModelInformation = {
