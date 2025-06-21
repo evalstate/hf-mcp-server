@@ -321,33 +321,6 @@ function formatModelDetails(model: ModelInformation): string {
 		r.push('');
 	}
 
-	// Inference Providers - if available
-	if (model.inferenceProviders && model.inferenceProviders.length > 0) {
-		r.push('## Inference Providers');
-		
-		for (const provider of model.inferenceProviders) {
-			let providerLine = `- **${provider.provider}**`;
-			
-			// Add status if available
-			if (provider.status) {
-				providerLine += ` (${provider.status})`;
-			}
-
-			// Add provider ID if available
-			if (provider.providerId) {
-				providerLine += ` | Provider ID: ${provider.providerId}`;
-			}
-
-			// Add task if available
-			if (provider.task) {
-				providerLine += ` | Task: ${provider.task}`;
-			}
-			r.push(providerLine);
-		}
-		
-		r.push('');
-	}
-
 	// Tags - reliable field from extended info
 	if (model.extended?.tags && model.extended.tags.length > 0) {
 		r.push('## Tags');
@@ -402,6 +375,34 @@ function formatModelDetails(model: ModelInformation): string {
 		if (model.spaces.length > SPACES_TO_INCLUDE) {
 			r.push(`- *... and ${(model.spaces.length - SPACES_TO_INCLUDE).toString()} more spaces*`);
 		}
+		r.push('');
+	}
+
+	// Inference Providers - if available
+	if (model.inferenceProviders && model.inferenceProviders.length > 0) {
+		r.push('## Inference Providers');
+		console.log('DEBUG: inferenceProviders:', model.inferenceProviders);
+		
+		for (const provider of model.inferenceProviders) {
+			let providerLine = `- **${provider.provider}**`;
+			
+			// Add status if available
+			if (provider.status) {
+				providerLine += ` (${provider.status})`;
+			}
+
+			// Add provider ID if available
+			if (provider.providerId) {
+				providerLine += ` | Provider ID: ${provider.providerId}`;
+			}
+
+			// Add task if available
+			if (provider.task) {
+				providerLine += ` | Task: ${provider.task}`;
+			}
+			r.push(providerLine);
+		}
+		
 		r.push('');
 	}
 
