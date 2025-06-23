@@ -179,7 +179,7 @@ async function fetchEndpointSchema(
 	};
 
 	if (isPrivateSpace && hfToken) {
-		headers.Authorization = `Bearer ${hfToken}`;
+		headers['X-HF-Authorization'] = `Bearer ${hfToken}`;
 	}
 
 	// Add timeout using AbortController (same pattern as HfApiCall)
@@ -320,11 +320,7 @@ export async function connectToGradioEndpoints(
 /**
  * Creates SSE connection to endpoint when needed for tool execution
  */
-async function createLazyConnection(
-	sseUrl: string,
-	hfToken: string | undefined,
-	isPrivate: boolean = false
-): Promise<Client> {
+async function createLazyConnection(sseUrl: string, hfToken: string | undefined): Promise<Client> {
 	logger.debug({ url: sseUrl }, 'Creating lazy SSE connection for tool execution');
 
 	// Create MCP client
@@ -341,7 +337,7 @@ async function createLazyConnection(
 	// Create SSE transport with HF token if available
 	const transportOptions: SSEClientTransportOptions = {};
 	if (hfToken) {
-		const headerName = isPrivate ? 'Authorization' : 'X-HF-Authorization';
+		const headerName = 'X-HF-Authorization';
 		const customHeaders = {
 			[headerName]: `Bearer ${hfToken}`,
 		};
@@ -445,7 +441,7 @@ export function registerRemoteTool(server: McpServer, connection: EndpointConnec
 					throw new Error('No SSE URL available for tool execution');
 				}
 				logger.debug({ tool: connection.tool.name }, 'Creating SSE connection for tool execution');
-				const activeClient = await createLazyConnection(connection.sseUrl, hfToken, connection.isPrivate);
+				const activeClient = await createLazyConnection(connection.sseUrl, hfToken);
 
 				const result = await activeClient.request(
 					{
