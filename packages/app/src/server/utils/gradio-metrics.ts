@@ -6,6 +6,9 @@
  * of Gradio endpoints.
  */
 
+import { createHash } from 'crypto';
+import { GRADIO_PRIVATE_PREFIX } from '../../shared/constants.js';
+
 export interface GradioToolMetrics {
 	/** Number of successful tool calls */
 	success: number;
@@ -96,3 +99,28 @@ export class GradioMetricsCollector {
 
 // Export singleton instance
 export const gradioMetrics = GradioMetricsCollector.getInstance();
+
+/**
+ * Get the metrics-safe name for a Gradio tool.
+ * For private tools (with grp prefix), this returns an obfuscated name
+ * that includes a hash for uniqueness but doesn't reveal the actual tool name.
+ * 
+ * @param toolName The original tool name (e.g., "grp1_evalstate_private_model")
+ * @returns The metrics-safe name (e.g., "grp1_[private_a1b2c3]" for private tools)
+ */
+export function getMetricsSafeName(toolName: string): string {
+	// Check if this is a private Gradio tool
+	if (toolName.startsWith(GRADIO_PRIVATE_PREFIX)) {
+		// Extract the index and the actual name
+		const match = toolName.match(/^grp(\d+)_(.*)$/);
+		if (match && match[1] && match[2]) {
+			const index = match[1];
+			const privateName = match[2];
+			// Create a short hash of the name for uniqueness
+			const hash = createHash('sha256').update(privateName).digest('hex').substring(0, 6);
+			return `grp${index}_[private_${hash}]`;
+		}
+	}
+	// For non-private tools, return as-is
+	return toolName;
+}
