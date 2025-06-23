@@ -5,8 +5,9 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { logger } from './lib/logger.js';
 import { z } from 'zod';
 import type { GradioEndpoint } from './lib/mcp-api-client.js';
-import { gradioMetrics } from './utils/gradio-metrics.js';
 import { spaceInfo } from '@huggingface/hub';
+import { gradioMetrics, getMetricsSafeName } from './utils/gradio-metrics.js';
+import { GRADIO_PREFIX, GRADIO_PRIVATE_PREFIX } from '../shared/constants.js';
 
 // Define types for JSON Schema
 interface JsonSchemaProperty {
@@ -177,9 +178,21 @@ async function fetchEndpointSchema(
 	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
 	};
-
-	if (isPrivateSpace && hfToken) {
+	// if (hfToken) {
+	// 	headers['X-HF-Authorization'] = `Bearer ${hfToken}`;
+	// }
+	// only send the Token if the space is private
+	if (hfToken && isPrivateSpace) {
 		headers.Authorization = `Bearer ${hfToken}`;
+		logger.debug(
+			{ endpointId },
+			`Including HF token in schema request private==${isPrivateSpace}, token defined?==${!!hfToken}`
+		);
+	} else {
+		logger.debug(
+			{ endpointId },
+			`Excluding HF token in schema request private==${isPrivateSpace}, token defined?==${!!hfToken}`
+		);
 	}
 
 	// Add timeout using AbortController (same pattern as HfApiCall)
@@ -376,11 +389,12 @@ async function createLazyConnection(
  * Registers a remote tool from a Gradio endpoint
  */
 export function registerRemoteTool(server: McpServer, connection: EndpointConnection, hfToken?: string): void {
-	// Use new naming convention: gr<index>_<sanitized_name>
+	// Use new naming convention: gr<index>_<sanitized_name> or grp<index>_<sanitized_name> for private
 	// Convert "evalstate/flux1_schnell" to "evalstate_flux1_schnell"
 	const sanitizedName = connection.name ? connection.name.replace(/[/\-\s]+/g, '_').toLowerCase() : 'unknown';
-	const remoteName = `gr${(connection.originalIndex + 1).toString()}_${sanitizedName}`;
-	logger.debug(
+	const prefix = connection.isPrivate ? GRADIO_PRIVATE_PREFIX : GRADIO_PREFIX;
+	const remoteName = `${prefix}${(connection.originalIndex + 1).toString()}_${sanitizedName}`;
+	logger.trace(
 		{
 			endpointId: connection.endpointId,
 			originalName: connection.tool.name,
@@ -391,7 +405,7 @@ export function registerRemoteTool(server: McpServer, connection: EndpointConnec
 	);
 
 	// Log the exact structure we're getting
-	logger.debug(
+	logger.trace(
 		{
 			toolName: connection.tool.name,
 			inputSchema: connection.tool.inputSchema,
@@ -457,18 +471,23 @@ export function registerRemoteTool(server: McpServer, connection: EndpointConnec
 					},
 					CallToolResultSchema
 				);
+				// For metrics, use the safe name utility
+				const metricsName = getMetricsSafeName(remoteName);
+
 				if (result.isError) {
 					logger.warn({ tool: connection.tool.name, error: result.content }, 'Gradio tool call returned error');
-					gradioMetrics.recordFailure(remoteName);
+					gradioMetrics.recordFailure(metricsName);
 				} else {
 					logger.debug({ tool: connection.tool.name }, 'Gradio tool call returned error');
-					gradioMetrics.recordSuccess(remoteName);
+					gradioMetrics.recordSuccess(metricsName);
 				}
 				return result;
 			} catch (error) {
 				// this is a
 				logger.error({ tool: connection.tool.name, error }, 'Remote tool call failed');
-				gradioMetrics.recordFailure(remoteName);
+				// For metrics, use the safe name utility
+				const metricsName = getMetricsSafeName(remoteName);
+				gradioMetrics.recordFailure(metricsName);
 				throw error;
 			}
 		}

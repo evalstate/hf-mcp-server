@@ -390,15 +390,6 @@ function formatModelDetails(model: ModelInformation): string {
 				providerLine += ` (${provider.status})`;
 			}
 
-			// Add provider ID if available
-			if (provider.providerId) {
-				providerLine += ` | Provider ID: ${provider.providerId}`;
-			}
-
-			// Add task if available
-			if (provider.task) {
-				providerLine += ` | Task: ${provider.task}`;
-			}
 			r.push(providerLine);
 		}
 		

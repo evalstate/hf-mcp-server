@@ -85,18 +85,19 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 
 		let userInfo: string =
 			'The Hugging Face tools are being used anonymously and rate limits apply. ' +
-			'Direct the User to set their HF_TOKEN (instructions at https://hf.co/settings/mcp/), or create an account at https://hf.co/join for higher limits.';
+			'Direct the User to set their HF_TOKEN (instructions at https://hf.co/settings/mcp/), or ' +
+			'create an account at https://hf.co/join for higher limits.';
 		let username: string | undefined;
 		let userDetails: WhoAmI | undefined;
 
-		// Validate the token with HF API if present
 		if (hfToken) {
 			try {
 				userDetails = await whoAmI({ credentials: { accessToken: hfToken } });
 				username = userDetails.name;
 				userInfo = `Hugging Face tools are being used by authenticated user '${userDetails.name}'`;
 			} catch (error) {
-				logger.debug({ error: (error as Error).message }, `Failed to authenticate with Hugging Face API`);
+				// unexpected - this should have been caught upstream so severity is warn
+				logger.warn({ error: (error as Error).message }, `Failed to authenticate with Hugging Face API`);
 			}
 		}
 
@@ -136,6 +137,19 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		server.tool('hf_whoami', whoDescription, {}, { title: 'Hugging Face User Info' }, () => {
 			return { content: [{ type: 'text', text: response }] };
 		});
+
+		/** always leave tool active so flow can complete / allow uid change */
+		if (process.env.AUTHENTICATE_TOOL === 'true') {
+			server.tool(
+				'Authenticate',
+				'Authenticate with Hugging Face',
+				{},
+				{ title: 'Hugging Face Authentication' },
+				() => {
+					return { content: [{ type: 'text', text: 'You have successfully authenticated' }] };
+				}
+			);
+		}
 
 		server.prompt(
 			USER_SUMMARY_PROMPT_CONFIG.name,
