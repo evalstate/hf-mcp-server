@@ -129,3 +129,4 @@ The server respects the following environment variables:
 - `HF_API_TIMEOUT`: Timeout for Hugging Face API requests in milliseconds (default: 12500ms / 12.5 seconds)
 - `USER_CONFIG_API`: URL to use for User settings (defaults to Local front-end)
 - `MCP_STRICT_COMPLIANCE`: set to True for GET 405 rejects in JSON Mode (default serves a welcome page).
+- `AUTHENTICATE_TOOL`: whether to include an `Authenticate` tool to issue an OAuth challenge when called
