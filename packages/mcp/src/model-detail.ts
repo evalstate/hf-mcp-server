@@ -381,7 +381,6 @@ function formatModelDetails(model: ModelInformation): string {
 	// Inference Providers - if available
 	if (model.inferenceProviders && model.inferenceProviders.length > 0) {
 		r.push('## Inference Providers');
-		console.log('DEBUG: inferenceProviders:', model.inferenceProviders);
 		
 		for (const provider of model.inferenceProviders) {
 			let providerLine = `- **${provider.provider}**`;
