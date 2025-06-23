@@ -9,6 +9,8 @@ export function extractQueryParamsToHeaders(req: Request, headers: Record<string
 	const bouquet = req.query.bouquet as string | undefined;
 	const mix = req.query.mix as string | undefined;
 	const forceauth = req.query.forceauth as string | undefined;
+	const login = req.query.login;
+	const auth = req.query.auth;
 
 	if (bouquet) {
 		headers['x-mcp-bouquet'] = bouquet;
@@ -17,7 +19,8 @@ export function extractQueryParamsToHeaders(req: Request, headers: Record<string
 		headers['x-mcp-mix'] = mix;
 	}
 
-	if (forceauth) {
+	// Check if forceauth, login, or auth appears in the URL (with or without values)
+	if (forceauth || login !== undefined || auth !== undefined) {
 		headers['x-mcp-force-auth'] = 'true';
 	}
 }
