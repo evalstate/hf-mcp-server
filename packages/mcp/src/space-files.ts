@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { listFiles, spaceInfo } from '@huggingface/hub';
-import type { SpaceEntry } from '@huggingface/hub';
 import { formatBytes, escapeMarkdown } from './utilities.js';
 import { HfApiError } from './hf-api-call.js';
 import { explain } from './error-messages.js';
