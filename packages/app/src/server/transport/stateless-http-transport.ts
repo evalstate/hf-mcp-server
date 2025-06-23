@@ -94,9 +94,15 @@ export class StatelessHttpTransport extends BaseTransport {
 		// Check HF token validity if present
 		const headers = req.headers as Record<string, string>;
 		extractQueryParamsToHeaders(req, headers);
+		// Extract method name for tracking using shared utility
+		const requestBody = req.body as
+			| { method?: string; params?: { clientInfo?: unknown; capabilities?: unknown; name?: string } }
+			| undefined;
+
+		const trackingName = this.extractMethodForTracking(requestBody);
 
 		const authResult = await this.validateAuthAndTrackMetrics(headers);
-		if (!authResult.shouldContinue) {
+		if (!authResult.shouldContinue || trackingName === 'tools/call:Authenticate') {
 			res.set(
 				'WWW-Authenticate',
 				'Bearer resource_metadata="https://huggingface.co/.well-known/oauth-protected-resources/mcp"'
@@ -107,13 +113,6 @@ export class StatelessHttpTransport extends BaseTransport {
 
 		// Track new connection for metrics (each request is a "connection" in stateless mode)
 		this.trackNewConnection();
-
-		const requestBody = req.body as
-			| { method?: string; params?: { clientInfo?: unknown; capabilities?: unknown; name?: string } }
-			| undefined;
-
-		// Extract method name for tracking using shared utility
-		const trackingName = this.extractMethodForTracking(requestBody);
 
 		if (isJSONRPCNotification(req.body)) {
 			this.trackMethodCall(trackingName, startTime, false);
