@@ -130,12 +130,20 @@ export class ModelDetailTool {
 			let inferenceProviders: InferenceProvider[] | undefined;
 			
 			if (modelData.inferenceProviderMapping && typeof modelData.inferenceProviderMapping === 'object') {
-				inferenceProviders = Object.entries(modelData.inferenceProviderMapping).map(([providerName, providerData]: [string, any]) => ({
-					provider: providerName,
-					status: providerData.status,
-					providerId: providerData.providerId,
-					task: providerData.task,
-				}));
+				interface ProviderData {
+					providerId: string;
+					status: "live" | "staging";
+					task: string;
+				}
+				
+				inferenceProviders = Object.entries(modelData.inferenceProviderMapping as Partial<Record<string, ProviderData>>)
+					.filter((entry): entry is [string, ProviderData] => entry[1] !== undefined)
+					.map(([providerName, providerData]) => ({
+						provider: providerName,
+						status: providerData.status,
+						providerId: providerData.providerId,
+						task: providerData.task,
+					}));
 			}
 
 			// Build the structured model information
