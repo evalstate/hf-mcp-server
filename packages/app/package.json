@@ -5,7 +5,9 @@
 	"type": "module",
 	"main": "./dist/server/streamableHttp.js",
 	"bin": {
-		"hf-mcp-server": "./dist/server/stdio.js"
+		"hf-mcp-server": "./dist/server/stdio.js",
+		"hf-mcp-server-http": "./dist/server/streamableHttp.js",
+		"hf-mcp-server-http-json": "./dist/server/streamableHttpJson.js"
 	},
 	"files": [
 		"dist/**/*",
