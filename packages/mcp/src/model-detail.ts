@@ -6,7 +6,9 @@ const SPACES_TO_INCLUDE = 12;
 // Model Detail Tool Configuration
 export const MODEL_DETAIL_TOOL_CONFIG = {
 	name: 'model_details',
-	description: 'Get detailed information about a specific model from the Hugging Face Hub.',
+	description:
+		'Get detailed information about a model from the Hugging Face Hub. Include relevant links ' +
+		'in result summaries.',
 	schema: z.object({
 		model_id: z.string().min(1, 'Model ID is required').describe('Model ID (e.g., microsoft/DialoGPT-large)'),
 	}),
@@ -96,7 +98,6 @@ export class ModelDetailTool {
 		this.hubUrl = hubUrl;
 	}
 
-
 	/**
 	 * Get detailed information about a specific model
 	 *
@@ -128,14 +129,14 @@ export class ModelDetailTool {
 
 			// Extract inference providers from modelData if available
 			let inferenceProviders: InferenceProvider[] | undefined;
-			
+
 			if (modelData.inferenceProviderMapping && typeof modelData.inferenceProviderMapping === 'object') {
 				interface ProviderData {
 					providerId: string;
-					status: "live" | "staging";
+					status: 'live' | 'staging';
 					task: string;
 				}
-				
+
 				inferenceProviders = Object.entries(modelData.inferenceProviderMapping as Partial<Record<string, ProviderData>>)
 					.filter((entry): entry is [string, ProviderData] => entry[1] !== undefined)
 					.map(([providerName, providerData]) => ({
@@ -375,6 +376,7 @@ function formatModelDetails(model: ModelInformation): string {
 	// Spaces - processed with validation
 	if (model.spaces && model.spaces.length > 0) {
 		r.push('## Demo Spaces');
+		r.push('');
 		for (const space of model.spaces.slice(0, SPACES_TO_INCLUDE)) {
 			const title = space.title || space.name;
 			r.push(`- [${title}](https://hf.co/spaces/${space.id})`);
@@ -389,10 +391,10 @@ function formatModelDetails(model: ModelInformation): string {
 	// Inference Providers - if available
 	if (model.inferenceProviders && model.inferenceProviders.length > 0) {
 		r.push('## Inference Providers');
-		
+
 		for (const provider of model.inferenceProviders) {
 			let providerLine = `- **${provider.provider}**`;
-			
+
 			// Add status if available
 			if (provider.status) {
 				providerLine += ` (${provider.status})`;
@@ -400,7 +402,9 @@ function formatModelDetails(model: ModelInformation): string {
 
 			r.push(providerLine);
 		}
-		
+
+		r.push('');
+		r.push('Try this model in the [playground](https://hf.co/playground?modelId=' + model.name + ')');
 		r.push('');
 	}
 
