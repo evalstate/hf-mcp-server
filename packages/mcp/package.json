@@ -1,6 +1,6 @@
 {
 	"name": "@llmindset/hf-mcp",
-	"version": "0.1.14",
+	"version": "0.1.15",
 	"type": "module",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
