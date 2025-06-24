@@ -43,7 +43,7 @@ export function McpMethodsCard() {
 	const isStdioMode = metrics?.transport === 'stdio';
 
 	// Process methods and enrich with Gradio metrics
-	const processedMethods: MethodData[] = (metrics?.methods || []).map(method => {
+	const processedMethods: MethodData[] = (metrics?.methods || []).map((method) => {
 		let totalErrors = method.errors;
 		let gradioSuccess: number | undefined;
 		let gradioFailure: number | undefined;
@@ -53,12 +53,12 @@ export function McpMethodsCard() {
 			// Extract tool name from method (tools/call:toolName -> toolName)
 			const toolName = method.method.replace('tools/call:', '');
 			const gradioByTool = metrics.gradioMetrics.byTool;
-			
+
 			// Look for exact match in Gradio metrics
 			if (gradioByTool[toolName]) {
 				gradioSuccess = gradioByTool[toolName].success;
 				gradioFailure = gradioByTool[toolName].failure;
-				
+
 				// Add Gradio failures to total error count
 				totalErrors += gradioFailure;
 			}

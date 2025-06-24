@@ -12,7 +12,14 @@ interface GradioEndpointsCardProps {
 	onSpaceToolSubdomainChange: (index: number, subdomain: string) => void;
 }
 
-export function GradioEndpointsCard({ spaceNames, spaceSubdomains, enabledSpaces, onSpaceToolToggle, onSpaceToolNameChange, onSpaceToolSubdomainChange }: GradioEndpointsCardProps) {
+export function GradioEndpointsCard({
+	spaceNames,
+	spaceSubdomains,
+	enabledSpaces,
+	onSpaceToolToggle,
+	onSpaceToolNameChange,
+	onSpaceToolSubdomainChange,
+}: GradioEndpointsCardProps) {
 	// Always show 3 rows
 	const spaceRows = [0, 1, 2];
 
@@ -34,7 +41,7 @@ export function GradioEndpointsCard({ spaceNames, spaceSubdomains, enabledSpaces
 						<div className="flex-1 text-sm font-medium">Name</div>
 						<div className="flex-1 text-sm font-medium">Subdomain</div>
 					</div>
-					
+
 					{spaceRows.map((index) => (
 						<div key={index} className="flex items-center space-x-3">
 							<Checkbox

@@ -103,7 +103,7 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 			// Add timeout using AbortController
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => controller.abort(), this.apiTimeout);
-			
+
 			const response = await fetch(url.toString(), {
 				...options,
 				headers,
