@@ -3,7 +3,7 @@ import { logger } from './logger.js';
 import type { AppSettings } from '../../shared/settings.js';
 import type { TransportInfo } from '../../shared/transport-info.js';
 import { BOUQUET_FALLBACK } from '../mcp-server.js';
-import { ALL_BUILTIN_TOOL_IDS } from '@hf-mcp/mcp';
+import { ALL_BUILTIN_TOOL_IDS } from '@llmindset/hf-mcp';
 import { apiMetrics } from '../utils/api-metrics.js';
 export interface ToolStateChangeCallback {
 	(toolId: string, enabled: boolean): void;

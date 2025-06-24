@@ -9,34 +9,34 @@ describe('parseSchemaResponse', () => {
 	describe('object format schema', () => {
 		it('should parse object format schema and select the only tool', () => {
 			const schemaOne = {
-				"evalstate_shuttle_jaguarinfer": {
-					"type": "object",
-					"properties": {
-						"prompt": {
-							"type": "string"
+				evalstate_shuttle_jaguarinfer: {
+					type: 'object',
+					properties: {
+						prompt: {
+							type: 'string',
 						},
-						"seed": {
-							"type": "number",
-							"description": "numeric value between 0 and 2147483647"
+						seed: {
+							type: 'number',
+							description: 'numeric value between 0 and 2147483647',
 						},
-						"randomize_seed": {
-							"type": "boolean"
+						randomize_seed: {
+							type: 'boolean',
 						},
-						"width": {
-							"type": "number",
-							"description": "numeric value between 256 and 2048"
+						width: {
+							type: 'number',
+							description: 'numeric value between 256 and 2048',
 						},
-						"height": {
-							"type": "number",
-							"description": "numeric value between 256 and 2048"
+						height: {
+							type: 'number',
+							description: 'numeric value between 256 and 2048',
 						},
-						"num_inference_steps": {
-							"type": "number",
-							"description": "numeric value between 1 and 50"
-						}
+						num_inference_steps: {
+							type: 'number',
+							description: 'numeric value between 1 and 50',
+						},
 					},
-					"description": ""
-				}
+					description: '',
+				},
 			};
 
 			const result = parseSchemaResponse(schemaOne, endpointId, subdomain);
@@ -45,49 +45,49 @@ describe('parseSchemaResponse', () => {
 			expect(result.name).toBe('evalstate_shuttle_jaguarinfer');
 			expect(result.description).toBe('');
 			expect(result.inputSchema).toEqual({
-				"type": "object",
-				"properties": {
-					"prompt": {
-						"type": "string"
+				type: 'object',
+				properties: {
+					prompt: {
+						type: 'string',
 					},
-					"seed": {
-						"type": "number",
-						"description": "numeric value between 0 and 2147483647"
+					seed: {
+						type: 'number',
+						description: 'numeric value between 0 and 2147483647',
 					},
-					"randomize_seed": {
-						"type": "boolean"
+					randomize_seed: {
+						type: 'boolean',
 					},
-					"width": {
-						"type": "number",
-						"description": "numeric value between 256 and 2048"
+					width: {
+						type: 'number',
+						description: 'numeric value between 256 and 2048',
 					},
-					"height": {
-						"type": "number",
-						"description": "numeric value between 256 and 2048"
+					height: {
+						type: 'number',
+						description: 'numeric value between 256 and 2048',
 					},
-					"num_inference_steps": {
-						"type": "number",
-						"description": "numeric value between 1 and 50"
-					}
+					num_inference_steps: {
+						type: 'number',
+						description: 'numeric value between 1 and 50',
+					},
 				},
-				"description": ""
+				description: '',
 			});
 		});
 
 		it('should select tool with "infer" in the name when multiple tools exist', () => {
 			const schema = {
-				"some_other_tool": {
-					"type": "object",
-					"properties": { "test": { "type": "string" } }
+				some_other_tool: {
+					type: 'object',
+					properties: { test: { type: 'string' } },
 				},
-				"evalstate_shuttle_jaguarinfer": {
-					"type": "object",
-					"properties": { "prompt": { "type": "string" } }
+				evalstate_shuttle_jaguarinfer: {
+					type: 'object',
+					properties: { prompt: { type: 'string' } },
 				},
-				"another_tool": {
-					"type": "object",
-					"properties": { "data": { "type": "string" } }
-				}
+				another_tool: {
+					type: 'object',
+					properties: { data: { type: 'string' } },
+				},
 			};
 
 			const result = parseSchemaResponse(schema, endpointId, subdomain);
@@ -97,14 +97,14 @@ describe('parseSchemaResponse', () => {
 
 		it('should select last tool when no "infer" tool exists', () => {
 			const schema = {
-				"first_tool": {
-					"type": "object",
-					"properties": { "test": { "type": "string" } }
+				first_tool: {
+					type: 'object',
+					properties: { test: { type: 'string' } },
 				},
-				"last_tool": {
-					"type": "object",
-					"properties": { "data": { "type": "string" } }
-				}
+				last_tool: {
+					type: 'object',
+					properties: { data: { type: 'string' } },
+				},
 			};
 
 			const result = parseSchemaResponse(schema, endpointId, subdomain);
@@ -117,38 +117,38 @@ describe('parseSchemaResponse', () => {
 		it('should parse array format schema and select the only tool', () => {
 			const schemaTwo = [
 				{
-					"name": "OmniParser_v2_process",
-					"description": "",
-					"inputSchema": {
-						"type": "object",
-						"properties": {
-							"image_input": {
-								"title": "ImageData",
-								"type": "string",
-								"format": "a http or https url to a file"
+					name: 'OmniParser_v2_process',
+					description: '',
+					inputSchema: {
+						type: 'object',
+						properties: {
+							image_input: {
+								title: 'ImageData',
+								type: 'string',
+								format: 'a http or https url to a file',
 							},
-							"box_threshold": {
-								"type": "number",
-								"description": "numeric value between 0.01 and 1.0",
-								"default": 0.05
+							box_threshold: {
+								type: 'number',
+								description: 'numeric value between 0.01 and 1.0',
+								default: 0.05,
 							},
-							"iou_threshold": {
-								"type": "number",
-								"description": "numeric value between 0.01 and 1.0",
-								"default": 0.1
+							iou_threshold: {
+								type: 'number',
+								description: 'numeric value between 0.01 and 1.0',
+								default: 0.1,
 							},
-							"use_paddleocr": {
-								"type": "boolean",
-								"default": true
+							use_paddleocr: {
+								type: 'boolean',
+								default: true,
 							},
-							"imgsz": {
-								"type": "number",
-								"description": "numeric value between 640 and 1920",
-								"default": 640
-							}
-						}
-					}
-				}
+							imgsz: {
+								type: 'number',
+								description: 'numeric value between 640 and 1920',
+								default: 640,
+							},
+						},
+					},
+				},
 			];
 
 			const result = parseSchemaResponse(schemaTwo, endpointId, subdomain);
@@ -157,44 +157,44 @@ describe('parseSchemaResponse', () => {
 			expect(result.name).toBe('OmniParser_v2_process');
 			expect(result.description).toBe('');
 			expect(result.inputSchema).toEqual({
-				"type": "object",
-				"properties": {
-					"image_input": {
-						"title": "ImageData",
-						"type": "string",
-						"format": "a http or https url to a file"
+				type: 'object',
+				properties: {
+					image_input: {
+						title: 'ImageData',
+						type: 'string',
+						format: 'a http or https url to a file',
 					},
-					"box_threshold": {
-						"type": "number",
-						"description": "numeric value between 0.01 and 1.0",
-						"default": 0.05
+					box_threshold: {
+						type: 'number',
+						description: 'numeric value between 0.01 and 1.0',
+						default: 0.05,
 					},
-					"iou_threshold": {
-						"type": "number",
-						"description": "numeric value between 0.01 and 1.0",
-						"default": 0.1
+					iou_threshold: {
+						type: 'number',
+						description: 'numeric value between 0.01 and 1.0',
+						default: 0.1,
 					},
-					"use_paddleocr": {
-						"type": "boolean",
-						"default": true
+					use_paddleocr: {
+						type: 'boolean',
+						default: true,
 					},
-					"imgsz": {
-						"type": "number",
-						"description": "numeric value between 640 and 1920",
-						"default": 640
-					}
-				}
+					imgsz: {
+						type: 'number',
+						description: 'numeric value between 640 and 1920',
+						default: 640,
+					},
+				},
 			});
 		});
 
 		it('should filter out invalid tools in array format', () => {
 			const schema = [
-				{ "name": "valid_tool", "inputSchema": { "type": "object" } },
-				{ "name": "missing_schema" }, // missing inputSchema
-				{ "inputSchema": { "type": "object" } }, // missing name
-				{ "name": 123, "inputSchema": { "type": "object" } }, // invalid name type
+				{ name: 'valid_tool', inputSchema: { type: 'object' } },
+				{ name: 'missing_schema' }, // missing inputSchema
+				{ inputSchema: { type: 'object' } }, // missing name
+				{ name: 123, inputSchema: { type: 'object' } }, // invalid name type
 				null, // null entry
-				{ "name": "another_valid_tool", "inputSchema": { "type": "object" } }
+				{ name: 'another_valid_tool', inputSchema: { type: 'object' } },
 			];
 
 			const result = parseSchemaResponse(schema, endpointId, subdomain);
@@ -205,9 +205,9 @@ describe('parseSchemaResponse', () => {
 
 		it('should select tool with "infer" in array format', () => {
 			const schema = [
-				{ "name": "first_tool", "inputSchema": { "type": "object" } },
-				{ "name": "infer_tool", "inputSchema": { "type": "object" } },
-				{ "name": "last_tool", "inputSchema": { "type": "object" } }
+				{ name: 'first_tool', inputSchema: { type: 'object' } },
+				{ name: 'infer_tool', inputSchema: { type: 'object' } },
+				{ name: 'last_tool', inputSchema: { type: 'object' } },
 			];
 
 			const result = parseSchemaResponse(schema, endpointId, subdomain);
@@ -218,30 +218,27 @@ describe('parseSchemaResponse', () => {
 
 	describe('error handling', () => {
 		it('should throw error for invalid schema format', () => {
-			expect(() => parseSchemaResponse("string", endpointId, subdomain))
-				.toThrow('Invalid schema format: expected array or object');
-			
-			expect(() => parseSchemaResponse(123, endpointId, subdomain))
-				.toThrow('Invalid schema format: expected array or object');
-			
-			expect(() => parseSchemaResponse(null, endpointId, subdomain))
-				.toThrow('Invalid schema format: expected array or object');
+			expect(() => parseSchemaResponse('string', endpointId, subdomain)).toThrow(
+				'Invalid schema format: expected array or object'
+			);
+
+			expect(() => parseSchemaResponse(123, endpointId, subdomain)).toThrow(
+				'Invalid schema format: expected array or object'
+			);
+
+			expect(() => parseSchemaResponse(null, endpointId, subdomain)).toThrow(
+				'Invalid schema format: expected array or object'
+			);
 		});
 
 		it('should throw error when no tools found in object format', () => {
-			expect(() => parseSchemaResponse({}, endpointId, subdomain))
-				.toThrow('No tools found in schema');
+			expect(() => parseSchemaResponse({}, endpointId, subdomain)).toThrow('No tools found in schema');
 		});
 
 		it('should throw error when no valid tools found in array format', () => {
-			const invalidSchema = [
-				{ "name": "missing_schema" },
-				{ "inputSchema": { "type": "object" } },
-				null
-			];
+			const invalidSchema = [{ name: 'missing_schema' }, { inputSchema: { type: 'object' } }, null];
 
-			expect(() => parseSchemaResponse(invalidSchema, endpointId, subdomain))
-				.toThrow('No tools found in schema');
+			expect(() => parseSchemaResponse(invalidSchema, endpointId, subdomain)).toThrow('No tools found in schema');
 		});
 	});
 });
@@ -249,17 +246,17 @@ describe('parseSchemaResponse', () => {
 describe('convertJsonSchemaToZod', () => {
 	it('should convert string type with file format', () => {
 		const jsonSchema = {
-			"title": "ImageData",
-			"type": "string",
-			"format": "a http or https url to a file"
+			title: 'ImageData',
+			type: 'string',
+			format: 'a http or https url to a file',
 		};
 
 		const zodSchema = convertJsonSchemaToZod(jsonSchema);
-		
+
 		// Should be a string schema with description
 		expect(zodSchema instanceof z.ZodString).toBe(true);
 		expect((zodSchema as z.ZodString)._def.description).toBe('File input: provide URL or file path');
-		
+
 		// Test validation
 		expect(zodSchema.parse('https://example.com/image.jpg')).toBe('https://example.com/image.jpg');
 		expect(zodSchema.parse('/path/to/file.png')).toBe('/path/to/file.png');
@@ -267,38 +264,40 @@ describe('convertJsonSchemaToZod', () => {
 
 	it('should convert number type with default', () => {
 		const jsonSchema = {
-			"type": "number",
-			"description": "numeric value between 0.01 and 1.0",
-			"default": 0.05
+			type: 'number',
+			description: 'numeric value between 0.01 and 1.0',
+			default: 0.05,
 		};
 
 		const zodSchema = convertJsonSchemaToZod(jsonSchema);
-		
+
 		expect(zodSchema instanceof z.ZodDefault).toBe(true);
 		expect((zodSchema as z.ZodDefault<z.ZodNumber>)._def.defaultValue()).toBe(0.05);
-		expect((zodSchema as z.ZodDefault<z.ZodNumber>)._def.innerType._def.description).toBe('numeric value between 0.01 and 1.0');
+		expect((zodSchema as z.ZodDefault<z.ZodNumber>)._def.innerType._def.description).toBe(
+			'numeric value between 0.01 and 1.0'
+		);
 	});
 
 	it('should convert boolean type with default', () => {
 		const jsonSchema = {
-			"type": "boolean",
-			"default": true
+			type: 'boolean',
+			default: true,
 		};
 
 		const zodSchema = convertJsonSchemaToZod(jsonSchema);
-		
+
 		expect(zodSchema instanceof z.ZodDefault).toBe(true);
 		expect((zodSchema as z.ZodDefault<z.ZodBoolean>)._def.defaultValue()).toBe(true);
 	});
 
 	it('should skip default when skipDefault is true', () => {
 		const jsonSchema = {
-			"type": "number",
-			"default": 100
+			type: 'number',
+			default: 100,
 		};
 
 		const zodSchema = convertJsonSchemaToZod(jsonSchema, true);
-		
+
 		// Should not be wrapped in ZodDefault
 		expect(zodSchema instanceof z.ZodNumber).toBe(true);
 		expect(zodSchema instanceof z.ZodDefault).toBe(false);
@@ -306,74 +305,74 @@ describe('convertJsonSchemaToZod', () => {
 
 	it('should handle FileData objects', () => {
 		const jsonSchema = {
-			"title": "FileData",
-			"type": "string",
-			"default": {
-				"path": "/tmp/file.jpg",
-				"url": "https://example.com/file.jpg",
-				"size": 1024,
-				"orig_name": "file.jpg",
-				"mime_type": "image/jpeg"
-			}
+			title: 'FileData',
+			type: 'string',
+			default: {
+				path: '/tmp/file.jpg',
+				url: 'https://example.com/file.jpg',
+				size: 1024,
+				orig_name: 'file.jpg',
+				mime_type: 'image/jpeg',
+			},
 		};
 
 		const zodSchema = convertJsonSchemaToZod(jsonSchema);
-		
+
 		// Should create object schema for FileData
 		expect(zodSchema instanceof z.ZodDefault).toBe(true);
 		const innerSchema = (zodSchema as z.ZodDefault<z.ZodObject<z.ZodRawShape>>)._def.innerType;
 		expect(innerSchema instanceof z.ZodObject).toBe(true);
-		
+
 		// Test parsing
 		const fileData = {
-			path: "/some/path.png",
-			url: "https://example.com/path.png"
+			path: '/some/path.png',
+			url: 'https://example.com/path.png',
 		};
 		expect(zodSchema.parse(fileData)).toMatchObject(fileData);
-		
+
 		// Test default value
 		expect(zodSchema.parse(undefined)).toMatchObject({
-			path: "/tmp/file.jpg",
-			url: "https://example.com/file.jpg",
+			path: '/tmp/file.jpg',
+			url: 'https://example.com/file.jpg',
 			size: 1024,
-			orig_name: "file.jpg",
-			mime_type: "image/jpeg"
+			orig_name: 'file.jpg',
+			mime_type: 'image/jpeg',
 		});
 	});
 
 	it('should extract URL from object default for non-FileData strings', () => {
 		const jsonSchema = {
-			"type": "string",
-			"default": {
-				"url": "https://example.com/default.jpg",
-				"other": "data"
-			}
+			type: 'string',
+			default: {
+				url: 'https://example.com/default.jpg',
+				other: 'data',
+			},
 		};
 
 		const zodSchema = convertJsonSchemaToZod(jsonSchema);
-		
+
 		expect(zodSchema instanceof z.ZodDefault).toBe(true);
-		expect((zodSchema as z.ZodDefault<z.ZodString>)._def.defaultValue()).toBe("https://example.com/default.jpg");
+		expect((zodSchema as z.ZodDefault<z.ZodString>)._def.defaultValue()).toBe('https://example.com/default.jpg');
 	});
 
 	it('should handle array and object types', () => {
-		const arraySchema = { "type": "array" };
-		const objectSchema = { "type": "object" };
-		
+		const arraySchema = { type: 'array' };
+		const objectSchema = { type: 'object' };
+
 		const zodArray = convertJsonSchemaToZod(arraySchema);
 		const zodObject = convertJsonSchemaToZod(objectSchema);
-		
+
 		expect(zodArray instanceof z.ZodArray).toBe(true);
 		expect(zodObject instanceof z.ZodObject).toBe(true);
 	});
 
 	it('should handle unknown types as any', () => {
-		const unknownSchema = { "type": "unknown" };
+		const unknownSchema = { type: 'unknown' };
 		const noTypeSchema = {};
-		
+
 		const zodUnknown = convertJsonSchemaToZod(unknownSchema);
 		const zodNoType = convertJsonSchemaToZod(noTypeSchema);
-		
+
 		expect(zodUnknown instanceof z.ZodAny).toBe(true);
 		expect(zodNoType instanceof z.ZodAny).toBe(true);
 	});

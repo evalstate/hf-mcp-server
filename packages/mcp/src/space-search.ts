@@ -135,7 +135,12 @@ export type SearchParams = z.infer<typeof SEMANTIC_SEARCH_TOOL_CONFIG.schema>;
  * @param results The search results to format
  * @returns A markdown formatted string with the search results
  */
-export const formatSearchResults = (query: string, results: SpaceSearchResult[], totalCount: number, headerLevel: number = 1): string => {
+export const formatSearchResults = (
+	query: string,
+	results: SpaceSearchResult[],
+	totalCount: number,
+	headerLevel: number = 1
+): string => {
 	if (results.length === 0) {
 		return `No matching Hugging Face Spaces found for the query '${query}'. Try a different query.`;
 	}

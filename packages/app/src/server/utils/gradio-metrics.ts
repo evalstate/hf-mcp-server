@@ -1,6 +1,6 @@
 /**
  * Gradio metrics tracking module
- * 
+ *
  * This module collects metrics for Gradio tool calls, tracking successful
  * and failed tool executions to provide visibility into the performance
  * of Gradio endpoints.
@@ -104,7 +104,7 @@ export const gradioMetrics = GradioMetricsCollector.getInstance();
  * Get the metrics-safe name for a Gradio tool.
  * For private tools (with grp prefix), this returns an obfuscated name
  * that includes a hash for uniqueness but doesn't reveal the actual tool name.
- * 
+ *
  * @param toolName The original tool name (e.g., "grp1_evalstate_private_model")
  * @returns The metrics-safe name (e.g., "grp1_[private_a1b2c3]" for private tools)
  */

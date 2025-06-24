@@ -29,6 +29,9 @@ importers:
       globals:
         specifier: ^16.1.0
         version: 16.2.0
+      prettier:
+        specifier: ^3.4.2
+        version: 3.5.3
       rimraf:
         specifier: ^5.0.10
         version: 5.0.10
@@ -38,12 +41,12 @@ importers:
 
   packages/app:
     dependencies:
-      '@hf-mcp/mcp':
-        specifier: workspace:*
-        version: link:../mcp
       '@huggingface/hub':
         specifier: ^2.1.0
         version: 2.1.0
+      '@llmindset/hf-mcp':
+        specifier: workspace:^
+        version: link:../mcp
       '@modelcontextprotocol/sdk':
         specifier: ^1.11.2
         version: 1.12.0

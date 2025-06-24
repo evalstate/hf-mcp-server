@@ -39,7 +39,7 @@ import {
 	type PaperSummaryParams,
 	CONFIG_GUIDANCE,
 	TOOL_ID_GROUPS,
-} from '@hf-mcp/mcp';
+} from '@llmindset/hf-mcp';
 
 import type { ServerFactory } from './transport/base-transport.js';
 import type { McpApiClient } from './lib/mcp-api-client.js';

@@ -14,7 +14,6 @@ interface StreamableHttpConnection extends BaseSession<StreamableHTTPServerTrans
 type Session = StreamableHttpConnection;
 
 export class StreamableHttpTransport extends StatefulTransport<Session> {
-
 	initialize(_options: TransportOptions): Promise<void> {
 		this.setupRoutes();
 		this.startStaleConnectionCheck();
@@ -121,7 +120,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 				// Create new session only for initialization requests
 				const headers = req.headers as Record<string, string>;
 				extractQueryParamsToHeaders(req, headers);
-				
+
 				// Check HF token validity before creating session
 				const authResult = await this.validateAuthAndTrackMetrics(headers);
 				if (!authResult.shouldContinue) {
@@ -134,7 +133,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 					res.status(authResult.statusCode || 401).send('Unauthorized');
 					return;
 				}
-				
+
 				transport = await this.createSession(headers);
 			} else if (!sessionId) {
 				// No session ID and not an initialization request
@@ -143,7 +142,10 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 				res
 					.status(400)
 					.json(
-						JsonRpcErrors.invalidRequest(extractJsonRpcId(req.body), 'Missing session ID for non-initialization request')
+						JsonRpcErrors.invalidRequest(
+							extractJsonRpcId(req.body),
+							'Missing session ID for non-initialization request'
+						)
 					);
 				return;
 			} else {
@@ -155,7 +157,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 			}
 
 			await transport.handleRequest(req, res, req.body);
-			
+
 			// Track successful method call without timing (stateful mode measures HTTP dispatch time, not MCP processing time)
 			this.metrics.trackMethod(trackingName, undefined, false);
 		} catch (error) {

@@ -214,10 +214,12 @@ export function formatMetricsForAPI(
 		uptimeSeconds,
 		connections: metrics.connections,
 		requests: metrics.requests,
-		pings: metrics.pings ? {
-			...metrics.pings,
-			lastPingTime: metrics.pings.lastPingTime?.toISOString()
-		} : undefined,
+		pings: metrics.pings
+			? {
+					...metrics.pings,
+					lastPingTime: metrics.pings.lastPingTime?.toISOString(),
+				}
+			: undefined,
 		errors: {
 			...metrics.errors,
 			lastError: metrics.errors.lastError

@@ -81,32 +81,35 @@ export function StdioTransportMetrics({ metrics }: StdioTransportMetricsProps) {
 	// Define columns for the sessions table
 	const createSessionColumns = (): ColumnDef<SessionData>[] => [
 		{
-			accessorKey: "clientInfo",
-			header: createSortableHeader("Client"),
+			accessorKey: 'clientInfo',
+			header: createSortableHeader('Client'),
 			cell: ({ row }) => {
 				const session = row.original;
-				const clientDisplay = session.clientInfo 
+				const clientDisplay = session.clientInfo
 					? `${truncateClientName(session.clientInfo.name)}@${session.clientInfo.version}`
 					: 'unknown';
 				return (
-					<div className="font-mono text-sm" title={session.clientInfo ? `${session.clientInfo.name}@${session.clientInfo.version}` : 'unknown'}>
+					<div
+						className="font-mono text-sm"
+						title={session.clientInfo ? `${session.clientInfo.name}@${session.clientInfo.version}` : 'unknown'}
+					>
 						{clientDisplay}
 					</div>
 				);
 			},
 		},
 		{
-			accessorKey: "id",
-			header: createSortableHeader("Session ID"),
+			accessorKey: 'id',
+			header: createSortableHeader('Session ID'),
 			cell: ({ row }) => (
-				<div className="font-mono text-sm" title={row.getValue<string>("id")}>
-					{truncateSessionId(row.getValue<string>("id"))}
+				<div className="font-mono text-sm" title={row.getValue<string>('id')}>
+					{truncateSessionId(row.getValue<string>('id'))}
 				</div>
 			),
 		},
 		{
-			accessorKey: "isConnected",
-			header: createSortableHeader("Status"),
+			accessorKey: 'isConnected',
+			header: createSortableHeader('Status'),
 			cell: ({ row }) => {
 				const session = row.original;
 				return (
@@ -118,31 +121,19 @@ export function StdioTransportMetrics({ metrics }: StdioTransportMetricsProps) {
 			},
 		},
 		{
-			accessorKey: "connectedAt",
-			header: createSortableHeader("Connected"),
-			cell: ({ row }) => (
-				<div className="text-sm">
-					{formatRelativeTime(row.getValue<string>("connectedAt"))}
-				</div>
-			),
+			accessorKey: 'connectedAt',
+			header: createSortableHeader('Connected'),
+			cell: ({ row }) => <div className="text-sm">{formatRelativeTime(row.getValue<string>('connectedAt'))}</div>,
 		},
 		{
-			accessorKey: "requestCount",
-			header: createSortableHeader("Requests", "right"),
-			cell: ({ row }) => (
-				<div className="text-right font-mono text-sm">
-					{row.getValue<number>("requestCount")}
-				</div>
-			),
+			accessorKey: 'requestCount',
+			header: createSortableHeader('Requests', 'right'),
+			cell: ({ row }) => <div className="text-right font-mono text-sm">{row.getValue<number>('requestCount')}</div>,
 		},
 		{
-			accessorKey: "lastActivity",
-			header: createSortableHeader("Last Activity"),
-			cell: ({ row }) => (
-				<div className="text-sm">
-					{formatRelativeTime(row.getValue<string>("lastActivity"))}
-				</div>
-			),
+			accessorKey: 'lastActivity',
+			header: createSortableHeader('Last Activity'),
+			cell: ({ row }) => <div className="text-sm">{formatRelativeTime(row.getValue<string>('lastActivity'))}</div>,
 		},
 	];
 
@@ -150,9 +141,7 @@ export function StdioTransportMetrics({ metrics }: StdioTransportMetricsProps) {
 		<Card>
 			<CardHeader>
 				<CardTitle>📊 Transport Metrics</CardTitle>
-				<CardDescription>
-					Real-time connection and performance metrics for STDIO transport
-				</CardDescription>
+				<CardDescription>Real-time connection and performance metrics for STDIO transport</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-4">
 				{/* Transport Info */}
@@ -172,15 +161,16 @@ export function StdioTransportMetrics({ metrics }: StdioTransportMetricsProps) {
 					<Separator />
 					<div>
 						<h3 className="text-sm font-semibold text-foreground mb-3">
-							Sessions ({sessionData.filter(s => s.isConnected).length} active, {sessionData.filter(s => !s.isConnected).length} disconnected)
+							Sessions ({sessionData.filter((s) => s.isConnected).length} active,{' '}
+							{sessionData.filter((s) => !s.isConnected).length} disconnected)
 						</h3>
-						<DataTable 
-							columns={createSessionColumns()} 
-							data={sessionData} 
+						<DataTable
+							columns={createSessionColumns()}
+							data={sessionData}
 							searchColumn="id"
 							searchPlaceholder="Filter sessions..."
 							pageSize={10}
-							defaultSorting={[{ id: "lastActivity", desc: true }]}
+							defaultSorting={[{ id: 'lastActivity', desc: true }]}
 						/>
 					</div>
 				</>

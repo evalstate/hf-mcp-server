@@ -64,6 +64,18 @@ export class StatelessHttpTransport extends BaseTransport {
 				return;
 			}
 
+			// Check if the request is not secure and redirect to HTTPS (skip for localhost)
+			const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+			const host = req.get('host') || '';
+			const isLocalhost =
+				host === 'localhost' || host.startsWith('localhost:') || host === '127.0.0.1' || host.startsWith('127.0.0.1:');
+			if (!isSecure && !isLocalhost) {
+				const httpsUrl = `https://${host}${req.originalUrl}`;
+				logger.debug(`Redirecting insecure request to HTTPS: ${httpsUrl}`);
+				res.redirect(301, httpsUrl);
+				return;
+			}
+
 			// Track successful static page hit
 			this.metrics.trackStaticPageHit(200);
 

@@ -3,7 +3,7 @@
  * Manages application settings like enabled search tools
  */
 
-import { ALL_BUILTIN_TOOL_IDS } from '@hf-mcp/mcp';
+import { ALL_BUILTIN_TOOL_IDS } from '@llmindset/hf-mcp';
 
 // Define the settings types
 export interface SpaceTool {
