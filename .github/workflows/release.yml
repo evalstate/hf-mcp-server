@@ -87,7 +87,12 @@ jobs:
       - name: Publish to npm
         if: ${{ !inputs.prerelease }}
         run: |
-          cd packages/app
-          npm publish --access public
+          # Publish the mcp package first (dependency)
+          cd packages/mcp
+          pnpm publish --access public --no-git-checks
+          
+          # Then publish the main app package  
+          cd ../app
+          pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -8,7 +8,7 @@ import { logger } from './lib/logger.js';
 import type { BaseTransport } from './transport/base-transport.js';
 import type { McpApiClient } from './lib/mcp-api-client.js';
 import { formatMetricsForAPI } from '../shared/transport-metrics.js';
-import { ALL_BUILTIN_TOOL_IDS } from '@hf-mcp/mcp';
+import { ALL_BUILTIN_TOOL_IDS } from '@llmindset/hf-mcp';
 import { apiMetrics } from './utils/api-metrics.js';
 import { gradioMetrics } from './utils/gradio-metrics.js';
 const __filename = fileURLToPath(import.meta.url);

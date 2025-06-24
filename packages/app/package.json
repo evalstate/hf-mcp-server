@@ -1,9 +1,32 @@
 {
-	"name": "@hf-mcp/app",
+	"name": "@llmindset/hf-mcp-server",
 	"version": "0.1.12",
+	"description": "Official Hugging Face MCP Server",
 	"type": "module",
+	"main": "./dist/server/streamableHttp.js",
 	"bin": {
-		"hf-mcp-server": "./dist/server/streamableHttp.js"
+		"hf-mcp-server": "./dist/server/stdio.js"
+	},
+	"files": [
+		"dist/**/*",
+		"components.json"
+	],
+	"keywords": [
+		"mcp",
+		"huggingface",
+		"ai",
+		"model-context-protocol"
+	],
+	"author": "Hugging Face",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/evalstate/hf-mcp-server.git",
+		"directory": "packages/app"
+	},
+	"homepage": "https://github.com/evalstate/hf-mcp-server",
+	"bugs": {
+		"url": "https://github.com/evalstate/hf-mcp-server/issues"
 	},
 	"scripts": {
 		"build": "pnpm run build:server && pnpm run build:web && pnpm run build:mcp-welcome",
@@ -27,7 +50,7 @@
 		"preview": "vite preview"
 	},
 	"dependencies": {
-		"@hf-mcp/mcp": "workspace:*",
+		"@llmindset/hf-mcp": "workspace:^",
 		"@huggingface/hub": "^2.1.0",
 		"@modelcontextprotocol/sdk": "^1.11.2",
 		"@radix-ui/react-checkbox": "^1.2.3",

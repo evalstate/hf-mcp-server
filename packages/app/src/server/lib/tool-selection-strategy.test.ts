@@ -8,7 +8,7 @@ import {
 import { McpApiClient, type ApiClientConfig } from './mcp-api-client.js';
 import type { AppSettings } from '../../shared/settings.js';
 import type { TransportInfo } from '../../shared/transport-info.js';
-import { ALL_BUILTIN_TOOL_IDS, TOOL_ID_GROUPS } from '@hf-mcp/mcp';
+import { ALL_BUILTIN_TOOL_IDS, TOOL_ID_GROUPS } from '@llmindset/hf-mcp';
 import { extractAuthBouquetAndMix } from '../utils/auth-utils.js';
 
 describe('extractBouquetAndMix', () => {
