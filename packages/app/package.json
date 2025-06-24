@@ -20,7 +20,9 @@
 		"start:stdio": "cross-env NODE_ENV=production node dist/server/stdio.js",
 		"start:sse": "cross-env NODE_ENV=production node dist/server/sse.js",
 		"test": "vitest run",
-		"lint": "eslint .",
+		"lint": "eslint . --fix",
+		"lint:check": "eslint .",
+		"typecheck": "tsc --noEmit",
 		"clean": "rimraf dist",
 		"preview": "vite preview"
 	},
