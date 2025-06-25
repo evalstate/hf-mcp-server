@@ -10,6 +10,8 @@ The easiest way to access Hugging Face MCP Services is via `https://hf.co/mcp` w
 
 Anonymous access is supported with a default set of Tools and Prompts, or use a Hugging Face READ token to customize your settings:
 
+<details>
+<summary>Install in **Claude Desktop**</summary>
 For **Claude Desktop** (via MCP Remote) (in your `mcpServers` section):
 
 ```JSON
@@ -25,9 +27,13 @@ For **Claude Desktop** (via MCP Remote) (in your `mcpServers` section):
     }
 }
 ```
+</details>
 
+<details>
+<summary>Install in **VSCode** or **Cursor**</summary>
 For **VSCode** and **Cursor** (in your `mcp/servers`or `mcpServers` section respectively):
 
+If you prefer to use OAuth, use `https://hf.co/mcp?login`
 
 ```JSON
 "hf-mcp-server": {
@@ -36,6 +42,7 @@ For **VSCode** and **Cursor** (in your `mcp/servers`or `mcpServers` section resp
         "Authorization": "Bearer <YOUR_HF_TOKEN>"
     }
 ```
+</details>
 
 For **claude.ai** (Anonymous access only - OAuth coming soon)
 
