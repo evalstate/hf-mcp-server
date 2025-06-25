@@ -3,7 +3,7 @@ import { DOC_MAPPINGS } from './doc-mappings.js';
 
 export const DOC_FETCH_CONFIG = {
 	name: 'fetch_hf_doc',
-	description: 'Fetch Hugging Face documentation content from its source markdown file',
+	description: 'Fetch a document from the Hugging Face documentation library.',
 	schema: z.object({
 		doc_url: z
 			.string()
@@ -34,15 +34,17 @@ export type DocFetchParams = z.infer<typeof DOC_FETCH_CONFIG.schema>;
  * but might want to reconsider this. Mappings were built from:
  * https://github.com/huggingface/doc-builder/blob/main/.github/workflows/build_embeddings.yml
  *
+ * Falls back to HTML if no mapping is found...
+ *
  */
 export class DocFetchTool {
 	/**
 	 * Convert HF docs URL to GitHub raw content URL
 	 */
-	convertToGithubUrl(hfUrl: string): string {
+	processUrl(hfUrl: string): string {
 		// Validate URL format
 		if (!hfUrl.startsWith('https://huggingface.co/docs/')) {
-			throw new Error('That was not a valid docs URL');
+			throw new Error('That was not a valid Hugging Face document URL');
 		}
 
 		// Remove the base URL and any fragment identifier
@@ -53,19 +55,20 @@ export class DocFetchTool {
 		const packageName = parts[0] || '';
 
 		// Check if package exists in mapping
+		let fetchUrl = hfUrl;
 		const mapping = DOC_MAPPINGS[packageName];
-		if (!mapping) {
-			throw new Error('Not a valid Hugging Face document URL');
+		if (mapping) {
+			const remainingPath = parts.slice(1).join('/');
+			const filePath = remainingPath ? `${remainingPath}.md` : 'index.md';
+
+			// Construct GitHub raw URL
+			const githubUrl = `https://raw.githubusercontent.com/${mapping.repo_id}/refs/heads/main/${mapping.doc_folder}/${filePath}`;
+			fetchUrl = githubUrl;
 		}
 
 		// Build the file path
-		const remainingPath = parts.slice(1).join('/');
-		const filePath = remainingPath ? `${remainingPath}.md` : 'index.md';
-
-		// Construct GitHub raw URL
-		const githubUrl = `https://raw.githubusercontent.com/${mapping.repo_id}/refs/heads/main/${mapping.doc_folder}/${filePath}`;
-
-		return githubUrl;
+		console.error(fetchUrl);
+		return fetchUrl;
 	}
 
 	/**
@@ -73,7 +76,7 @@ export class DocFetchTool {
 	 */
 	async fetch(url: string): Promise<string> {
 		try {
-			const githubUrl = this.convertToGithubUrl(url);
+			const githubUrl = this.processUrl(url);
 
 			const response = await fetch(githubUrl);
 
