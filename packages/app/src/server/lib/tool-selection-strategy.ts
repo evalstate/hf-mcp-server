@@ -39,6 +39,10 @@ export const BOUQUETS: Record<string, AppSettings> = {
 		builtInTools: [...TOOL_ID_GROUPS.search],
 		spaceTools: [],
 	},
+	docs: {
+		builtInTools: [...TOOL_ID_GROUPS.docs],
+		spaceTools: [],
+	},
 	all: {
 		builtInTools: [...ALL_BUILTIN_TOOL_IDS],
 		spaceTools: [],

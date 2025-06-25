@@ -36,7 +36,7 @@ export function ToolsCard({ title, description, tools, onToolToggle }: ToolsCard
 							description={tool.description}
 							isEnabled={tool.settings.enabled}
 							onToggle={(checked) => {
-								onToolToggle(toolId, checked);
+								onToolToggle(tool.id, checked);
 							}}
 						/>
 					))}
