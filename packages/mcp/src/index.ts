@@ -13,6 +13,8 @@ export * from './space-info.js';
 export * from './space-files.js';
 export * from './user-summary.js';
 export * from './paper-summary.js';
+export * from './docs-search/docs-semantic-search.js';
+export * from './docs-search/doc-fetch.js';
 
 // Export tool IDs for external use - these are the canonical tool identifiers
 export * from './tool-ids.js';
