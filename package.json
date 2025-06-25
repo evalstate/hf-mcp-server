@@ -3,7 +3,7 @@
 	"private": true,
 	"version": "0.1.17",
 	"type": "module",
-	"packageManager": "pnpm@10.12.1",
+	"packageManager": "pnpm@10.12.3+sha512.467df2c586056165580ad6dfb54ceaad94c5a30f80893ebdec5a44c5aa73c205ae4a5bb9d5ed6bb84ea7c249ece786642bbb49d06a307df218d03da41c317417",
 	"scripts": {
 		"dev": "concurrently \"pnpm run --filter=@llmindset/hf-mcp dev\" \"pnpm run --filter=@llmindset/hf-mcp-server dev\"",
 		"dev:sse": "concurrently \"pnpm run --filter=@llmindset/hf-mcp dev\" \"pnpm run --filter=@llmindset/hf-mcp-server dev:sse\"",
@@ -18,8 +18,8 @@
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"build": "pnpm -r build",
-		"clean": "pnpm run -r clean && rimraf node_modules",
-		"buildrun": "pnpm run clean && pnpm run build && pnpm run test && pnpm run start",
+		"clean": "pnpm run -r clean",
+		"buildrun": "pnpm run clean && pnpm run build && pnpm run lint:check && pnpm run test && pnpm run start",
 		"prepublishOnly": "pnpm run build"
 	},
 	"devDependencies": {
@@ -31,7 +31,7 @@
 		"eslint-plugin-prettier": "^5.4.0",
 		"globals": "^16.1.0",
 		"prettier": "^3.4.2",
-		"rimraf": "^5.0.10",
+		"rimraf": "^6.0.1",
 		"typescript": "~5.8.3"
 	}
 }

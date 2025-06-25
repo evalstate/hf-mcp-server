@@ -75,7 +75,17 @@ SSE and StreamableHTTP services are available at `/sse` and `/mcp` respectively.
 
 ## Development
 
-This project uses `pnpm` for build and development. 
+This project uses `pnpm` for build and development. Corepack is used to ensure everyone uses the same pnpm version (10.12.3).
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build all packages
+pnpm build
+```
+
+### Build Commands
 
 `pnpm run clean` -> clean build artifacts
 
