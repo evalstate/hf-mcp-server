@@ -12,6 +12,7 @@ Anonymous access is supported with a default set of Tools and Prompts, or use a 
 
 <details>
 <summary>Install in <b>Claude Desktop</b></summary>
+<br />
 For <b>Claude Desktop</b> (via MCP Remote) (in your `mcpServers` section):
 
 ```JSON
@@ -30,7 +31,9 @@ For <b>Claude Desktop</b> (via MCP Remote) (in your `mcpServers` section):
 </details>
 
 <details>
+
 <summary>Install in <b>VSCode</b> or <b>Cursor</b></summary>
+<br />
 For <b>VSCode</b> and <b>Cursor</b> (in your `mcp/servers`or `mcpServers` section respectively):
 
 If you prefer to use OAuth, use `https://hf.co/mcp?login`
