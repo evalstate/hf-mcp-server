@@ -3,7 +3,6 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
 
 jobs:
   lint:
@@ -13,7 +12,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.12.1
+          version: 10.12.3
 
       - uses: actions/setup-node@v4
         with:
@@ -36,7 +35,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.12.1
+          version: 10.12.3
 
       - uses: actions/setup-node@v4
         with:
