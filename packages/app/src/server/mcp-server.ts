@@ -291,7 +291,6 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			}
 		);
 
-
 		toolInstances[DOCS_SEMANTIC_SEARCH_CONFIG.name] = server.tool(
 			DOCS_SEMANTIC_SEARCH_CONFIG.name,
 			DOCS_SEMANTIC_SEARCH_CONFIG.description,
@@ -299,7 +298,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			DOCS_SEMANTIC_SEARCH_CONFIG.annotations,
 			async (params: DocSearchParams) => {
 				const docSearch = new DocSearchTool(hfToken);
-				const results = await docSearch.search(params.query);
+				const results = await docSearch.search(params);
 				return {
 					content: [{ type: 'text', text: results }],
 				};
@@ -307,19 +306,18 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		);
 
 		toolInstances[DOC_FETCH_CONFIG.name] = server.tool(
-		DOC_FETCH_CONFIG.name,
-		DOC_FETCH_CONFIG.description,
-		DOC_FETCH_CONFIG.schema.shape,
-		DOC_FETCH_CONFIG.annotations,
-		async (params: DocFetchParams) => {
-			const docFetch = new DocFetchTool();
-			const results = await docFetch.fetch(params.doc_url);
-			return {
-				content: [{ type: 'text', text: results }],
-			};
-		}
-	);
-
+			DOC_FETCH_CONFIG.name,
+			DOC_FETCH_CONFIG.description,
+			DOC_FETCH_CONFIG.schema.shape,
+			DOC_FETCH_CONFIG.annotations,
+			async (params: DocFetchParams) => {
+				const docFetch = new DocFetchTool();
+				const results = await docFetch.fetch(params.doc_url);
+				return {
+					content: [{ type: 'text', text: results }],
+				};
+			}
+		);
 
 		const duplicateToolConfig = DuplicateSpaceTool.createToolConfig(username);
 		toolInstances[duplicateToolConfig.name] = server.tool(

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DocSearchTool } from './docs-semantic-search.js';
+import { DOC_FETCH_CONFIG } from './doc-fetch.js';
 
 // Mock the fetch function
 const mockFetch = vi.fn();
@@ -14,9 +15,8 @@ describe('DocSearchTool', () => {
 	});
 
 	describe('search', () => {
-		it('should return "No query provided" when query is empty', async () => {
-			const result = await docSearchTool.search('');
-			expect(result).toBe('No query provided');
+		it('should return error when query is too short', async () => {
+			await expect(docSearchTool.search({ query: 'ab' })).rejects.toThrow();
 		});
 
 		it('should return no results message when API returns empty array', async () => {
@@ -25,7 +25,7 @@ describe('DocSearchTool', () => {
 				json: () => Promise.resolve([]),
 			});
 
-			const result = await docSearchTool.search('nonexistent');
+			const result = await docSearchTool.search({ query: 'nonexistent' });
 			expect(result).toBe(`No documentation found for query 'nonexistent'`);
 		});
 
@@ -35,7 +35,7 @@ describe('DocSearchTool', () => {
 				json: () => Promise.resolve([]),
 			});
 
-			const result = await docSearchTool.search('nonexistent', 'hub');
+			const result = await docSearchTool.search({ query: 'nonexistent', product: 'hub' });
 			expect(result).toBe(`No documentation found for query 'nonexistent' in product 'hub'`);
 		});
 
@@ -71,10 +71,10 @@ describe('DocSearchTool', () => {
 				json: () => Promise.resolve(sampleResults),
 			});
 
-			const result = await docSearchTool.search('analytics');
+			const result = await docSearchTool.search({ query: 'analytics' });
 
 			// Check header
-			expect(result).toContain('# Documentation Search Results for "analytics"');
+			expect(result).toContain('# Documentation Library Search Results for "analytics"');
 			expect(result).toContain('Found 3 results');
 
 			// Check product grouping - hub should come before dataset-viewer (hub has 2 results, dataset-viewer has 1)
@@ -88,13 +88,15 @@ describe('DocSearchTool', () => {
 			expect(result).toContain('## Results for Product: hub (2 results)');
 			expect(result).toContain('## Results for Product: dataset-viewer (1 results)');
 
-			// Check page links
-			expect(result).toContain('### Results from [Analytics](https://huggingface.co/docs/hub/enterprise-hub-analytics#export-analytics-as-csv)');
-			expect(result).toContain('### Results from [Quickstart](https://huggingface.co/docs/dataset-viewer/quick_start#quickstart)');
+			// Check page links (without anchors)
+			expect(result).toContain(
+				'### Results from [Analytics](https://huggingface.co/docs/hub/enterprise-hub-analytics)'
+			);
+			expect(result).toContain('### Results from [Quickstart](https://huggingface.co/docs/dataset-viewer/quick_start)');
 
 			// Check excerpts with heading2
-			expect(result).toContain('**Excerpt from "Export Analytics as CSV":**');
-			expect(result).toContain('**Excerpt from "View Analytics":**');
+			expect(result).toContain('#### Excerpt from the "Export Analytics as CSV" section');
+			expect(result).toContain('#### Excerpt from the "View Analytics" section');
 
 			// Check excerpt content appears as plain text
 			expect(result).toContain('Download a comprehensive CSV file containing analytics');
@@ -102,7 +104,7 @@ describe('DocSearchTool', () => {
 			expect(result).toContain('In this quickstart, you will learn how to use the dataset viewer REST API');
 
 			// Check footer
-			expect(result).toContain('Use the "fetch_hf_doc" tool to download a specific document.');
+			expect(result).toContain('Use the "' + DOC_FETCH_CONFIG.name + '" tool to fetch a document from the library.');
 		});
 
 		it('should handle results without heading2', async () => {
@@ -121,10 +123,10 @@ describe('DocSearchTool', () => {
 				json: () => Promise.resolve(sampleResults),
 			});
 
-			const result = await docSearchTool.search('transformers');
+			const result = await docSearchTool.search({ query: 'transformers' });
 
 			// Should not contain "Excerpt from" when heading2 is missing
-			expect(result).not.toContain('**Excerpt from');
+			expect(result).not.toContain('#### Excerpt from');
 			expect(result).toContain('This is a simple text without heading2');
 		});
 
@@ -145,12 +147,12 @@ describe('DocSearchTool', () => {
 				json: () => Promise.resolve(sampleResults),
 			});
 
-			const result = await docSearchTool.search('special');
+			const result = await docSearchTool.search({ query: 'special' });
 
 			// Check that special characters are escaped in headings and page titles
 			expect(result).toContain('Special \\* Characters');
-			// Note: heading2 appears in bold text, which doesn't get escaped
-			expect(result).toContain('"Section with [brackets]"');
+			// Note: heading2 appears in header text, but brackets don't get escaped
+			expect(result).toContain('#### Excerpt from the "Section with [brackets]" section');
 		});
 
 		it('should clean HTML tags from text', async () => {
@@ -169,7 +171,7 @@ describe('DocSearchTool', () => {
 				json: () => Promise.resolve(sampleResults),
 			});
 
-			const result = await docSearchTool.search('html');
+			const result = await docSearchTool.search({ query: 'html' });
 
 			// HTML tags should be removed
 			expect(result).toContain('Text with HTML tags and');
@@ -224,9 +226,9 @@ describe('DocSearchTool', () => {
 				json: () => Promise.resolve(sampleResults),
 			});
 
-			const result = await docSearchTool.search('test');
+			const result = await docSearchTool.search({ query: 'test' });
 
-			// Check product order by count: hub (3) > transformers (1) = datasets (1) 
+			// Check product order by count: hub (3) > transformers (1) = datasets (1)
 			const hubIndex = result.indexOf('## Results for Product: hub');
 			const transformersIndex = result.indexOf('## Results for Product: transformers');
 			const datasetsIndex = result.indexOf('## Results for Product: datasets');
@@ -236,7 +238,7 @@ describe('DocSearchTool', () => {
 
 			// Check that hub shows total count
 			expect(result).toContain('## Results for Product: hub (3 results)');
-			
+
 			// Check page order within hub product: page1 (2 results) should come before page2 (1 result)
 			const page1Index = result.indexOf('https://huggingface.co/docs/hub/page1');
 			const page2Index = result.indexOf('https://huggingface.co/docs/hub/page2');
@@ -252,18 +254,63 @@ describe('DocSearchTool', () => {
 				json: () => Promise.resolve([]),
 			});
 
-			await docSearchTool.search('test', 'hub');
+			await docSearchTool.search({ query: 'test', product: 'hub' });
 
-			expect(mockFetch).toHaveBeenCalledWith(
-				expect.stringContaining('q=test&product=hub'),
-				expect.any(Object)
-			);
+			expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('q=test&product=hub'), expect.any(Object));
+		});
+
+		it('should group results from the same page with different anchors together', async () => {
+			const sampleResults = [
+				{
+					text: 'First result from section 1',
+					product: 'hub',
+					heading1: 'Analytics',
+					source_page_url: 'https://huggingface.co/docs/hub/analytics#section1',
+					source_page_title: 'Analytics Page',
+					heading2: 'Section 1',
+				},
+				{
+					text: 'Second result from section 2',
+					product: 'hub',
+					heading1: 'Analytics',
+					source_page_url: 'https://huggingface.co/docs/hub/analytics#section2',
+					source_page_title: 'Analytics Page',
+					heading2: 'Section 2',
+				},
+				{
+					text: 'Third result from section 3',
+					product: 'hub',
+					heading1: 'Analytics',
+					source_page_url: 'https://huggingface.co/docs/hub/analytics#section3',
+					source_page_title: 'Analytics Page',
+					heading2: 'Section 3',
+				},
+			];
+
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: () => Promise.resolve(sampleResults),
+			});
+
+			const result = await docSearchTool.search({ query: 'analytics' });
+
+			// All three results should be grouped under one page heading (without anchor)
+			expect(result).toContain('### Results from [Analytics](https://huggingface.co/docs/hub/analytics) (3 results)');
+
+			// All three excerpts should appear under the same page
+			expect(result).toContain('First result from section 1');
+			expect(result).toContain('Second result from section 2');
+			expect(result).toContain('Third result from section 3');
+
+			// There should only be one "Results from" heading for this page
+			const resultsFromCount = (result.match(/### Results from/g) || []).length;
+			expect(resultsFromCount).toBe(1);
 		});
 
 		it('should handle API errors gracefully', async () => {
 			mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
-			await expect(docSearchTool.search('test')).rejects.toThrow('Failed to search documentation:');
+			await expect(docSearchTool.search({ query: 'test' })).rejects.toThrow('Failed to search documentation:');
 		});
 	});
 
@@ -298,17 +345,17 @@ describe('DocSearchTool', () => {
 				json: () => Promise.resolve(sampleResults),
 			});
 
-			const result = await docSearchTool.search('test');
+			const result = await docSearchTool.search({ query: 'test' });
 
 			// Verify grouping structure in output
 			expect(result).toContain('## Results for Product: hub');
 			expect(result).toContain('## Results for Product: transformers');
-			
+
 			// Verify that both results from the same page are together
 			const result1Index = result.indexOf('Result 1');
 			const result2Index = result.indexOf('Result 2');
 			const result3Index = result.indexOf('Result 3');
-			
+
 			// Results 1 and 2 should be close together (same page)
 			expect(Math.abs(result2Index - result1Index)).toBeLessThan(100);
 			// Result 3 should be further away (different product)
