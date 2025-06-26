@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { DOC_MAPPINGS } from './doc-mappings.js';
 
 export const DOC_FETCH_CONFIG = {
-	name: 'fetch_hf_doc',
+	name: 'hf_doc_fetch',
 	description: 'Fetch a document from the Hugging Face documentation library.',
 	schema: z.object({
 		doc_url: z
@@ -67,7 +67,6 @@ export class DocFetchTool {
 		}
 
 		// Build the file path
-		console.error(fetchUrl);
 		return fetchUrl;
 	}
 
