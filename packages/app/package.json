@@ -1,12 +1,7 @@
 {
-<<<<<<< HEAD
-	"name": "@hf-mcp/app",
-	"version": "0.1.9",
-=======
 	"name": "@llmindset/hf-mcp-server",
 	"version": "0.1.20",
 	"description": "Official Hugging Face MCP Server",
->>>>>>> origin/main
 	"type": "module",
 	"main": "./dist/server/streamableHttp.js",
 	"bin": {
