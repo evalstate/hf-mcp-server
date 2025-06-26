@@ -128,25 +128,19 @@ export class ModelDetailTool {
 			});
 
 			// Extract inference providers from modelData if available
-			let inferenceProviders: InferenceProvider[] | undefined;
-
-			if (modelData.inferenceProviderMapping && typeof modelData.inferenceProviderMapping === 'object') {
-				interface ProviderData {
-					providerId: string;
-					status: 'live' | 'staging';
-					task: string;
-				}
-
-				inferenceProviders = Object.entries(modelData.inferenceProviderMapping as Partial<Record<string, ProviderData>>)
-					.filter((entry): entry is [string, ProviderData] => entry[1] !== undefined)
-					.map(([providerName, providerData]) => ({
-						provider: providerName,
+			const inferenceProviders = Object.entries(modelData.inferenceProviderMapping)
+				.map(([provider, providerData]) => {
+					if (!providerData) {
+						return;
+					}
+					return {
+						provider,
 						status: providerData.status,
 						providerId: providerData.providerId,
 						task: providerData.task,
-					}));
-			}
-
+					};
+				})
+				.filter((el) => !!el);
 			// Build the structured model information
 			const modelDetails: ModelInformation = {
 				// Basic info (required fields)
@@ -376,7 +370,6 @@ function formatModelDetails(model: ModelInformation): string {
 	// Spaces - processed with validation
 	if (model.spaces && model.spaces.length > 0) {
 		r.push('## Demo Spaces');
-		r.push('');
 		for (const space of model.spaces.slice(0, SPACES_TO_INCLUDE)) {
 			const title = space.title || space.name;
 			r.push(`- [${title}](https://hf.co/spaces/${space.id})`);
