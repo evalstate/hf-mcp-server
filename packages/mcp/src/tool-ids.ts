@@ -15,6 +15,8 @@ import {
 	SPACE_FILES_TOOL_CONFIG,
 	USER_SUMMARY_PROMPT_CONFIG,
 	PAPER_SUMMARY_PROMPT_CONFIG,
+	DOCS_SEMANTIC_SEARCH_CONFIG,
+	DOC_FETCH_CONFIG,
 } from './index.js';
 
 // Extract tool IDs from their configs (single source of truth)
@@ -27,8 +29,11 @@ export const DATASET_DETAIL_TOOL_ID = DATASET_DETAIL_TOOL_CONFIG.name;
 export const DUPLICATE_SPACE_TOOL_ID = DUPLICATE_SPACE_TOOL_CONFIG.name;
 export const SPACE_INFO_TOOL_ID = SPACE_INFO_TOOL_CONFIG.name;
 export const SPACE_FILES_TOOL_ID = SPACE_FILES_TOOL_CONFIG.name;
+export const DOCS_SEMANTIC_SEARCH_TOOL_ID = DOCS_SEMANTIC_SEARCH_CONFIG.name;
+export const DOC_FETCH_TOOL_ID = DOC_FETCH_CONFIG.name;
 export const USER_SUMMARY_PROMPT_ID = USER_SUMMARY_PROMPT_CONFIG.name;
 export const PAPER_SUMMARY_PROMPT_ID = PAPER_SUMMARY_PROMPT_CONFIG.name;
+
 
 // Complete list of all built-in tool IDs
 export const ALL_BUILTIN_TOOL_IDS = [
@@ -41,12 +46,15 @@ export const ALL_BUILTIN_TOOL_IDS = [
 	DUPLICATE_SPACE_TOOL_ID,
 	SPACE_INFO_TOOL_ID,
 	SPACE_FILES_TOOL_ID,
+	DOCS_SEMANTIC_SEARCH_TOOL_ID,
+	DOC_FETCH_TOOL_ID,
 ] as const;
 // Grouped tool IDs for bouquet configurations
 export const TOOL_ID_GROUPS = {
-	search: [SPACE_SEARCH_TOOL_ID, MODEL_SEARCH_TOOL_ID, DATASET_SEARCH_TOOL_ID, PAPER_SEARCH_TOOL_ID] as const,
+	search: [SPACE_SEARCH_TOOL_ID, MODEL_SEARCH_TOOL_ID, DATASET_SEARCH_TOOL_ID, PAPER_SEARCH_TOOL_ID, DOCS_SEMANTIC_SEARCH_TOOL_ID] as const,
 	spaces: [SPACE_SEARCH_TOOL_ID, DUPLICATE_SPACE_TOOL_ID, SPACE_INFO_TOOL_ID, SPACE_FILES_TOOL_ID] as const,
 	detail: [MODEL_DETAIL_TOOL_ID, DATASET_DETAIL_TOOL_ID] as const,
+	docs: [DOCS_SEMANTIC_SEARCH_TOOL_ID, DOC_FETCH_TOOL_ID] as const,
 	hf_api: [
 		SPACE_SEARCH_TOOL_ID,
 		MODEL_SEARCH_TOOL_ID,
@@ -64,21 +72,4 @@ export type BuiltinToolId = (typeof ALL_BUILTIN_TOOL_IDS)[number];
 // Type guard function
 export function isValidBuiltinToolId(toolId: string): toolId is BuiltinToolId {
 	return (ALL_BUILTIN_TOOL_IDS as readonly string[]).includes(toolId);
-}
-
-// Helper to get tool description from configs
-export function getToolDescription(toolId: BuiltinToolId): string {
-	const configs = {
-		[SPACE_SEARCH_TOOL_ID]: SEMANTIC_SEARCH_TOOL_CONFIG,
-		[MODEL_SEARCH_TOOL_ID]: MODEL_SEARCH_TOOL_CONFIG,
-		[MODEL_DETAIL_TOOL_ID]: MODEL_DETAIL_TOOL_CONFIG,
-		[PAPER_SEARCH_TOOL_ID]: PAPER_SEARCH_TOOL_CONFIG,
-		[DATASET_SEARCH_TOOL_ID]: DATASET_SEARCH_TOOL_CONFIG,
-		[DATASET_DETAIL_TOOL_ID]: DATASET_DETAIL_TOOL_CONFIG,
-		[DUPLICATE_SPACE_TOOL_ID]: DUPLICATE_SPACE_TOOL_CONFIG,
-		[SPACE_INFO_TOOL_ID]: SPACE_INFO_TOOL_CONFIG,
-		[SPACE_FILES_TOOL_ID]: SPACE_FILES_TOOL_CONFIG,
-	} as const;
-
-	return configs[toolId]?.description || `Tool: ${toolId}`;
 }

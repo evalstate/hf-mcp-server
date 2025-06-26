@@ -154,8 +154,8 @@ async function isSpacePrivate(spaceName: string, hfToken?: string): Promise<bool
 		return info.private;
 	} catch (error) {
 		// If we can't fetch space info, assume it might be private to be safe
-		logger.warn({ spaceName, error }, 'Failed to fetch space info, assuming public');
-		return false;
+		logger.warn({ spaceName, error }, 'Failed to fetch space info, assuming private');
+		return true;
 	}
 }
 
@@ -302,10 +302,11 @@ export async function connectToGradioEndpoints(
 		'Gradio endpoint schema fetch results'
 	);
 
-	// Log failed endpoints separately for debugging
+	// Log failed endpoints separately for debugging.
+	// switched to "debug" level as these are errored at point of failure.
 	if (failed.length > 0) {
 		failed.forEach((f) => {
-			logger.error(
+			logger.debug(
 				{
 					endpointId: f.endpointId,
 					error: f.error.message,

@@ -3,7 +3,6 @@ import type { z } from 'zod';
 import { createRequire } from 'module';
 import { whoAmI, type WhoAmI } from '@huggingface/hub';
 
-// Import the search services
 import {
 	SpaceSearchTool,
 	formatSearchResults,
@@ -39,6 +38,12 @@ import {
 	type PaperSummaryParams,
 	CONFIG_GUIDANCE,
 	TOOL_ID_GROUPS,
+	DOCS_SEMANTIC_SEARCH_CONFIG,
+	DocSearchTool,
+	type DocSearchParams,
+	DOC_FETCH_CONFIG,
+	DocFetchTool,
+	type DocFetchParams,
 } from '@llmindset/hf-mcp';
 
 import type { ServerFactory } from './transport/base-transport.js';
@@ -280,6 +285,34 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			async (params: DatasetDetailParams) => {
 				const datasetDetail = new DatasetDetailTool(hfToken, undefined);
 				const results = await datasetDetail.getDetails(params.dataset_id);
+				return {
+					content: [{ type: 'text', text: results }],
+				};
+			}
+		);
+
+		toolInstances[DOCS_SEMANTIC_SEARCH_CONFIG.name] = server.tool(
+			DOCS_SEMANTIC_SEARCH_CONFIG.name,
+			DOCS_SEMANTIC_SEARCH_CONFIG.description,
+			DOCS_SEMANTIC_SEARCH_CONFIG.schema.shape,
+			DOCS_SEMANTIC_SEARCH_CONFIG.annotations,
+			async (params: DocSearchParams) => {
+				const docSearch = new DocSearchTool(hfToken);
+				const results = await docSearch.search(params);
+				return {
+					content: [{ type: 'text', text: results }],
+				};
+			}
+		);
+
+		toolInstances[DOC_FETCH_CONFIG.name] = server.tool(
+			DOC_FETCH_CONFIG.name,
+			DOC_FETCH_CONFIG.description,
+			DOC_FETCH_CONFIG.schema.shape,
+			DOC_FETCH_CONFIG.annotations,
+			async (params: DocFetchParams) => {
+				const docFetch = new DocFetchTool();
+				const results = await docFetch.fetch(params.doc_url);
 				return {
 					content: [{ type: 'text', text: results }],
 				};
