@@ -1,12 +1,14 @@
-import { z } from 'zod';
 import { modelInfo } from '@huggingface/hub';
+import { z } from 'zod';
 import { formatDate, formatNumber } from './utilities.js';
 
 const SPACES_TO_INCLUDE = 12;
 // Model Detail Tool Configuration
 export const MODEL_DETAIL_TOOL_CONFIG = {
 	name: 'model_details',
-	description: 'Get detailed information about a specific model from the Hugging Face Hub.',
+	description:
+		'Get detailed information about a model from the Hugging Face Hub. Include relevant links ' +
+		'in result summaries.',
 	schema: z.object({
 		model_id: z.string().min(1, 'Model ID is required').describe('Model ID (e.g., microsoft/DialoGPT-large)'),
 	}),
@@ -58,11 +60,20 @@ interface ModelMetadata {
 	fineTunedFrom?: string;
 }
 
+// Inference providers information
+interface InferenceProvider {
+	provider: string;
+	status?: string;
+	providerId?: string;
+	task?: string;
+}
+
 // Complete model information structure
 interface ModelInformation extends ModelBasicInfo {
 	extended?: ModelExtendedInfo;
 	technical?: ModelTechnicalDetails;
 	metadata?: ModelMetadata;
+	inferenceProviders?: InferenceProvider[];
 	spaces?: Array<{
 		id: string;
 		name: string;
@@ -106,6 +117,7 @@ export class ModelDetailTool {
 				'safetensors',
 				'cardData',
 				'spaces',
+				'inferenceProviderMapping',
 			] as const;
 
 			const modelData = await modelInfo<(typeof additionalFields)[number]>({
@@ -115,6 +127,20 @@ export class ModelDetailTool {
 				...(this.hubUrl && { hubUrl: this.hubUrl }),
 			});
 
+			// Extract inference providers from modelData if available
+			const inferenceProviders = Object.entries(modelData.inferenceProviderMapping)
+				.map(([provider, providerData]) => {
+					if (!providerData) {
+						return;
+					}
+					return {
+						provider,
+						status: providerData.status,
+						providerId: providerData.providerId,
+						task: providerData.task,
+					};
+				})
+				.filter((el) => !!el);
 			// Build the structured model information
 			const modelDetails: ModelInformation = {
 				// Basic info (required fields)
@@ -134,6 +160,9 @@ export class ModelDetailTool {
 					downloadsAllTime: modelData.downloadsAllTime,
 					tags: modelData.tags,
 				},
+
+				// Inference providers (if available)
+				...(inferenceProviders && inferenceProviders.length > 0 && { inferenceProviders }),
 			};
 
 			// Technical details (requires validation)
@@ -349,6 +378,26 @@ function formatModelDetails(model: ModelInformation): string {
 		if (model.spaces.length > SPACES_TO_INCLUDE) {
 			r.push(`- *... and ${(model.spaces.length - SPACES_TO_INCLUDE).toString()} more spaces*`);
 		}
+		r.push('');
+	}
+
+	// Inference Providers - if available
+	if (model.inferenceProviders && model.inferenceProviders.length > 0) {
+		r.push('## Inference Providers');
+
+		for (const provider of model.inferenceProviders) {
+			let providerLine = `- **${provider.provider}**`;
+
+			// Add status if available
+			if (provider.status) {
+				providerLine += ` (${provider.status})`;
+			}
+
+			r.push(providerLine);
+		}
+
+		r.push('');
+		r.push('Try this model in the [playground](https://hf.co/playground?modelId=' + model.name + ')');
 		r.push('');
 	}
 
