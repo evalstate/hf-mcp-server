@@ -376,7 +376,7 @@ async function createLazyConnection(sseUrl: string, hfToken: string | undefined)
 export function registerRemoteTool(server: McpServer, connection: EndpointConnection, hfToken?: string): void {
 	// Use new naming convention: gr<index>_<sanitized_name> or grp<index>_<sanitized_name> for private
 	// Convert "evalstate/flux1_schnell" to "evalstate_flux1_schnell"
-	const sanitizedName = connection.name ? connection.name.replace(/[/\-\s]+/g, '_').toLowerCase() : 'unknown';
+	const sanitizedName = connection.name ? connection.name.replace(/[/\-\s.]+/g, '_').toLowerCase() : 'unknown';
 	const prefix = connection.isPrivate ? GRADIO_PRIVATE_PREFIX : GRADIO_PREFIX;
 	const remoteName = `${prefix}${(connection.originalIndex + 1).toString()}_${sanitizedName}`;
 	logger.trace(
