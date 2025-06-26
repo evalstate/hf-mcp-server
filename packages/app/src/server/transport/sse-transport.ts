@@ -69,7 +69,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			// Create server instance using factory with request headers and query params
 			const headers = req.headers as Record<string, string>;
 			extractQueryParamsToHeaders(req, headers);
-			
+
 			// Validate auth and track metrics
 			const authResult = await this.validateAuthAndTrackMetrics(headers);
 			if (!authResult.shouldContinue) {
@@ -77,7 +77,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 				res.status(authResult.statusCode || 401).send('Unauthorized');
 				return;
 			}
-			
+
 			const server = await this.serverFactory(headers);
 
 			// Create new transport
@@ -88,7 +88,6 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 
 			// Create comprehensive cleanup function
 			const cleanup = this.createCleanupFunction(sessionId);
-
 
 			// Store connection with metadata
 			const connection: SSEConnection = {

@@ -1,21 +1,30 @@
 {
 	"name": "hf-mcp",
 	"private": true,
+<<<<<<< HEAD
 	"version": "0.1.9",
+=======
+	"version": "0.1.20",
+>>>>>>> origin/main
 	"type": "module",
-	"packageManager": "pnpm@10.12.1",
+	"packageManager": "pnpm@10.12.3",
 	"scripts": {
-		"dev": "concurrently \"pnpm run --filter=mcp dev\" \"pnpm run --filter=app dev\"",
-		"dev:sse": "concurrently \"pnpm run --filter=mcp dev\" \"pnpm run --filter=app dev:sse\"",
-		"dev:json": "concurrently \"pnpm run --filter=mcp dev\" \"pnpm run --filter=app dev:json\"",
-		"dev:stdio": "concurrently \"pnpm run --filter=mcp dev\" \"pnpm run --filter=app dev:stdio\"",
+		"dev": "concurrently \"pnpm run --filter=@llmindset/hf-mcp dev\" \"pnpm run --filter=@llmindset/hf-mcp-server dev\"",
+		"dev:sse": "concurrently \"pnpm run --filter=@llmindset/hf-mcp dev\" \"pnpm run --filter=@llmindset/hf-mcp-server dev:sse\"",
+		"dev:json": "concurrently \"pnpm run --filter=@llmindset/hf-mcp dev\" \"pnpm run --filter=@llmindset/hf-mcp-server dev:json\"",
+		"dev:stdio": "concurrently \"pnpm run --filter=@llmindset/hf-mcp dev\" \"pnpm run --filter=@llmindset/hf-mcp-server dev:stdio\"",
 		"start": "cd packages/app && pnpm start",
 		"start:json": "cd packages/app && pnpm start:json",
 		"test": "pnpm run -r test",
 		"lint": "pnpm run -r lint",
+		"lint:check": "pnpm run -r lint:check",
+		"typecheck": "pnpm -r exec tsc --noEmit",
+		"format": "prettier --write .",
+		"format:check": "prettier --check .",
 		"build": "pnpm -r build",
 		"clean": "pnpm run -r clean",
-		"buildrun": "pnpm run clean && pnpm run build && pnpm run test && pnpm run start"
+		"buildrun": "pnpm run clean && pnpm run build && pnpm run lint:check && pnpm run test && pnpm run start",
+		"prepublishOnly": "pnpm run build"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.27.0",
@@ -25,7 +34,8 @@
 		"cross-env": "^7.0.3",
 		"eslint-plugin-prettier": "^5.4.0",
 		"globals": "^16.1.0",
-		"rimraf": "^5.0.10",
+		"prettier": "^3.4.2",
+		"rimraf": "^6.0.1",
 		"typescript": "~5.8.3"
 	}
 }

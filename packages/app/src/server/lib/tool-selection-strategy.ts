@@ -1,6 +1,6 @@
 import { logger } from './logger.js';
 import type { AppSettings } from '../../shared/settings.js';
-import { ALL_BUILTIN_TOOL_IDS, TOOL_ID_GROUPS } from '@hf-mcp/mcp';
+import { ALL_BUILTIN_TOOL_IDS, TOOL_ID_GROUPS } from '@llmindset/hf-mcp';
 import type { McpApiClient } from './mcp-api-client.js';
 import { extractAuthBouquetAndMix } from '../utils/auth-utils.js';
 
@@ -37,6 +37,10 @@ export const BOUQUETS: Record<string, AppSettings> = {
 	},
 	search: {
 		builtInTools: [...TOOL_ID_GROUPS.search],
+		spaceTools: [],
+	},
+	docs: {
+		builtInTools: [...TOOL_ID_GROUPS.docs],
 		spaceTools: [],
 	},
 	all: {

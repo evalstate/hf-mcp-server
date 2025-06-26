@@ -64,6 +64,18 @@ export class StatelessHttpTransport extends BaseTransport {
 				return;
 			}
 
+			// Check if the request is not secure and redirect to HTTPS (skip for localhost)
+			const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+			const host = req.get('host') || '';
+			const isLocalhost =
+				host === 'localhost' || host.startsWith('localhost:') || host === '127.0.0.1' || host.startsWith('127.0.0.1:');
+			if (!isSecure && !isLocalhost) {
+				const httpsUrl = `https://${host}${req.originalUrl}`;
+				logger.debug(`Redirecting insecure request to HTTPS: ${httpsUrl}`);
+				res.redirect(301, httpsUrl);
+				return;
+			}
+
 			// Track successful static page hit
 			this.metrics.trackStaticPageHit(200);
 
@@ -93,21 +105,26 @@ export class StatelessHttpTransport extends BaseTransport {
 
 		// Check HF token validity if present
 		const headers = req.headers as Record<string, string>;
+		extractQueryParamsToHeaders(req, headers);
+		// Extract method name for tracking using shared utility
+		const requestBody = req.body as
+			| { method?: string; params?: { clientInfo?: unknown; capabilities?: unknown; name?: string } }
+			| undefined;
+
+		const trackingName = this.extractMethodForTracking(requestBody);
+
 		const authResult = await this.validateAuthAndTrackMetrics(headers);
-		if (!authResult.shouldContinue) {
+		if (!authResult.shouldContinue || trackingName === 'tools/call:Authenticate') {
+			res.set(
+				'WWW-Authenticate',
+				'Bearer resource_metadata="https://huggingface.co/.well-known/oauth-protected-resources/mcp"'
+			);
 			res.status(authResult.statusCode || 401).send('Unauthorized');
 			return;
 		}
 
 		// Track new connection for metrics (each request is a "connection" in stateless mode)
 		this.trackNewConnection();
-
-		const requestBody = req.body as
-			| { method?: string; params?: { clientInfo?: unknown; capabilities?: unknown; name?: string } }
-			| undefined;
-
-		// Extract method name for tracking using shared utility
-		const trackingName = this.extractMethodForTracking(requestBody);
 
 		if (isJSONRPCNotification(req.body)) {
 			this.trackMethodCall(trackingName, startTime, false);

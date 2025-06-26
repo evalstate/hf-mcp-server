@@ -12,7 +12,7 @@ export class StdioTransport extends StatefulTransport<StdioSession> {
 
 	async initialize(_options: TransportOptions): Promise<void> {
 		const transport = new StdioServerTransport();
-		
+
 		// Create server instance using factory (null headers for STDIO)
 		const server = await this.serverFactory(null);
 
@@ -31,7 +31,7 @@ export class StdioTransport extends StatefulTransport<StdioSession> {
 
 		// Store session in map
 		this.sessions.set(this.SESSION_ID, session);
-		
+
 		// Track the session creation for metrics
 		this.trackSessionCreated(this.SESSION_ID);
 
@@ -41,13 +41,13 @@ export class StdioTransport extends StatefulTransport<StdioSession> {
 			transport.send = (message) => {
 				this.trackRequest();
 				this.updateSessionActivity(this.SESSION_ID);
-				
+
 				// Increment request count
 				const session = this.sessions.get(this.SESSION_ID);
 				if (session) {
 					session.metadata.requestCount++;
 				}
-				
+
 				return originalSendMessage(message);
 			};
 

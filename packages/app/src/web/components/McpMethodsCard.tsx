@@ -23,6 +23,9 @@ type MethodData = {
 	errorRate: number;
 	averageResponseTime?: number;
 	lastCalled: string;
+	// Gradio-specific metrics if available
+	gradioSuccess?: number;
+	gradioFailure?: number;
 };
 
 export function McpMethodsCard() {
@@ -39,18 +42,56 @@ export function McpMethodsCard() {
 	const isLoading = !metrics && !error;
 	const isStdioMode = metrics?.transport === 'stdio';
 
+	// Process methods and enrich with Gradio metrics
+	const processedMethods: MethodData[] = (metrics?.methods || []).map((method) => {
+		let totalErrors = method.errors;
+		let gradioSuccess: number | undefined;
+		let gradioFailure: number | undefined;
+
+		// Check if this is a tool call and we have Gradio metrics
+		if (method.method.startsWith('tools/call:') && metrics?.gradioMetrics) {
+			// Extract tool name from method (tools/call:toolName -> toolName)
+			const toolName = method.method.replace('tools/call:', '');
+			const gradioByTool = metrics.gradioMetrics.byTool;
+
+			// Look for exact match in Gradio metrics
+			if (gradioByTool[toolName]) {
+				gradioSuccess = gradioByTool[toolName].success;
+				gradioFailure = gradioByTool[toolName].failure;
+
+				// Add Gradio failures to total error count
+				totalErrors += gradioFailure;
+			}
+		}
+
+		// Recalculate error rate with the updated error count
+		const errorRate = method.count > 0 ? (totalErrors / method.count) * 100 : 0;
+
+		const methodData: MethodData = {
+			method: method.method,
+			count: method.count,
+			errors: totalErrors,
+			errorRate: errorRate,
+			averageResponseTime: method.averageResponseTime,
+			lastCalled: method.lastCalled,
+			gradioSuccess,
+			gradioFailure,
+		};
+
+		return methodData;
+	});
+
 	// Filter methods if checkbox is checked
-	const allMethods = metrics?.methods || [];
 	const filteredMethods = showOnlyToolAndPromptCalls
-		? allMethods.filter((m) => m.method.startsWith('tools/call') || m.method.startsWith('prompts/get'))
-		: allMethods;
+		? processedMethods.filter((m) => m.method.startsWith('tools/call') || m.method.startsWith('prompts/get'))
+		: processedMethods;
 
 	// Calculate total calls, tool calls, and prompt calls
-	const totalMcpCalls = allMethods.reduce((sum, method) => sum + method.count, 0);
-	const toolCalls = allMethods
+	const totalMcpCalls = processedMethods.reduce((sum, method) => sum + method.count, 0);
+	const toolCalls = processedMethods
 		.filter((m) => m.method.startsWith('tools/call'))
 		.reduce((sum, method) => sum + method.count, 0);
-	const promptCalls = allMethods
+	const promptCalls = processedMethods
 		.filter((m) => m.method.startsWith('prompts/get'))
 		.reduce((sum, method) => sum + method.count, 0);
 
@@ -99,6 +140,23 @@ export function McpMethodsCard() {
 						{errors > 0 ? <span className="text-red-600 dark:text-red-400">{errors}</span> : '0'}
 					</div>
 				);
+			},
+		},
+		{
+			accessorKey: 'gradioMetrics',
+			header: createSortableHeader('Success/Failure', 'right'),
+			cell: ({ row }) => {
+				const data = row.original;
+				if (data.gradioSuccess !== undefined && data.gradioFailure !== undefined) {
+					return (
+						<div className="text-right font-mono text-sm">
+							<span className="text-green-600 dark:text-green-400">{data.gradioSuccess}</span>
+							<span className="text-muted-foreground">/</span>
+							<span className="text-red-600 dark:text-red-400">{data.gradioFailure}</span>
+						</div>
+					);
+				}
+				return <div className="text-right text-muted-foreground">—</div>;
 			},
 		},
 		{
@@ -168,7 +226,7 @@ export function McpMethodsCard() {
 
 				{metrics && !isStdioMode && (
 					<div className="space-y-4">
-						{allMethods.length > 0 && (
+						{processedMethods.length > 0 && (
 							<div className="flex items-center justify-between">
 								<div className="text-sm text-muted-foreground">
 									Showing {filteredMethods.length} method{filteredMethods.length !== 1 ? 's' : ''} tracked since{' '}
@@ -188,7 +246,7 @@ export function McpMethodsCard() {
 							</div>
 						)}
 
-						{allMethods.length > 0 && (
+						{processedMethods.length > 0 && (
 							<div className="flex items-center space-x-2">
 								<Checkbox
 									id="tool-prompt-calls-filter"
@@ -223,6 +281,7 @@ export function McpMethodsCard() {
 									method: true,
 									count: true,
 									errors: false,
+									gradioMetrics: false,
 									errorRate: true,
 									averageResponseTime: metrics.transport === 'streamableHttpJson',
 									lastCalled: true,

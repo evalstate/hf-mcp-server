@@ -24,13 +24,13 @@ export function extractAuthBouquetAndMix(headers: Record<string, string> | null)
 		// Extract bouquet from custom header
 		if ('x-mcp-bouquet' in headers) {
 			bouquet = headers['x-mcp-bouquet'];
-			logger.info({ bouquet }, 'Bouquet parameter received');
+			logger.trace({ bouquet }, 'Bouquet parameter received');
 		}
 
 		// Extract mix from custom header
 		if ('x-mcp-mix' in headers) {
 			mix = headers['x-mcp-mix'];
-			logger.info({ mix }, 'Mix parameter received');
+			logger.trace({ mix }, 'Mix parameter received');
 		}
 	}
 

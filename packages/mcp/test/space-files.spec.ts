@@ -59,7 +59,7 @@ describe('SpaceFilesTool', () => {
 				path: 'css/style.css',
 				size: 2048,
 				type: 'file',
-				url: 'https://evalstate-filedrop.static.hf.space/css/style.css',
+				url: 'https://huggingface.co/spaces/evalstate/filedrop/resolve/main/css/style.css',
 				sizeFormatted: '2.0 KB',
 				lfs: false,
 			});
@@ -67,7 +67,7 @@ describe('SpaceFilesTool', () => {
 				path: 'index.html',
 				size: 1024,
 				type: 'file',
-				url: 'https://evalstate-filedrop.static.hf.space/index.html',
+				url: 'https://huggingface.co/spaces/evalstate/filedrop/resolve/main/index.html',
 				sizeFormatted: '1.0 KB',
 				lfs: false,
 			});
@@ -107,7 +107,7 @@ describe('SpaceFilesTool', () => {
 			} as any);
 
 			await expect(tool.getSpaceFilesWithUrls('test/gradio-app')).rejects.toThrow(
-				'Space "test/gradio-app" is not a static space (found: gradio). This tool only works with static HTML/CSS/JS spaces.'
+				'Space "test/gradio-app" is not a static space (found: gradio). This tool only works with static spaces.'
 			);
 		});
 	});

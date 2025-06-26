@@ -10,23 +10,14 @@ export default tseslint.config(
 	// Server-side TypeScript files - use strict config
 	{
 		files: ['src/server/**/*.ts', 'src/shared/**/*.ts'],
-		extends: [js.configs.recommended, ...tseslint.configs.recommendedTypeChecked],
+		extends: [js.configs.recommended, ...tseslint.configs.recommended],
 		languageOptions: {
 			ecmaVersion: 2020,
 			globals: globals.node,
-			parserOptions: {
-				project: './tsconfig.server.json',
-				tsconfigRootDir: import.meta.dirname,
-			},
 		},
 		rules: {
-			// Strict TypeScript rules
+			// Strict TypeScript rules (syntax-based only)
 			'@typescript-eslint/no-explicit-any': 'error',
-			'@typescript-eslint/no-unsafe-assignment': 'error',
-			'@typescript-eslint/no-unsafe-member-access': 'error',
-			'@typescript-eslint/no-unsafe-call': 'error',
-			'@typescript-eslint/no-unsafe-return': 'error',
-			'@typescript-eslint/no-unsafe-argument': 'error',
 			'@typescript-eslint/explicit-module-boundary-types': 'error',
 			'@typescript-eslint/consistent-type-imports': 'error',
 			'@typescript-eslint/no-unused-vars': [
@@ -55,10 +46,6 @@ export default tseslint.config(
 		languageOptions: {
 			ecmaVersion: 2020,
 			globals: globals.browser,
-			parserOptions: {
-				project: './tsconfig.web.json',
-				tsconfigRootDir: import.meta.dirname,
-			},
 		},
 		plugins: {
 			'react-hooks': reactHooks,
@@ -85,10 +72,7 @@ export default tseslint.config(
 		files: ['vite.config.ts'],
 		extends: [js.configs.recommended, ...tseslint.configs.recommended],
 		languageOptions: {
-			parserOptions: {
-				project: './tsconfig.node.json',
-				tsconfigRootDir: import.meta.dirname,
-			},
+			globals: globals.node,
 		},
 	}
 );

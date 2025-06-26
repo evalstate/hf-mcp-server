@@ -7,6 +7,7 @@ import type { AppSettings } from '../../shared/settings.js';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import { whoAmI, HubApiError } from '@huggingface/hub';
 import { extractAuthBouquetAndMix } from '../utils/auth-utils.js';
+import { getMetricsSafeName } from '../utils/gradio-metrics.js';
 
 /**
  * Factory function to create server instances
@@ -187,7 +188,9 @@ export abstract class BaseTransport {
 		if (methodName === 'tools/call' && body?.params && typeof body.params === 'object' && 'name' in body.params) {
 			const toolName = body.params.name;
 			if (typeof toolName === 'string') {
-				return `tools/call:${toolName}`;
+				// Use utility function to get metrics-safe name
+				const safeToolName = getMetricsSafeName(toolName);
+				return `tools/call:${safeToolName}`;
 			}
 		}
 
@@ -216,12 +219,12 @@ export abstract class BaseTransport {
 			return true;
 		}
 
-		// For tools/call, check if it's a Gradio tool (gr<number>_*)
+		// For tools/call, check if it's a Gradio tool (gr<number>_* or grp<number>_*)
 		if (methodName === 'tools/call' && body?.params && typeof body.params === 'object' && 'name' in body.params) {
 			const toolName = body.params.name;
 			if (typeof toolName === 'string') {
-				// Gradio tools follow pattern: gr<number>_<name>
-				return !/^gr\d+_/.test(toolName);
+				// Gradio tools follow pattern: gr<number>_<name> or grp<number>_<name>
+				return !/^grp?\d+_/.test(toolName);
 			}
 		}
 
@@ -278,7 +281,9 @@ export abstract class BaseTransport {
 		} else {
 			// Track anonymous connection
 			this.metrics.trackAnonymousConnection();
-			return { shouldContinue: true };
+			const shouldContinue: boolean = !headers['x-mcp-force-auth'];
+			if (!shouldContinue) logger.trace(`NO TOKEN, FORCE AUTH? ${headers['x-mcp-force-auth']}`);
+			return { shouldContinue };
 		}
 	}
 }

@@ -290,7 +290,7 @@ export class PaperSummaryPrompt extends HfApiCall<Record<string, string>, PaperD
 		try {
 			const spaceSearch = new SpaceSearchTool(this.hfToken);
 			// Use the filter parameter to search for spaces referencing this paper
-			const spaceResults = await spaceSearch.searchWithFilter(`arxiv:${arxivId}`, 25);
+			const spaceResults = await spaceSearch.searchWithFilter(`arxiv:${arxivId}`, 25, 2);
 			if (spaceResults && !spaceResults.includes('No matching Hugging Face Spaces found')) {
 				results.spaces = `## Related Spaces\n\n${spaceResults}`;
 			}

@@ -1,5 +1,4 @@
-# hf-mcp-server packages
-
+# Hugging Face Official MCP Server 
 
 ## Getting Started
 
@@ -7,10 +6,50 @@ This repository contains the offical Hugging Face MCP Server source. The server 
 
 The easiest way to access Hugging Face MCP Services is via `https://hf.co/mcp` which offers a number of Tools, Prompts and access to Gradio Spaces which are configurable at `https://hf.co/settings/mcp`. 
 
-(ADD SCREENSHOT)
+![hf_mcp_server_small](https://github.com/user-attachments/assets/d30f9f56-b08c-4dfc-a68f-a164a93db564)
 
+Anonymous access is supported with a default set of Tools and Prompts, or use a Hugging Face READ token to customize your settings:
 
-## Quick Guide
+<details>
+<summary>Install in <b>Claude Desktop</b></summary>
+<br />
+For <b>Claude Desktop</b> (via MCP Remote) (in your `mcpServers` section):
+
+```JSON
+"Hugging Face": {
+    "command": "npx",
+    "args": [
+        "-y","mcp-remote",
+        "https://hf.co/mcp",
+        "--header", "Authorization:${AUTH_HEADER}"
+    ],
+    "env": {
+    "AUTH_HEADER": "Bearer <YOUR_HF_TOKEN>"
+    }
+}
+```
+</details>
+
+<details>
+
+<summary>Install in <b>VSCode</b> or <b>Cursor</b></summary>
+<br />
+For <b>VSCode</b> and <b>Cursor</b> (in your `mcp/servers`or `mcpServers` section respectively):
+
+If you prefer to use OAuth, use `https://hf.co/mcp?login`
+
+```JSON
+"hf-mcp-server": {
+    "url": "https://hf.co/mcp",
+    "headers": {
+        "Authorization": "Bearer <YOUR_HF_TOKEN>"
+    }
+```
+</details>
+
+For **claude.ai**  enter `https://hf.co/mcp` from the "Add Integrations" dropdown menu. Claude does not currently support the MCP 2025-06-18 OAuth standard so is limited to anonymous access.
+
+## Quick Guide (Repository Packages)
 
 This repo contains:
 
@@ -36,7 +75,17 @@ SSE and StreamableHTTP services are available at `/sse` and `/mcp` respectively.
 
 ## Development
 
-This project uses `pnpm` for build and development. 
+This project uses `pnpm` for build and development. Corepack is used to ensure everyone uses the same pnpm version (10.12.3).
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build all packages
+pnpm build
+```
+
+### Build Commands
 
 `pnpm run clean` -> clean build artifacts
 
@@ -97,3 +146,4 @@ The server respects the following environment variables:
 - `HF_API_TIMEOUT`: Timeout for Hugging Face API requests in milliseconds (default: 12500ms / 12.5 seconds)
 - `USER_CONFIG_API`: URL to use for User settings (defaults to Local front-end)
 - `MCP_STRICT_COMPLIANCE`: set to True for GET 405 rejects in JSON Mode (default serves a welcome page).
+- `AUTHENTICATE_TOOL`: whether to include an `Authenticate` tool to issue an OAuth challenge when called

@@ -89,7 +89,9 @@ describe('extractUserIdFromInput', () => {
 		});
 
 		it('should reject malformed URLs', () => {
-			expect(() => extractUserIdFromInput('not://a/valid/url')).toThrow('URL must be from huggingface.co or hf.co domain');
+			expect(() => extractUserIdFromInput('not://a/valid/url')).toThrow(
+				'URL must be from huggingface.co or hf.co domain'
+			);
 			// Note: hf.co//evalstate actually gets normalized by URL constructor to hf.co/evalstate
 			// so it's treated as valid. Testing a different malformed case instead:
 			expect(() => extractUserIdFromInput('://invalid')).toThrow('Invalid URL format');

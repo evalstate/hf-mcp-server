@@ -90,6 +90,15 @@ export interface ApiCallMetrics {
 }
 
 /**
+ * Gradio tool call metrics
+ */
+export interface GradioToolMetrics {
+	success: number;
+	failure: number;
+	byTool: Record<string, { success: number; failure: number }>;
+}
+
+/**
  * API response format for transport metrics
  */
 export interface SessionData {
@@ -180,6 +189,9 @@ export interface TransportMetricsResponse {
 
 	// API call metrics (only shown in external API mode)
 	apiMetrics?: ApiCallMetrics;
+
+	// Gradio tool call metrics
+	gradioMetrics?: GradioToolMetrics;
 }
 
 /**
@@ -202,10 +214,12 @@ export function formatMetricsForAPI(
 		uptimeSeconds,
 		connections: metrics.connections,
 		requests: metrics.requests,
-		pings: metrics.pings ? {
-			...metrics.pings,
-			lastPingTime: metrics.pings.lastPingTime?.toISOString()
-		} : undefined,
+		pings: metrics.pings
+			? {
+					...metrics.pings,
+					lastPingTime: metrics.pings.lastPingTime?.toISOString(),
+				}
+			: undefined,
 		errors: {
 			...metrics.errors,
 			lastError: metrics.errors.lastError

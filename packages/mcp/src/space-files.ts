@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { listFiles, spaceInfo } from '@huggingface/hub';
-import type { SpaceEntry } from '@huggingface/hub';
 import { formatBytes, escapeMarkdown } from './utilities.js';
 import { HfApiError } from './hf-api-call.js';
 import { explain } from './error-messages.js';
@@ -132,12 +131,9 @@ export class SpaceFilesTool {
 			// Check if it's a static space
 			if (space.sdk !== 'static') {
 				throw new Error(
-					`Space "${spaceName}" is not a static space (found: ${space.sdk}). This tool only works with static HTML/CSS/JS spaces.`
+					`Space "${spaceName}" is not a static space (found: ${space.sdk}). This tool only works with static spaces.`
 				);
 			}
-
-			// Construct base URL
-			const subdomain = (space as SpaceEntry & { subdomain?: string }).subdomain;
 
 			const files: FileWithUrl[] = [];
 
@@ -153,7 +149,7 @@ export class SpaceFilesTool {
 						path: file.path,
 						size: file.size,
 						type: file.type,
-						url: this.constructFileUrl(spaceName, file.path, subdomain),
+						url: this.constructFileUrl(spaceName, file.path),
 						sizeFormatted: formatBytes(file.size),
 						lastModified: file.lastCommit?.date,
 						lfs: !!file.lfs,
@@ -173,15 +169,7 @@ export class SpaceFilesTool {
 	/**
 	 * Construct the URL for a file
 	 */
-	private constructFileUrl(spaceName: string, filePath: string, subdomain?: string): string {
-		// For static spaces with custom domains
-		if (subdomain) {
-			// Remove leading slash if present
-			const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
-			return `https://${subdomain}.static.hf.space/${cleanPath}`;
-		}
-
-		// Fallback to direct HF URL
+	private constructFileUrl(spaceName: string, filePath: string): string {
 		return `https://huggingface.co/spaces/${spaceName}/resolve/main/${filePath}`;
 	}
 
@@ -257,7 +245,7 @@ export class SpaceFilesTool {
 		}
 		markdown += `\`\`\`\n`;
 		markdown += '## Use the URL when specifying Files inputs for Gradio endpoints.\n\n';
-
+		markdown += 'This space is accessible via `git` with `git clone https://huggingface.co/spaces/' + spaceName + '`\n';
 		return markdown;
 	}
 

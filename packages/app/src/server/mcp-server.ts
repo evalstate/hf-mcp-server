@@ -3,7 +3,6 @@ import type { z } from 'zod';
 import { createRequire } from 'module';
 import { whoAmI, type WhoAmI } from '@huggingface/hub';
 
-// Import the search services
 import {
 	SpaceSearchTool,
 	formatSearchResults,
@@ -39,7 +38,13 @@ import {
 	type PaperSummaryParams,
 	CONFIG_GUIDANCE,
 	TOOL_ID_GROUPS,
-} from '@hf-mcp/mcp';
+	DOCS_SEMANTIC_SEARCH_CONFIG,
+	DocSearchTool,
+	type DocSearchParams,
+	DOC_FETCH_CONFIG,
+	DocFetchTool,
+	type DocFetchParams,
+} from '@llmindset/hf-mcp';
 
 import type { ServerFactory } from './transport/base-transport.js';
 import type { McpApiClient } from './lib/mcp-api-client.js';
@@ -85,18 +90,19 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 
 		let userInfo: string =
 			'The Hugging Face tools are being used anonymously and rate limits apply. ' +
-			'Direct the User to set their HF_TOKEN (instructions at https://hf.co/settings/mcp/), or create an account at https://hf.co/join for higher limits.';
+			'Direct the User to set their HF_TOKEN (instructions at https://hf.co/settings/mcp/), or ' +
+			'create an account at https://hf.co/join for higher limits.';
 		let username: string | undefined;
 		let userDetails: WhoAmI | undefined;
 
-		// Validate the token with HF API if present
 		if (hfToken) {
 			try {
 				userDetails = await whoAmI({ credentials: { accessToken: hfToken } });
 				username = userDetails.name;
 				userInfo = `Hugging Face tools are being used by authenticated user '${userDetails.name}'`;
 			} catch (error) {
-				logger.debug({ error: (error as Error).message }, `Failed to authenticate with Hugging Face API`);
+				// unexpected - this should have been caught upstream so severity is warn
+				logger.warn({ error: (error as Error).message }, `Failed to authenticate with Hugging Face API`);
 			}
 		}
 
@@ -136,6 +142,19 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		server.tool('hf_whoami', whoDescription, {}, { title: 'Hugging Face User Info' }, () => {
 			return { content: [{ type: 'text', text: response }] };
 		});
+
+		/** always leave tool active so flow can complete / allow uid change */
+		if (process.env.AUTHENTICATE_TOOL === 'true') {
+			server.tool(
+				'Authenticate',
+				'Authenticate with Hugging Face',
+				{},
+				{ title: 'Hugging Face Authentication' },
+				() => {
+					return { content: [{ type: 'text', text: 'You have successfully authenticated' }] };
+				}
+			);
+		}
 
 		server.prompt(
 			USER_SUMMARY_PROMPT_CONFIG.name,
@@ -272,6 +291,34 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			}
 		);
 
+		toolInstances[DOCS_SEMANTIC_SEARCH_CONFIG.name] = server.tool(
+			DOCS_SEMANTIC_SEARCH_CONFIG.name,
+			DOCS_SEMANTIC_SEARCH_CONFIG.description,
+			DOCS_SEMANTIC_SEARCH_CONFIG.schema.shape,
+			DOCS_SEMANTIC_SEARCH_CONFIG.annotations,
+			async (params: DocSearchParams) => {
+				const docSearch = new DocSearchTool(hfToken);
+				const results = await docSearch.search(params);
+				return {
+					content: [{ type: 'text', text: results }],
+				};
+			}
+		);
+
+		toolInstances[DOC_FETCH_CONFIG.name] = server.tool(
+			DOC_FETCH_CONFIG.name,
+			DOC_FETCH_CONFIG.description,
+			DOC_FETCH_CONFIG.schema.shape,
+			DOC_FETCH_CONFIG.annotations,
+			async (params: DocFetchParams) => {
+				const docFetch = new DocFetchTool();
+				const results = await docFetch.fetch(params.doc_url);
+				return {
+					content: [{ type: 'text', text: results }],
+				};
+			}
+		);
+
 		const duplicateToolConfig = DuplicateSpaceTool.createToolConfig(username);
 		toolInstances[duplicateToolConfig.name] = server.tool(
 			duplicateToolConfig.name,
@@ -317,7 +364,12 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			}
 		);
 
-		// Apply tool states using the new strategy
+		// Declare the function to apply tool states (we only need to call it if we are
+		// applying the tool states either because we have a Gradio tool call (grNN_) or
+		// we are responding to a ListToolsRequest). This also helps if there is a
+		// mismatch between Client cache state and desired states for these specific tools.
+		// NB: That may not always be the case, consider carefully whether you want a tool
+		// included in the skipGradio check.
 		const applyToolStates = async () => {
 			const context: ToolSelectionContext = {
 				headers,
@@ -360,7 +412,6 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		});
 
 		if (!skipGradio) {
-			// Apply initial tool states (fetch from API)
 			void applyToolStates();
 
 			if (!transportInfo?.jsonResponseEnabled && !transportInfo?.externalApiMode) {

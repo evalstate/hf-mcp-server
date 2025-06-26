@@ -187,12 +187,11 @@ export function StatelessTransportMetrics({ metrics }: StatelessTransportMetrics
 										{metrics.staticPageHits200 || 0}/{metrics.staticPageHits405 || 0}
 									</TableCell>
 									<TableCell className="font-medium text-sm">
-										<div className="flex items-center gap-1">
-											Auth Status (Anon/Auth/401)
-										</div>
+										<div className="flex items-center gap-1">Auth Status (Anon/Auth/401)</div>
 									</TableCell>
 									<TableCell className="text-sm font-mono">
-										{metrics.connections.anonymous}/{metrics.connections.authenticated}/{metrics.connections.unauthorized || 0}
+										{metrics.connections.anonymous}/{metrics.connections.authenticated}/
+										{metrics.connections.unauthorized || 0}
 									</TableCell>
 								</TableRow>
 							)}
@@ -210,6 +209,17 @@ export function StatelessTransportMetrics({ metrics }: StatelessTransportMetrics
 										<TableCell className="text-sm font-mono">{metrics.apiMetrics.unauthorized}</TableCell>
 										<TableCell className="font-medium text-sm">Tool API - 403 Forbidden</TableCell>
 										<TableCell className="text-sm font-mono">{metrics.apiMetrics.forbidden}</TableCell>
+									</TableRow>
+								</>
+							)}
+							{/* Gradio Metrics */}
+							{metrics.gradioMetrics && (
+								<>
+									<TableRow>
+										<TableCell className="font-medium text-sm">Gradio Tool - Success</TableCell>
+										<TableCell className="text-sm font-mono">{metrics.gradioMetrics.success}</TableCell>
+										<TableCell className="font-medium text-sm">Gradio Tool - Failure</TableCell>
+										<TableCell className="text-sm font-mono">{metrics.gradioMetrics.failure}</TableCell>
 									</TableRow>
 								</>
 							)}

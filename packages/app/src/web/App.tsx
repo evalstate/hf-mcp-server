@@ -13,6 +13,30 @@ import { Button } from './components/ui/button';
 import { Separator } from './components/ui/separator';
 import { Copy, Settings } from 'lucide-react';
 import type { TransportInfo } from '../shared/transport-info.js';
+import {
+	SPACE_SEARCH_TOOL_ID,
+	MODEL_SEARCH_TOOL_ID,
+	MODEL_DETAIL_TOOL_ID,
+	PAPER_SEARCH_TOOL_ID,
+	DATASET_SEARCH_TOOL_ID,
+	DATASET_DETAIL_TOOL_ID,
+	DUPLICATE_SPACE_TOOL_ID,
+	SPACE_INFO_TOOL_ID,
+	SPACE_FILES_TOOL_ID,
+	DOCS_SEMANTIC_SEARCH_TOOL_ID,
+	DOC_FETCH_TOOL_ID,
+	SEMANTIC_SEARCH_TOOL_CONFIG,
+	MODEL_SEARCH_TOOL_CONFIG,
+	MODEL_DETAIL_TOOL_CONFIG,
+	PAPER_SEARCH_TOOL_CONFIG,
+	DATASET_SEARCH_TOOL_CONFIG,
+	DATASET_DETAIL_TOOL_CONFIG,
+	DUPLICATE_SPACE_TOOL_CONFIG,
+	SPACE_INFO_TOOL_CONFIG,
+	SPACE_FILES_TOOL_CONFIG,
+	DOCS_SEMANTIC_SEARCH_CONFIG,
+	DOC_FETCH_CONFIG,
+} from '@llmindset/hf-mcp';
 
 type SpaceTool = {
 	_id: string;
@@ -211,63 +235,73 @@ function App() {
 	/** should we use annotations / Title here? */
 	const searchTools = {
 		paper_search: {
-			// Changed from paper_semantic_search
-			id: 'paper_search',
-			label: 'Papers Search',
-			description: 'Find Machine Learning Research Papers.',
-			settings: { enabled: settings?.builtInTools?.includes('paper_search') ?? true },
+			id: PAPER_SEARCH_TOOL_ID,
+			label: PAPER_SEARCH_TOOL_CONFIG.annotations.title,
+			description: PAPER_SEARCH_TOOL_CONFIG.description,
+			settings: { enabled: settings?.builtInTools?.includes(PAPER_SEARCH_TOOL_ID) ?? true },
 		},
 		space_search: {
-			// Changed from space_semantic_search
-			id: 'space_search',
-			label: 'Space Search',
-			description: 'Find Gradio Hugging Face Spaces.',
-			settings: { enabled: settings?.builtInTools?.includes('space_search') ?? true },
+			id: SPACE_SEARCH_TOOL_ID,
+			label: SEMANTIC_SEARCH_TOOL_CONFIG.annotations.title,
+			description: SEMANTIC_SEARCH_TOOL_CONFIG.description,
+			settings: { enabled: settings?.builtInTools?.includes(SPACE_SEARCH_TOOL_ID) ?? true },
 		},
 		model_search: {
-			id: 'model_search',
-			label: 'Model Search',
-			description: 'Find models with filters for task, library, etc.',
-			settings: { enabled: settings?.builtInTools?.includes('model_search') ?? true },
+			id: MODEL_SEARCH_TOOL_ID,
+			label: MODEL_SEARCH_TOOL_CONFIG.annotations.title,
+			description: MODEL_SEARCH_TOOL_CONFIG.description,
+			settings: { enabled: settings?.builtInTools?.includes(MODEL_SEARCH_TOOL_ID) ?? true },
 		},
 		model_details: {
-			id: 'model_details',
-			label: 'Model Details',
-			description: 'Detailed information about a specific model.',
-			settings: { enabled: settings?.builtInTools?.includes('model_details') ?? true },
+			id: MODEL_DETAIL_TOOL_ID,
+			label: MODEL_DETAIL_TOOL_CONFIG.annotations.title,
+			description: MODEL_DETAIL_TOOL_CONFIG.description,
+			settings: { enabled: settings?.builtInTools?.includes(MODEL_DETAIL_TOOL_ID) ?? true },
 		},
 		dataset_search: {
-			id: 'dataset_search',
-			label: 'Dataset Search',
-			description: 'Find datasets with filters for author, tags, etc.',
-			settings: { enabled: settings?.builtInTools?.includes('dataset_search') ?? true },
+			id: DATASET_SEARCH_TOOL_ID,
+			label: DATASET_SEARCH_TOOL_CONFIG.annotations.title,
+			description: DATASET_SEARCH_TOOL_CONFIG.description,
+			settings: { enabled: settings?.builtInTools?.includes(DATASET_SEARCH_TOOL_ID) ?? true },
 		},
 		dataset_details: {
-			id: 'dataset_details',
-			label: 'Dataset Details',
-			description: 'Detailed information about a specific dataset.',
-			settings: { enabled: settings?.builtInTools?.includes('dataset_details') ?? true },
+			id: DATASET_DETAIL_TOOL_ID,
+			label: DATASET_DETAIL_TOOL_CONFIG.annotations.title,
+			description: DATASET_DETAIL_TOOL_CONFIG.description,
+			settings: { enabled: settings?.builtInTools?.includes(DATASET_DETAIL_TOOL_ID) ?? true },
 		},
+		doc_semantic_search: {
+			id: DOCS_SEMANTIC_SEARCH_TOOL_ID,
+			label: DOCS_SEMANTIC_SEARCH_CONFIG.annotations.title,
+			description: DOCS_SEMANTIC_SEARCH_CONFIG.description,
+			settings: { enabled: settings?.builtInTools?.includes(DOCS_SEMANTIC_SEARCH_TOOL_ID) ?? true },
+		},
+		doc_fetch: {
+			id: DOC_FETCH_TOOL_ID,
+			label: DOC_FETCH_CONFIG.annotations.title,
+			description: DOC_FETCH_CONFIG.description,
+			settings: { enabled: settings?.builtInTools?.includes(DOC_FETCH_TOOL_ID) ?? true },
+		}
 	};
 
 	const spaceTools = {
 		duplicate_space: {
-			id: 'duplicate_space',
-			label: 'Duplicate Space',
-			description: 'Duplicate a Space to your account.',
-			settings: { enabled: settings?.builtInTools?.includes('duplicate_space') ?? true },
+			id: DUPLICATE_SPACE_TOOL_ID,
+			label: DUPLICATE_SPACE_TOOL_CONFIG.annotations.title,
+			description: DUPLICATE_SPACE_TOOL_CONFIG.description || 'Duplicate a Hugging Face Space to your account.',
+			settings: { enabled: settings?.builtInTools?.includes(DUPLICATE_SPACE_TOOL_ID) ?? true },
 		},
 		space_info: {
-			id: 'space_info',
-			label: 'Spaces Information',
-			description: 'Get detailed information about your Spaces.',
-			settings: { enabled: settings?.builtInTools?.includes('space_info') ?? true },
+			id: SPACE_INFO_TOOL_ID,
+			label: SPACE_INFO_TOOL_CONFIG.annotations.title,
+			description: SPACE_INFO_TOOL_CONFIG.description || 'Get detailed information about Hugging Face Spaces.',
+			settings: { enabled: settings?.builtInTools?.includes(SPACE_INFO_TOOL_ID) ?? true },
 		},
 		space_files: {
-			id: 'space_files',
-			label: 'Space Files',
-			description: 'List all files in a static Space with download URLs.',
-			settings: { enabled: settings?.builtInTools?.includes('space_files') ?? true },
+			id: SPACE_FILES_TOOL_ID,
+			label: SPACE_FILES_TOOL_CONFIG.annotations.title,
+			description: SPACE_FILES_TOOL_CONFIG.description || 'List all files in a static Hugging Face Space with download URLs.',
+			settings: { enabled: settings?.builtInTools?.includes(SPACE_FILES_TOOL_ID) ?? true },
 		},
 	};
 

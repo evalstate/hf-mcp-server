@@ -99,7 +99,7 @@ export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SpaceSearchRes
 	 * Search for spaces with a specific filter (e.g., arxiv:XXXX.XXXXX)
 	 * Note: For spaces, we need to use the regular API endpoint with filter parameter
 	 */
-	async searchWithFilter(filter: string, limit: number = 10): Promise<string> {
+	async searchWithFilter(filter: string, limit: number = 10, headerLevel: number = 1): Promise<string> {
 		try {
 			// For spaces, we need to use the regular spaces API endpoint with filter
 			const url = new URL('https://huggingface.co/api/spaces');
@@ -115,7 +115,7 @@ export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SpaceSearchRes
 			}
 
 			// Format results using the existing formatter
-			return formatSearchResults(filter, results, results.length);
+			return formatSearchResults(filter, results, results.length, headerLevel);
 		} catch (error) {
 			if (error instanceof Error) {
 				throw new Error(`Failed to search for spaces: ${error.message}`);
@@ -135,7 +135,12 @@ export type SearchParams = z.infer<typeof SEMANTIC_SEARCH_TOOL_CONFIG.schema>;
  * @param results The search results to format
  * @returns A markdown formatted string with the search results
  */
-export const formatSearchResults = (query: string, results: SpaceSearchResult[], totalCount: number): string => {
+export const formatSearchResults = (
+	query: string,
+	results: SpaceSearchResult[],
+	totalCount: number,
+	headerLevel: number = 1
+): string => {
 	if (results.length === 0) {
 		return `No matching Hugging Face Spaces found for the query '${query}'. Try a different query.`;
 	}
@@ -144,7 +149,8 @@ export const formatSearchResults = (query: string, results: SpaceSearchResult[],
 		results.length < totalCount
 			? `Showing ${results.length.toString()} of ${totalCount.toString()} results`
 			: `All ${results.length.toString()} results`;
-	let markdown = `# Space Search Results for the query '${query}' (${showingText})\n\n`;
+	const headerPrefix = '#'.repeat(headerLevel);
+	let markdown = `${headerPrefix} Space Search Results for the query '${query}' (${showingText})\n\n`;
 	markdown += '| Space | Description | Author | ID | Category |  Likes | Trending Score | Relevance |\n';
 	markdown += '|-------|-------------|--------|----|----------|--------|----------------|-----------|\n';
 
