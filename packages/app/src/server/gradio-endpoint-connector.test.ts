@@ -43,9 +43,9 @@ describe('parseSchemaResponse', () => {
 
 			expect(result).toHaveLength(1);
 			expect(result[0]).toBeDefined();
-			expect(result[0]!.name).toBe('evalstate_shuttle_jaguarinfer');
-			expect(result[0]!.description).toBe('');
-			expect(result[0]!.inputSchema).toEqual({
+			expect(result[0]?.name).toBe('evalstate_shuttle_jaguarinfer');
+			expect(result[0]?.description).toBe('');
+			expect(result[0]?.inputSchema).toEqual({
 				type: 'object',
 				properties: {
 					prompt: {
@@ -94,9 +94,9 @@ describe('parseSchemaResponse', () => {
 			const result = parseSchemaResponse(schema, endpointId, subdomain);
 
 			expect(result).toHaveLength(3);
-			expect(result[0]!.name).toBe('some_other_tool');
-			expect(result[1]!.name).toBe('evalstate_shuttle_jaguarinfer');
-			expect(result[2]!.name).toBe('another_tool');
+			expect(result[0]?.name).toBe('some_other_tool');
+			expect(result[1]?.name).toBe('evalstate_shuttle_jaguarinfer');
+			expect(result[2]?.name).toBe('another_tool');
 		});
 
 		it('should return all tools in order', () => {
@@ -114,8 +114,8 @@ describe('parseSchemaResponse', () => {
 			const result = parseSchemaResponse(schema, endpointId, subdomain);
 
 			expect(result).toHaveLength(2);
-			expect(result[0]!.name).toBe('first_tool');
-			expect(result[1]!.name).toBe('last_tool');
+			expect(result[0]?.name).toBe('first_tool');
+			expect(result[1]?.name).toBe('last_tool');
 		});
 	});
 
@@ -161,9 +161,9 @@ describe('parseSchemaResponse', () => {
 
 			expect(result).toHaveLength(1);
 			expect(result[0]).toBeDefined();
-			expect(result[0]!.name).toBe('OmniParser_v2_process');
-			expect(result[0]!.description).toBe('');
-			expect(result[0]!.inputSchema).toEqual({
+			expect(result[0]?.name).toBe('OmniParser_v2_process');
+			expect(result[0]?.description).toBe('');
+			expect(result[0]?.inputSchema).toEqual({
 				type: 'object',
 				properties: {
 					image_input: {
@@ -208,8 +208,8 @@ describe('parseSchemaResponse', () => {
 
 			// Should return only valid tools
 			expect(result).toHaveLength(2);
-			expect(result[0]!.name).toBe('valid_tool');
-			expect(result[1]!.name).toBe('another_valid_tool');
+			expect(result[0]?.name).toBe('valid_tool');
+			expect(result[1]?.name).toBe('another_valid_tool');
 		});
 
 		it('should return all tools in array format', () => {
@@ -222,9 +222,9 @@ describe('parseSchemaResponse', () => {
 			const result = parseSchemaResponse(schema, endpointId, subdomain);
 
 			expect(result).toHaveLength(3);
-			expect(result[0]!.name).toBe('first_tool');
-			expect(result[1]!.name).toBe('infer_tool');
-			expect(result[2]!.name).toBe('last_tool');
+			expect(result[0]?.name).toBe('first_tool');
+			expect(result[1]?.name).toBe('infer_tool');
+			expect(result[2]?.name).toBe('last_tool');
 		});
 
 		it('should include tools with Lambda in name during parsing', () => {
@@ -239,10 +239,10 @@ describe('parseSchemaResponse', () => {
 
 			// parseSchemaResponse doesn't filter, it returns all valid tools
 			expect(result).toHaveLength(4);
-			expect(result[0]!.name).toBe('normal_tool');
-			expect(result[1]!.name).toBe('tool<Lambda>Function');
-			expect(result[2]!.name).toBe('<Lambda>_tool');
-			expect(result[3]!.name).toBe('FLUX_1_Kontext_Dev_<lambda>');
+			expect(result[0]?.name).toBe('normal_tool');
+			expect(result[1]?.name).toBe('tool<Lambda>Function');
+			expect(result[2]?.name).toBe('<Lambda>_tool');
+			expect(result[3]?.name).toBe('FLUX_1_Kontext_Dev_<lambda>');
 		});
 	});
 
