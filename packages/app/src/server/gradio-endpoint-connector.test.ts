@@ -7,7 +7,7 @@ describe('parseSchemaResponse', () => {
 	const subdomain = 'test-subdomain';
 
 	describe('object format schema', () => {
-		it('should parse object format schema and select the only tool', () => {
+		it('should parse object format schema and return all tools', () => {
 			const schemaOne = {
 				evalstate_shuttle_jaguarinfer: {
 					type: 'object',
@@ -41,10 +41,11 @@ describe('parseSchemaResponse', () => {
 
 			const result = parseSchemaResponse(schemaOne, endpointId, subdomain);
 
-			expect(result).toBeDefined();
-			expect(result.name).toBe('evalstate_shuttle_jaguarinfer');
-			expect(result.description).toBe('');
-			expect(result.inputSchema).toEqual({
+			expect(result).toHaveLength(1);
+			expect(result[0]).toBeDefined();
+			expect(result[0]!.name).toBe('evalstate_shuttle_jaguarinfer');
+			expect(result[0]!.description).toBe('');
+			expect(result[0]!.inputSchema).toEqual({
 				type: 'object',
 				properties: {
 					prompt: {
@@ -74,7 +75,7 @@ describe('parseSchemaResponse', () => {
 			});
 		});
 
-		it('should select tool with "infer" in the name when multiple tools exist', () => {
+		it('should return all tools when multiple tools exist', () => {
 			const schema = {
 				some_other_tool: {
 					type: 'object',
@@ -92,10 +93,13 @@ describe('parseSchemaResponse', () => {
 
 			const result = parseSchemaResponse(schema, endpointId, subdomain);
 
-			expect(result.name).toBe('evalstate_shuttle_jaguarinfer');
+			expect(result).toHaveLength(3);
+			expect(result[0]!.name).toBe('some_other_tool');
+			expect(result[1]!.name).toBe('evalstate_shuttle_jaguarinfer');
+			expect(result[2]!.name).toBe('another_tool');
 		});
 
-		it('should select last tool when no "infer" tool exists', () => {
+		it('should return all tools in order', () => {
 			const schema = {
 				first_tool: {
 					type: 'object',
@@ -109,12 +113,14 @@ describe('parseSchemaResponse', () => {
 
 			const result = parseSchemaResponse(schema, endpointId, subdomain);
 
-			expect(result.name).toBe('last_tool');
+			expect(result).toHaveLength(2);
+			expect(result[0]!.name).toBe('first_tool');
+			expect(result[1]!.name).toBe('last_tool');
 		});
 	});
 
 	describe('array format schema', () => {
-		it('should parse array format schema and select the only tool', () => {
+		it('should parse array format schema and return all tools', () => {
 			const schemaTwo = [
 				{
 					name: 'OmniParser_v2_process',
@@ -153,10 +159,11 @@ describe('parseSchemaResponse', () => {
 
 			const result = parseSchemaResponse(schemaTwo, endpointId, subdomain);
 
-			expect(result).toBeDefined();
-			expect(result.name).toBe('OmniParser_v2_process');
-			expect(result.description).toBe('');
-			expect(result.inputSchema).toEqual({
+			expect(result).toHaveLength(1);
+			expect(result[0]).toBeDefined();
+			expect(result[0]!.name).toBe('OmniParser_v2_process');
+			expect(result[0]!.description).toBe('');
+			expect(result[0]!.inputSchema).toEqual({
 				type: 'object',
 				properties: {
 					image_input: {
@@ -199,11 +206,13 @@ describe('parseSchemaResponse', () => {
 
 			const result = parseSchemaResponse(schema, endpointId, subdomain);
 
-			// Should select the last valid tool
-			expect(result.name).toBe('another_valid_tool');
+			// Should return only valid tools
+			expect(result).toHaveLength(2);
+			expect(result[0]!.name).toBe('valid_tool');
+			expect(result[1]!.name).toBe('another_valid_tool');
 		});
 
-		it('should select tool with "infer" in array format', () => {
+		it('should return all tools in array format', () => {
 			const schema = [
 				{ name: 'first_tool', inputSchema: { type: 'object' } },
 				{ name: 'infer_tool', inputSchema: { type: 'object' } },
@@ -212,7 +221,28 @@ describe('parseSchemaResponse', () => {
 
 			const result = parseSchemaResponse(schema, endpointId, subdomain);
 
-			expect(result.name).toBe('infer_tool');
+			expect(result).toHaveLength(3);
+			expect(result[0]!.name).toBe('first_tool');
+			expect(result[1]!.name).toBe('infer_tool');
+			expect(result[2]!.name).toBe('last_tool');
+		});
+
+		it('should include tools with Lambda in name during parsing', () => {
+			const schema = [
+				{ name: 'normal_tool', inputSchema: { type: 'object' } },
+				{ name: 'tool<Lambda>Function', inputSchema: { type: 'object' } },
+				{ name: '<Lambda>_tool', inputSchema: { type: 'object' } },
+				{ name: 'FLUX_1_Kontext_Dev_<lambda>', inputSchema: { type: 'object' } },
+			];
+
+			const result = parseSchemaResponse(schema, endpointId, subdomain);
+
+			// parseSchemaResponse doesn't filter, it returns all valid tools
+			expect(result).toHaveLength(4);
+			expect(result[0]!.name).toBe('normal_tool');
+			expect(result[1]!.name).toBe('tool<Lambda>Function');
+			expect(result[2]!.name).toBe('<Lambda>_tool');
+			expect(result[3]!.name).toBe('FLUX_1_Kontext_Dev_<lambda>');
 		});
 	});
 

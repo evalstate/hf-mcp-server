@@ -35,7 +35,7 @@ interface EndpointConnection {
 	endpointId: string;
 	originalIndex: number;
 	client: Client | null; // Will be null when using schema-only approach
-	tool: Tool;
+	tools: Tool[];
 	name?: string;
 	emoji?: string;
 	sseUrl?: string; // Store the SSE URL for lazy connection during tool calls
@@ -74,7 +74,7 @@ export function parseSchemaResponse(
 	schemaResponse: unknown,
 	endpointId: string,
 	subdomain: string
-): { name: string; description?: string; inputSchema: JsonSchema } {
+): Array<{ name: string; description?: string; inputSchema: JsonSchema }> {
 	// Handle both array and object schema formats
 	let tools: Array<{ name: string; description?: string; inputSchema: JsonSchema }> = [];
 
@@ -122,25 +122,7 @@ export function parseSchemaResponse(
 		throw new Error('No tools found in schema');
 	}
 
-	// Select which tool to use based on the algorithm:
-	// 1. Find a tool containing "infer" (case-insensitive)
-	// 2. Otherwise, use the last tool
-	let selectedTool = tools[tools.length - 1];
-	if (!selectedTool) {
-		logger.error({ endpointId, subdomain }, 'No tool selected from available tools');
-		throw new Error('No tool selected from available tools');
-	}
-
-	const inferTool = tools.find((tool) => tool.name.toLowerCase().includes('infer'));
-
-	if (inferTool) {
-		selectedTool = inferTool;
-		logger.debug({ endpointId, toolName: selectedTool.name }, 'Selected tool containing "infer"');
-	} else {
-		logger.debug({ endpointId, toolName: selectedTool.name }, 'Selected last tool (no "infer" tool found)');
-	}
-
-	return selectedTool;
+	return tools;
 }
 
 /**
@@ -213,25 +195,25 @@ async function fetchEndpointSchema(
 	const schemaResponse = (await response.json()) as unknown;
 
 	// Parse the schema response
-	const selectedTool = parseSchemaResponse(schemaResponse, endpointId, endpoint.subdomain);
-
-	// Create tool with raw JSON schema (conversion to Zod happens in registerRemoteTool)
-	const tool: Tool = {
-		name: selectedTool.name,
-		description: selectedTool.description || `${selectedTool.name} tool`,
-		inputSchema: {
-			type: 'object',
-			properties: selectedTool.inputSchema.properties || {},
-			required: selectedTool.inputSchema.required || [],
-			description: selectedTool.inputSchema.description,
-		},
-	};
+	const parsed = parseSchemaResponse(schemaResponse, endpointId, endpoint.subdomain);
+	const tools: Tool[] = parsed
+		.filter((parsedTool) => !parsedTool.name.toLowerCase().includes('<lambda'))
+		.map((parsedTool) => ({
+			name: parsedTool.name,
+			description: parsedTool.description || `${parsedTool.name} tool`,
+			inputSchema: {
+				type: 'object',
+				properties: parsedTool.inputSchema.properties || {},
+				required: parsedTool.inputSchema.required || [],
+				description: parsedTool.inputSchema.description,
+			},
+		}));
 
 	return {
 		endpointId,
 		originalIndex,
 		client: null, // No client connection yet
-		tool,
+		tools: tools,
 		name: endpoint.name,
 		emoji: endpoint.emoji,
 		sseUrl: `https://${endpoint.subdomain}.hf.space/gradio_api/mcp/sse`, // Store SSE URL for later
@@ -371,38 +353,34 @@ async function createLazyConnection(sseUrl: string, hfToken: string | undefined)
 }
 
 /**
- * Registers a remote tool from a Gradio endpoint
+ * Generates the outward-facing name for a tool
  */
-export function registerRemoteTool(server: McpServer, connection: EndpointConnection, hfToken?: string): void {
-	// Use new naming convention: gr<index>_<sanitized_name> or grp<index>_<sanitized_name> for private
-	// Convert "evalstate/flux1_schnell" to "evalstate_flux1_schnell"
-	const sanitizedName = connection.name ? connection.name.replace(/[/\-\s]+/g, '_').toLowerCase() : 'unknown';
+function generateToolName(connection: EndpointConnection, tool: Tool): string {
+	const sanitizedName = tool.name;
 	const prefix = connection.isPrivate ? GRADIO_PRIVATE_PREFIX : GRADIO_PREFIX;
-	const remoteName = `${prefix}${(connection.originalIndex + 1).toString()}_${sanitizedName}`;
-	logger.trace(
-		{
-			endpointId: connection.endpointId,
-			originalName: connection.tool.name,
-			remoteName,
-			description: connection.tool.description,
-		},
-		'Registering remote tool'
-	);
+	return `${prefix}${(connection.originalIndex + 1).toString()}_${sanitizedName}`;
+}
 
-	// Log the exact structure we're getting
-	logger.trace(
-		{
-			toolName: connection.tool.name,
-			inputSchema: connection.tool.inputSchema,
-		},
-		'Remote tool inputSchema structure'
-	);
+/**
+ * Creates the display information for a tool
+ */
+function createToolDisplayInfo(connection: EndpointConnection, tool: Tool): { title: string; description: string } {
+	const displayName = connection.name || 'Unknown Space';
+	const title = `${displayName} - ${tool.name}${connection.emoji ? ` ${connection.emoji}` : ''}`;
+	const description = tool.description
+		? `${tool.description} (from ${displayName})`
+		: `${tool.name} tool from ${displayName}`;
+	return { title, description };
+}
 
-	// Convert JSON Schema to Zod schema
+/**
+ * Converts a tool's JSON schema to Zod schema shape
+ */
+function convertToolSchemaToZod(tool: Tool): Record<string, z.ZodTypeAny> {
 	const schemaShape: Record<string, z.ZodTypeAny> = {};
 
-	if (typeof connection.tool.inputSchema === 'object' && 'properties' in connection.tool.inputSchema) {
-		const jsonSchema = connection.tool.inputSchema as JsonSchema;
+	if (typeof tool.inputSchema === 'object' && 'properties' in tool.inputSchema) {
+		const jsonSchema = tool.inputSchema as JsonSchema;
 		const props = jsonSchema.properties || {};
 		const required = jsonSchema.required || [];
 
@@ -421,62 +399,118 @@ export function registerRemoteTool(server: McpServer, connection: EndpointConnec
 		}
 	}
 
-	// Create user-friendly title and description
-	const displayName = connection.name || 'Unknown Space';
-	const toolTitle = `${displayName} - ${connection.tool.name}${connection.emoji ? ` ${connection.emoji}` : ''}`;
-	const toolDescription = connection.tool.description
-		? `${connection.tool.description} (from ${displayName})`
-		: `${connection.tool.name} tool from ${displayName}`;
+	return schemaShape;
+}
 
-	server.tool(
-		remoteName,
-		toolDescription,
-		schemaShape,
-		{
-			openWorldHint: true,
-			title: toolTitle,
-		}, // annotations parameter
-		async (params: Record<string, unknown>) => {
-			logger.info({ tool: connection.tool.name, params }, 'Calling remote tool');
-			try {
-				// Since we use schema fetch, we always need to create SSE connection for tool execution
-				if (!connection.sseUrl) {
-					throw new Error('No SSE URL available for tool execution');
-				}
-				logger.debug({ tool: connection.tool.name }, 'Creating SSE connection for tool execution');
-				const activeClient = await createLazyConnection(connection.sseUrl, hfToken);
-
-				const result = await activeClient.request(
-					{
-						method: 'tools/call',
-						params: {
-							name: connection.tool.name,
-							arguments: params,
-						},
-					},
-					CallToolResultSchema
-				);
-				// For metrics, use the safe name utility
-				const metricsName = getMetricsSafeName(remoteName);
-
-				if (result.isError) {
-					logger.warn({ tool: connection.tool.name, error: result.content }, 'Gradio tool call returned error');
-					gradioMetrics.recordFailure(metricsName);
-				} else {
-					logger.debug({ tool: connection.tool.name }, 'Gradio tool call returned error');
-					gradioMetrics.recordSuccess(metricsName);
-				}
-				return result;
-			} catch (error) {
-				// this is a
-				logger.error({ tool: connection.tool.name, error }, 'Remote tool call failed');
-				// For metrics, use the safe name utility
-				const metricsName = getMetricsSafeName(remoteName);
-				gradioMetrics.recordFailure(metricsName);
-				throw error;
+/**
+ * Creates the tool handler function
+ */
+function createToolHandler(
+	connection: EndpointConnection,
+	tool: Tool,
+	outwardFacingName: string,
+	hfToken?: string
+): (params: Record<string, unknown>) => Promise<typeof CallToolResultSchema._type> {
+	return async (params: Record<string, unknown>) => {
+		logger.info({ tool: tool.name, params }, 'Calling remote tool');
+		try {
+			// Since we use schema fetch, we always need to create SSE connection for tool execution
+			if (!connection.sseUrl) {
+				throw new Error('No SSE URL available for tool execution');
 			}
+			logger.debug({ tool: tool.name }, 'Creating SSE connection for tool execution');
+			const activeClient = await createLazyConnection(connection.sseUrl, hfToken);
+
+			const result = await activeClient.request(
+				{
+					method: 'tools/call',
+					params: {
+						name: tool.name,
+						arguments: params,
+					},
+				},
+				CallToolResultSchema
+			);
+			// For metrics, use the safe name utility
+			const metricsName = getMetricsSafeName(outwardFacingName);
+
+			if (result.isError) {
+				logger.warn({ tool: tool.name, error: result.content }, 'Gradio tool call returned error');
+				gradioMetrics.recordFailure(metricsName);
+			} else {
+				logger.debug({ tool: tool.name }, 'Gradio tool call completed successfully');
+				gradioMetrics.recordSuccess(metricsName);
+			}
+			return result;
+		} catch (error) {
+			// this is a
+			logger.error({ tool: tool.name, error }, 'Remote tool call failed');
+			// For metrics, use the safe name utility
+			const metricsName = getMetricsSafeName(outwardFacingName);
+			gradioMetrics.recordFailure(metricsName);
+			throw error;
 		}
-	);
+	};
+}
+
+/**
+ * Registers multiple remote tools from a Gradio endpoint
+ */
+export function registerRemoteTools(server: McpServer, connection: EndpointConnection, hfToken?: string): void {
+	for (const tool of connection.tools) {
+		// Generate tool name
+		const outwardFacingName = generateToolName(connection, tool);
+
+		// Create display info
+		const { title, description } = createToolDisplayInfo(connection, tool);
+
+		// Convert schema
+		const schemaShape = convertToolSchemaToZod(tool);
+
+		// Create handler
+		const handler = createToolHandler(connection, tool, outwardFacingName, hfToken);
+
+		// Log registration
+		logger.trace(
+			{
+				endpointId: connection.endpointId,
+				originalName: tool.name,
+				outwardFacingName: outwardFacingName,
+				description: tool.description,
+			},
+			'Registering remote tool'
+		);
+
+		// Log the exact structure we're getting
+		logger.trace(
+			{
+				toolName: tool.name,
+				inputSchema: tool.inputSchema,
+			},
+			'Remote tool inputSchema structure'
+		);
+
+		// Register the tool
+		server.tool(
+			outwardFacingName,
+			description,
+			schemaShape,
+			{
+				openWorldHint: true,
+				title: title,
+			},
+			handler
+		);
+	}
+}
+
+/**
+ * Registers a remote tool from a Gradio endpoint (legacy single tool support)
+ * @deprecated Use registerRemoteTools instead
+ */
+export function registerRemoteTool(server: McpServer, connection: EndpointConnection, hfToken?: string): void {
+	// Simply delegate to the new function
+	registerRemoteTools(server, connection, hfToken);
 }
 
 /**
