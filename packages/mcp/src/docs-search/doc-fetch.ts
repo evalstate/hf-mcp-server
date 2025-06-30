@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { DOC_MAPPINGS } from './doc-mappings.js';
 
 export const DOC_FETCH_CONFIG = {
 	name: 'hf_doc_fetch',
@@ -21,63 +20,24 @@ export const DOC_FETCH_CONFIG = {
 
 export type DocFetchParams = z.infer<typeof DOC_FETCH_CONFIG.schema>;
 
-/**
- * Return a (usually) markdown document for a Doc URL
- *
- * There were a few different options for this...
- * 1) Return the HTML directly. Good option would include any post-processing (but prefer markdown)
- * 2) Get the HTML and convert to markdown
- * 3) Get the HTML and follow the GitHub link to get the raw markdown file
- * 4) Use a mapping.
- *
- * There is also the risk that the GitHub HEAD is newer than the indexed version. Will leave as is for now
- * but might want to reconsider this. Mappings were built from:
- * https://github.com/huggingface/doc-builder/blob/main/.github/workflows/build_embeddings.yml
- *
- * Falls back to HTML if no mapping is found...
- *
- */
 export class DocFetchTool {
 	/**
-	 * Convert HF docs URL to GitHub raw content URL
+	 * Validate HF docs URL
 	 */
-	processUrl(hfUrl: string): string {
-		// Validate URL format
+	validateUrl(hfUrl: string): void {
 		if (!hfUrl.startsWith('https://huggingface.co/docs/')) {
 			throw new Error('That was not a valid Hugging Face document URL');
 		}
-
-		// Remove the base URL and any fragment identifier
-		const urlPath = hfUrl.replace('https://huggingface.co/docs/', '').split('#')[0] || '';
-
-		// Extract package name and path
-		const parts = urlPath.split('/');
-		const packageName = parts[0] || '';
-
-		// Check if package exists in mapping
-		let fetchUrl = hfUrl;
-		const mapping = DOC_MAPPINGS[packageName];
-		if (mapping) {
-			const remainingPath = parts.slice(1).join('/');
-			const filePath = remainingPath ? `${remainingPath}.md` : 'index.md';
-
-			// Construct GitHub raw URL
-			const githubUrl = `https://raw.githubusercontent.com/${mapping.repo_id}/refs/heads/main/${mapping.doc_folder}/${filePath}`;
-			fetchUrl = githubUrl;
-		}
-
-		// Build the file path
-		return fetchUrl;
 	}
 
 	/**
-	 * Fetch markdown content from GitHub
+	 * Fetch content from Hugging Face docs URL
 	 */
 	async fetch(url: string): Promise<string> {
 		try {
-			const githubUrl = this.processUrl(url);
+			this.validateUrl(url);
 
-			const response = await fetch(githubUrl);
+			const response = await fetch(url);
 
 			if (!response.ok) {
 				throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
