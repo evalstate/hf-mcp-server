@@ -312,7 +312,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			DOC_FETCH_CONFIG.annotations,
 			async (params: DocFetchParams) => {
 				const docFetch = new DocFetchTool();
-				const results = await docFetch.fetch(params.doc_url);
+				const results = await docFetch.fetch(params);
 				return {
 					content: [{ type: 'text', text: results }],
 				};
