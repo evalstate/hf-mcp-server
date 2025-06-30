@@ -312,6 +312,71 @@ describe('DocSearchTool', () => {
 
 			await expect(docSearchTool.search({ query: 'test' })).rejects.toThrow('Failed to search documentation:');
 		});
+
+		it('should handle token budget by truncating or switching to links', async () => {
+			// Create a tool with a small token budget to trigger limits
+			const smallBudgetTool = new DocSearchTool(undefined, undefined, 5000); // 5k token budget
+			
+			// Create a result with a very long excerpt
+			const longText = 'This is a very long text that repeats. '.repeat(100); // ~3900 chars per excerpt
+			
+			// Create many results to exceed budget (5k tokens = ~16.5k chars)
+			const manyResults: Array<{
+				text: string;
+				product: string;
+				heading1: string;
+				source_page_url: string;
+				source_page_title: string;
+				heading2: string;
+			}> = [];
+			// Create enough to exceed token budget when formatted
+			for (let i = 0; i < 8; i++) {
+				manyResults.push({
+					text: longText,
+					product: 'hub',
+					heading1: `Page ${i}`,
+					source_page_url: `https://huggingface.co/docs/hub/page${i}`,
+					source_page_title: `Page ${i}`,
+					heading2: `Section ${i}`,
+				});
+			}
+
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: () => Promise.resolve(manyResults),
+			});
+
+			const result = await smallBudgetTool.search({ query: 'test' });
+
+			// Should contain the header
+			expect(result).toContain('# Documentation Library Search Results for "test"');
+			expect(result).toContain('Found 8 results');
+
+			// Early results should have full content
+			expect(result).toContain('This is a very long text that repeats');
+
+			// Debug: let's see what the result looks like
+			console.log('Result length:', result.length);
+			console.log('Estimated tokens:', Math.ceil(result.length / 3.3));
+			
+			// Check that early pages have content 
+			expect(result).toContain('#### Excerpt from the "Section 0" section');
+			expect(result).toContain('This is a very long text that repeats');
+			
+			// With token budget, we should see either truncation or link-only section
+			const hasTruncation = result.includes(`*[Content truncated - use ${DOC_FETCH_CONFIG.name} for full text or narrow search terms]*`);
+			const hasAdditionalResults = result.includes('## Further results were found in:');
+			
+			
+			// At least one of these should indicate budget management
+			expect(hasTruncation || hasAdditionalResults).toBeTruthy();
+
+			// Should still contain the footer
+			expect(result).toContain(`Use the "${DOC_FETCH_CONFIG.name}" tool to fetch a document from the library.`);
+
+			// Result should be around our smaller token budget (5k tokens = ~16.5k chars)
+			expect(result.length).toBeLessThan(25000); // Should be controlled by token budget
+		});
 	});
 
 	describe('groupResults', () => {

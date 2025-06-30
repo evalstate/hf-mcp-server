@@ -62,3 +62,16 @@ export function escapeMarkdown(text: string): string {
 		.replace(/>/g, '\\>')
 		.replace(/#/g, '\\#');
 }
+
+// Token estimation constants
+const CHARS_PER_TOKEN = 3.3; // based on anthropic tokenizer for "how to load a image to image model in transformers"
+//  data: 121973 chars = 36711 tokens
+
+/**
+ * Simple token estimation based on character count
+ * @param text The text to estimate tokens for
+ * @returns Estimated number of tokens
+ */
+export function estimateTokens(text: string): number {
+	return Math.ceil(text.length / CHARS_PER_TOKEN);
+}
