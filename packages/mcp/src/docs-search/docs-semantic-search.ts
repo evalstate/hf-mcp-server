@@ -166,8 +166,8 @@ function formatSectionExcerpts(
 	if (section) {
 		const heading =
 			results.length > 1
-				? `#### Excerpts from the "${escapeMarkdown(section)}" section`
-				: `#### Excerpt from the "${escapeMarkdown(section)}" section`;
+				? `\n#### Excerpts from the "${escapeMarkdown(section)}" section`
+				: `\n#### Excerpt from the "${escapeMarkdown(section)}" section`;
 
 		lines.push(heading, '');
 		tokensUsed += estimateTokens(heading + '\n\n');
@@ -213,7 +213,7 @@ function formatSearchResults(
 
 	// Header
 	const filterText = productFilter ? ` (filtered by product: ${productFilter})` : '';
-	const header = `# Documentation Library Search Results for "${escapeMarkdown(query)}"${filterText}\n\nFound ${results.length} results\n`;
+	const header = `# Documentation Library Search Results for "${escapeMarkdown(query)}"${filterText}\n\nFound ${results.length} results`;
 	lines.push(header);
 
 	// Group and sort results
@@ -268,7 +268,7 @@ function formatSearchResults(
 			if (!pageResults?.[0]) continue;
 
 			const pageTitle = pageResults[0].heading1 || pageResults[0].source_page_title;
-			
+
 			// Check if we're over budget - if so, add remaining pages to links
 			const currentText = lines.join('\n');
 			if (estimateTokens(currentText) > tokenBudget) {
@@ -277,7 +277,7 @@ function formatSearchResults(
 			}
 
 			const hitCount = pageResults.length > 1 ? ` (${pageResults.length} results)` : '';
-			const pageHeader = `### Results from [${escapeMarkdown(pageTitle)}](${url})${hitCount}\n`;
+			const pageHeader = `\n### Results from [${escapeMarkdown(pageTitle)}](${url})${hitCount}\n`;
 			lines.push(pageHeader);
 
 			// Add all sections for this page
@@ -287,7 +287,7 @@ function formatSearchResults(
 				const useTruncatedMode = currentTokens > tokenBudget * 0.7;
 
 				const result = formatSectionExcerpts(section, sectionResults, useTruncatedMode, hasShownTruncationMessage);
-				
+
 				if (result.text.trim()) {
 					lines.push(result.text);
 					if (result.wasContentTruncated) {
