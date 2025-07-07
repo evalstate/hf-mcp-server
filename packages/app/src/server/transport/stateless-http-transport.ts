@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import { isJSONRPCNotification } from '@modelcontextprotocol/sdk/types.js';
 import { extractQueryParamsToHeaders } from '../utils/query-params.js';
 import { isBrowser } from '../utils/browser-detection.js';
+import { OAUTH_RESOURCE } from '../../shared/constants.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -115,10 +116,7 @@ export class StatelessHttpTransport extends BaseTransport {
 
 		const authResult = await this.validateAuthAndTrackMetrics(headers);
 		if (!authResult.shouldContinue || trackingName === 'tools/call:Authenticate') {
-			res.set(
-				'WWW-Authenticate',
-				'Bearer resource_metadata="https://huggingface.co/.well-known/oauth-protected-resources/mcp"'
-			);
+			res.set('WWW-Authenticate', OAUTH_RESOURCE);
 			res.status(authResult.statusCode || 401).send('Unauthorized');
 			return;
 		}
