@@ -1,6 +1,7 @@
-import { pino, type Logger, multistream } from 'pino';
+import { pino, type Logger } from 'pino';
 import type { LoggerOptions, Level } from 'pino';
-import type { StreamEntry } from 'pino';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 const isDev = process.env.NODE_ENV === 'development';
 const activeTransport = process.env.TRANSPORT || '';
@@ -10,63 +11,65 @@ const destination = activeTransport.toUpperCase() === 'STDIO' ? 2 : 1; // 2 = st
 const logLevel = (process.env.LOG_LEVEL || 'info') as Level;
 const hfLoggingEnabled = !!process.env.LOGGING_DATASET_ID;
 
+// Get the current file's directory in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+
 function createLogger(): Logger {
 	const baseOptions: LoggerOptions = {
 		level: logLevel,
 		...(!isDev && { timestamp: pino.stdTimeFunctions.isoTime }),
 	};
 
-	// Try to setup HF logging if enabled
+	// Setup HF logging if enabled
 	if (hfLoggingEnabled) {
-		try {
-			const streams: StreamEntry[] = [
-				// Console stream
-				{
-					level: logLevel,
-					stream: isDev
-						? pino.transport({
-								target: 'pino-pretty',
-								options: {
-									colorize: true,
-									destination,
-								},
-							})
-						: pino.destination(destination),
-				},
-				// HF dataset stream
-				{
-					level: logLevel,
-					stream: pino.transport({
-						target: './hf-dataset-transport.js',
-						options: {
-							sync: false,
-							ignoreErrors: true,
+		const datasetId = process.env.LOGGING_DATASET_ID;
+		const hfToken = process.env.LOGGING_HF_TOKEN || process.env.DEFAULT_HF_TOKEN;
+		
+		if (!hfToken) {
+			console.warn('[Logger] HF Dataset logging disabled: No HF token found (set LOGGING_HF_TOKEN or DEFAULT_HF_TOKEN)');
+		} else {
+			console.log(`[Logger] HF Dataset logging enabled for dataset: ${datasetId}`);
+			
+			try {
+				const transportPath = join(__dirname, 'hf-dataset-transport.js');
+				
+				const targets = [
+					// Console output
+					{
+						target: 'pino-pretty',
+						level: logLevel,
+						options: { 
+							colorize: isDev, 
+							destination 
 						},
-					}),
-				},
-			];
-			return pino(baseOptions, multistream(streams));
-		} catch (error) {
-			console.warn('[Logger] Failed to setup HF transport, falling back to console only:', error);
-			// Fall through to console-only setup
+					},
+					// HF dataset output
+					{
+						target: transportPath,
+						level: logLevel,
+						options: { sync: false },
+					},
+				];
+				
+				return pino({ ...baseOptions, transport: { targets } });
+			} catch (error) {
+				console.error('[Logger] Failed to setup HF transport, falling back to console only:', error);
+			}
 		}
 	}
 
 	// Console-only logging (default or fallback)
-	if (isDev) {
-		return pino({
-			...baseOptions,
+	return pino({
+		...baseOptions,
+		...(isDev ? {
 			transport: {
 				target: 'pino-pretty',
-				options: {
-					colorize: true,
-					destination,
-				},
+				options: { colorize: true, destination },
 			},
-		});
-	} else {
-		return pino(baseOptions, pino.destination(destination));
-	}
+		} : {}),
+	}, !isDev ? pino.destination(destination) : undefined);
 }
 
 const logger: Logger = createLogger();

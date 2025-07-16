@@ -186,7 +186,7 @@ interface TransportOptions {
 
 // Helper function to create a no-op transport
 function createNoOpTransport(reason: string): Transform {
-	console.log(`[HF Dataset Logger] Creating no-op transport: ${reason}`);
+	console.warn(`[HF Dataset Logger] Dataset logging disabled: ${reason}`);
 	return build(function (source) {
 		source.on('data', function (_obj: unknown) {
 			// No-op
