@@ -5,7 +5,7 @@
  * Usage: tsx test-hf-logging.ts <dataset-id>
  */
 
-import { HfDatasetLogger } from './packages/app/src/server/lib/hf-dataset-transport.js';
+import { HfDatasetLogger } from '../packages/app/src/server/lib/hf-dataset-transport.js';
 
 interface TestConfig {
 	datasetId: string;
@@ -21,7 +21,7 @@ class SimpleHfLoggingTester {
 
 	public async testBasicLogging(): Promise<void> {
 		console.log('\n🧪 Testing basic HF dataset logging...');
-		
+
 		if (!this.config.loggingToken) {
 			console.error('❌ No logging token provided. Set LOGGING_HF_TOKEN or DEFAULT_HF_TOKEN');
 			return;
@@ -32,9 +32,7 @@ class SimpleHfLoggingTester {
 			datasetId: this.config.datasetId,
 			batchSize: 3,
 			flushInterval: 5000, // 5 seconds for testing
-			maxRetries: 2,
 			baseRetryDelay: 1000,
-			organizeByDate: true,
 		});
 
 		// Send some test logs
@@ -48,11 +46,11 @@ class SimpleHfLoggingTester {
 		console.log(`Sending ${testLogs.length} test logs...`);
 		for (const log of testLogs) {
 			logger.processLog(log);
-			await new Promise(resolve => setTimeout(resolve, 500));
+			await new Promise((resolve) => setTimeout(resolve, 500));
 		}
 
 		console.log('Waiting 10 seconds for upload...');
-		await new Promise(resolve => setTimeout(resolve, 10000));
+		await new Promise((resolve) => setTimeout(resolve, 10000));
 
 		console.log('Test completed! Check your HF dataset for new logs.');
 		await logger.destroy();

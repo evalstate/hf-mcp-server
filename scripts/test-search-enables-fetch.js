@@ -5,8 +5,8 @@
 // Set up minimal test environment
 process.env.NODE_ENV = 'test';
 
-import { ToolSelectionStrategy } from './packages/app/dist/server/lib/tool-selection-strategy.js';
-import { McpApiClient } from './packages/app/dist/server/lib/mcp-api-client.js';
+import { ToolSelectionStrategy } from '../packages/app/dist/server/lib/tool-selection-strategy.js';
+import { McpApiClient } from '../packages/app/dist/server/lib/mcp-api-client.js';
 
 // Create a mock API client
 const config = {
@@ -34,7 +34,7 @@ async function testFeature() {
 	// Test 1: Without SEARCH_ENABLES_FETCH
 	console.log('Test 1: Without SEARCH_ENABLES_FETCH');
 	delete process.env.SEARCH_ENABLES_FETCH;
-	
+
 	const context1 = {
 		headers: {},
 		userSettings: {
@@ -52,7 +52,7 @@ async function testFeature() {
 	// Test 2: With SEARCH_ENABLES_FETCH=true
 	console.log('Test 2: With SEARCH_ENABLES_FETCH=true');
 	process.env.SEARCH_ENABLES_FETCH = 'true';
-	
+
 	const context2 = {
 		headers: {},
 		userSettings: {
@@ -70,7 +70,7 @@ async function testFeature() {
 	// Test 3: With SEARCH_ENABLES_FETCH=true but no hf_doc_search
 	console.log('Test 3: With SEARCH_ENABLES_FETCH=true but no hf_doc_search');
 	process.env.SEARCH_ENABLES_FETCH = 'true';
-	
+
 	const context3 = {
 		headers: {},
 		userSettings: {

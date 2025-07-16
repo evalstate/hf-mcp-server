@@ -535,8 +535,8 @@ export function convertJsonSchemaToZod(jsonSchemaProperty: JsonSchemaProperty, s
 	let description = jsonSchemaProperty.description || '';
 	if (jsonSchemaProperty.format === 'a http or https url to a file' || jsonSchemaProperty.title === 'FileData') {
 		description = description
-			? `${description} (File input: provide URL or file path)`
-			: 'File input: provide URL or file path';
+			? `${description} (File input: provide URL or file pathYYY)`
+			: 'a http or https url to a file';
 	}
 
 	if (description) {
