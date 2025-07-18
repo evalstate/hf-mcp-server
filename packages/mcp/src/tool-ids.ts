@@ -69,6 +69,13 @@ export const TOOL_ID_GROUPS = {
 		DATASET_DETAIL_TOOL_ID,
 		DOCS_SEMANTIC_SEARCH_TOOL_ID,
 	] as const,
+	hf_limited_set: [
+		SPACE_SEARCH_TOOL_ID,
+		MODEL_SEARCH_TOOL_ID,
+		DATASET_SEARCH_TOOL_ID,
+		PAPER_SEARCH_TOOL_ID,
+		DOCS_SEMANTIC_SEARCH_TOOL_ID,
+	] as const,
 	all: [...ALL_BUILTIN_TOOL_IDS] as const,
 } as const;
 

@@ -56,13 +56,13 @@ import { ToolSelectionStrategy, type ToolSelectionContext } from './lib/tool-sel
 
 // Fallback settings when API fails (enables all tools)
 export const BOUQUET_FALLBACK: AppSettings = {
-	builtInTools: [...TOOL_ID_GROUPS.hf_api],
+	builtInTools: [...TOOL_ID_GROUPS.hf_limited_set],
 	spaceTools: DEFAULT_SPACE_TOOLS,
 };
 
 // Default tools for unauthenticated users when using external settings API
 export const BOUQUET_ANON_DEFAULT: AppSettings = {
-	builtInTools: [...TOOL_ID_GROUPS.hf_api],
+	builtInTools: [...TOOL_ID_GROUPS.hf_limited_set],
 	spaceTools: DEFAULT_SPACE_TOOLS,
 };
 

@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import { logger } from './logger.js';
 import type { AppSettings } from '../../shared/settings.js';
 import type { TransportInfo } from '../../shared/transport-info.js';
-import { BOUQUET_FALLBACK } from '../mcp-server.js';
+import { BOUQUET_ANON_DEFAULT, BOUQUET_FALLBACK } from '../mcp-server.js';
 import { ALL_BUILTIN_TOOL_IDS } from '@llmindset/hf-mcp';
 import { apiMetrics } from '../utils/api-metrics.js';
 export interface ToolStateChangeCallback {
@@ -81,7 +81,7 @@ export class McpApiClient extends EventEmitter {
 						// Record anonymous access (successful fallback usage)
 						apiMetrics.recordCall(false, 200);
 						logger.debug('No HF token available for external config API - using fallback');
-						return BOUQUET_FALLBACK;
+						return BOUQUET_ANON_DEFAULT;
 					}
 
 					const headers: Record<string, string> = {};
