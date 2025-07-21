@@ -157,8 +157,9 @@ export class StatelessHttpTransport extends BaseTransport {
 				// Skip Gradio endpoints for initialize requests or non-Gradio tool calls
 				const skipGradio = this.skipGradioSetup(requestBody);
 				server = await this.serverFactory(headers, undefined, skipGradio);
-				directResponse = skipGradio;
-				logger.error(`setting direct response to ${directResponse}`);
+
+				// For Gradio tool calls, disable direct response to enable streaming/progress notifications
+				directResponse = !this.isGradioToolCall(requestBody);
 			} else {
 				// Create fresh stub responder for simple requests
 				server = new McpServer({ name: '@huggingface/internal-responder', version: '0.0.1' });

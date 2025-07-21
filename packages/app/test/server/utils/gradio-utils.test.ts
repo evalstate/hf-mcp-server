@@ -139,14 +139,16 @@ describe('createGradioToolName', () => {
 			
 			expect(result1.length).toBeLessThanOrEqual(40);
 			expect(result2.length).toBeLessThanOrEqual(40);
-			expect(result1).toBe('gr1_very_long_space_name_that_exceeds_f');
-			expect(result2).toBe('grp1000_very_long_space_name_that_exce');
+			// Check actual lengths and content
+			expect(result1).toBe('gr1_very_long_space_name_that_exceeds_fo');
+			expect(result2).toBe('grp1000_very_long_space_name_that_exceed');
 		});
 
 		it('should handle edge cases with exactly 40 characters', () => {
-			// Test case where the name fits exactly
-			const result = createGradioToolName('exactly_thirty_one_chars_long_here', 0, false);
-			expect(result).toBe('gr1_exactly_thirty_one_chars_long_here');
+			// Create a name that will result in exactly 40 chars: gr1_ + 36 chars = 40 total
+			const exactName = 'space_name_that_is_exactly_thirtysix'; // 36 chars
+			const result = createGradioToolName(exactName, 0, false);
+			expect(result).toBe('gr1_space_name_that_is_exactly_thirtysix');
 			expect(result.length).toBe(40);
 		});
 	});

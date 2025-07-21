@@ -210,6 +210,26 @@ export abstract class BaseTransport {
 	 * Determine if Gradio endpoints should be skipped based on request type
 	 * Returns true for initialize requests or non-Gradio tool calls
 	 */
+	/**
+	 * Determines if a request is a tools/call targeting a Gradio endpoint
+	 * @param requestBody - The JSON-RPC request body
+	 * @returns true if this is a tools/call for a Gradio tool, false otherwise
+	 */
+	protected isGradioToolCall(requestBody: unknown): boolean {
+		const body = requestBody as { method?: string; params?: { name?: string } } | undefined;
+		const methodName = body?.method || 'unknown';
+
+		// Check if this is a tools/call with a valid tool name
+		if (methodName === 'tools/call' && body?.params && typeof body.params === 'object' && 'name' in body.params) {
+			const toolName = body.params.name;
+			if (typeof toolName === 'string') {
+				return isGradioTool(toolName);
+			}
+		}
+
+		return false;
+	}
+
 	protected skipGradioSetup(requestBody: unknown): boolean {
 		const body = requestBody as { method?: string; params?: { name?: string } } | undefined;
 
@@ -220,13 +240,10 @@ export abstract class BaseTransport {
 			return true;
 		}
 
-		// For tools/call, check if it's a Gradio tool
-		if (methodName === 'tools/call' && body?.params && typeof body.params === 'object' && 'name' in body.params) {
-			const toolName = body.params.name;
-			if (typeof toolName === 'string') {
-				// Return true (skip) for non-Gradio tools, false (don't skip) for Gradio tools
-				return !isGradioTool(toolName);
-			}
+		// For tools/call, check if it's a Gradio tool using the dedicated method
+		if (methodName === 'tools/call') {
+			// Return true (skip) for non-Gradio tools, false (don't skip) for Gradio tools
+			return !this.isGradioToolCall(requestBody);
 		}
 
 		// For other methods, don't skip Gradio (conservative default)
