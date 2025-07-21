@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getTokenDisplayText } from './transport-info.js';
-import type { TransportInfo } from './transport-info.js';
+import { getTokenDisplayText } from '../../src/shared/transport-info.js';
+import type { TransportInfo } from '../../src/shared/transport-info.js';
 
 describe('getTokenDisplayText', () => {
 	describe('STDIO mode', () => {

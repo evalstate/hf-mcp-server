@@ -8,7 +8,7 @@ import { Application } from './application.js';
 import { WebServer } from './web-server.js';
 import { DEFAULT_WEB_APP_PORT } from '../shared/constants.js';
 import { parseArgs } from 'node:util';
-import { logger, forceLoggerToStderr } from './lib/logger.js';
+import { logger, forceLoggerToStderr } from './utils/logger.js';
 
 // Force logger to use STDERR. The environment variable may not have been set in dev, so just force it.
 forceLoggerToStderr();

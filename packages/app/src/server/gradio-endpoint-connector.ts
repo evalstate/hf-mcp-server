@@ -3,9 +3,9 @@ import { SSEClientTransport, type SSEClientTransportOptions } from '@modelcontex
 import { CallToolResultSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import { logger } from './lib/logger.js';
+import { logger } from './utils/logger.js';
 import { z } from 'zod';
-import type { GradioEndpoint } from './lib/mcp-api-client.js';
+import type { GradioEndpoint } from './utils/mcp-api-client.js';
 import { spaceInfo } from '@huggingface/hub';
 import { gradioMetrics, getMetricsSafeName } from './utils/gradio-metrics.js';
 import { GRADIO_PREFIX, GRADIO_PRIVATE_PREFIX } from '../shared/constants.js';

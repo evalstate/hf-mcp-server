@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isBrowser } from './browser-detection.js';
+import { isBrowser } from '../../../src/server/utils/browser-detection.js';
 
 describe('isBrowser', () => {
 	it('returns false when accept header is missing', () => {

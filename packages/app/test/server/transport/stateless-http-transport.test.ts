@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { StatelessHttpTransport } from './stateless-http-transport.js';
-import type { ServerFactory } from './base-transport.js';
+import { StatelessHttpTransport } from '../../../src/server/transport/stateless-http-transport.js';
+import type { ServerFactory } from '../../../src/server/transport/base-transport.js';
 import express from 'express';
 
 describe('StatelessHttpTransport', () => {

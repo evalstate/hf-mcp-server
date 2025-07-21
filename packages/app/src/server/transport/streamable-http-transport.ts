@@ -2,7 +2,7 @@ import { StatefulTransport, type TransportOptions, type BaseSession } from './ba
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { randomUUID } from 'node:crypto';
 import type { Request, Response } from 'express';
-import { logger } from '../lib/logger.js';
+import { logger } from '../utils/logger.js';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { extractQueryParamsToHeaders } from '../utils/query-params.js';

@@ -1,6 +1,6 @@
 import { BaseTransport, type TransportOptions, STATELESS_MODE, type SessionMetadata } from './base-transport.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { logger } from '../lib/logger.js';
+import { logger } from '../utils/logger.js';
 import type { Request, Response } from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
@@ -47,7 +47,6 @@ export class StatelessHttpTransport extends BaseTransport {
 	}
 
 	initialize(_options: TransportOptions): Promise<void> {
-		// Handle POST requests (the only valid method for stateless JSON-RPC)
 		this.app.post('/mcp', (req: Request, res: Response) => {
 			this.trackRequest();
 			void this.handleJsonRpcRequest(req, res);
@@ -156,7 +155,7 @@ export class StatelessHttpTransport extends BaseTransport {
 				extractQueryParamsToHeaders(req, headers);
 
 				// Skip Gradio endpoints for initialize requests or non-Gradio tool calls
-				const skipGradio = this.shouldSkipGradio(requestBody);
+				const skipGradio = this.skipGradioSetup(requestBody);
 				server = await this.serverFactory(headers, undefined, skipGradio);
 			} else {
 				// Create fresh stub responder for simple requests

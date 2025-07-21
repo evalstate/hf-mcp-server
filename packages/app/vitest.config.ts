@@ -8,6 +8,9 @@ export default defineConfig({
 		env: {
 			NODE_ENV: 'test',
 		},
+		typecheck: {
+			tsconfig: './tsconfig.test.json',
+		},
 	},
 	resolve: {
 		alias: {

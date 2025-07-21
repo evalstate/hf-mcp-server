@@ -47,12 +47,12 @@ import {
 } from '@llmindset/hf-mcp';
 
 import type { ServerFactory } from './transport/base-transport.js';
-import type { McpApiClient } from './lib/mcp-api-client.js';
+import type { McpApiClient } from './utils/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
-import { logger } from './lib/logger.js';
+import { logger } from './utils/logger.js';
 import { DEFAULT_SPACE_TOOLS, type AppSettings } from '../shared/settings.js';
 import { extractAuthBouquetAndMix } from './utils/auth-utils.js';
-import { ToolSelectionStrategy, type ToolSelectionContext } from './lib/tool-selection-strategy.js';
+import { ToolSelectionStrategy, type ToolSelectionContext } from './utils/tool-selection-strategy.js';
 
 // Fallback settings when API fails (enables all tools)
 export const BOUQUET_FALLBACK: AppSettings = {
