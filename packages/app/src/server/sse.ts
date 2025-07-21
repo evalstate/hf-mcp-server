@@ -4,7 +4,7 @@ import { Application } from './application.js';
 import { WebServer } from './web-server.js';
 import { DEFAULT_WEB_APP_PORT } from '../shared/constants.js';
 import { parseArgs } from 'node:util';
-import { logger } from './lib/logger.js';
+import { logger } from './utils/logger.js';
 
 // Parse command line arguments
 const { values } = parseArgs({

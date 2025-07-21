@@ -1,6 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Express } from 'express';
-import { logger } from '../lib/logger.js';
+import { logger } from '../utils/logger.js';
 import type { TransportMetrics } from '../../shared/transport-metrics.js';
 import { MetricsCounter } from '../../shared/transport-metrics.js';
 import type { AppSettings } from '../../shared/settings.js';
@@ -8,6 +8,7 @@ import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import { whoAmI, HubApiError } from '@huggingface/hub';
 import { extractAuthBouquetAndMix } from '../utils/auth-utils.js';
 import { getMetricsSafeName } from '../utils/gradio-metrics.js';
+import { isGradioTool } from '../utils/gradio-utils.js';
 
 /**
  * Factory function to create server instances
@@ -209,7 +210,27 @@ export abstract class BaseTransport {
 	 * Determine if Gradio endpoints should be skipped based on request type
 	 * Returns true for initialize requests or non-Gradio tool calls
 	 */
-	protected shouldSkipGradio(requestBody: unknown): boolean {
+	/**
+	 * Determines if a request is a tools/call targeting a Gradio endpoint
+	 * @param requestBody - The JSON-RPC request body
+	 * @returns true if this is a tools/call for a Gradio tool, false otherwise
+	 */
+	protected isGradioToolCall(requestBody: unknown): boolean {
+		const body = requestBody as { method?: string; params?: { name?: string } } | undefined;
+		const methodName = body?.method || 'unknown';
+
+		// Check if this is a tools/call with a valid tool name
+		if (methodName === 'tools/call' && body?.params && typeof body.params === 'object' && 'name' in body.params) {
+			const toolName = body.params.name;
+			if (typeof toolName === 'string') {
+				return isGradioTool(toolName);
+			}
+		}
+
+		return false;
+	}
+
+	protected skipGradioSetup(requestBody: unknown): boolean {
 		const body = requestBody as { method?: string; params?: { name?: string } } | undefined;
 
 		const methodName = body?.method || 'unknown';
@@ -219,13 +240,10 @@ export abstract class BaseTransport {
 			return true;
 		}
 
-		// For tools/call, check if it's a Gradio tool (gr<number>_* or grp<number>_*)
-		if (methodName === 'tools/call' && body?.params && typeof body.params === 'object' && 'name' in body.params) {
-			const toolName = body.params.name;
-			if (typeof toolName === 'string') {
-				// Gradio tools follow pattern: gr<number>_<name> or grp<number>_<name>
-				return !/^grp?\d+_/.test(toolName);
-			}
+		// For tools/call, check if it's a Gradio tool using the dedicated method
+		if (methodName === 'tools/call') {
+			// Return true (skip) for non-Gradio tools, false (don't skip) for Gradio tools
+			return !this.isGradioToolCall(requestBody);
 		}
 
 		// For other methods, don't skip Gradio (conservative default)

@@ -4,12 +4,12 @@ import {
 	ToolSelectionMode,
 	BOUQUETS,
 	type ToolSelectionContext,
-} from './tool-selection-strategy.js';
-import { McpApiClient, type ApiClientConfig } from './mcp-api-client.js';
-import type { AppSettings } from '../../shared/settings.js';
-import type { TransportInfo } from '../../shared/transport-info.js';
+} from '../../../src/server/utils/tool-selection-strategy.js';
+import { McpApiClient, type ApiClientConfig } from '../../../src/server/utils/mcp-api-client.js';
+import type { AppSettings } from '../../../src/shared/settings.js';
+import type { TransportInfo } from '../../../src/shared/transport-info.js';
 import { ALL_BUILTIN_TOOL_IDS, TOOL_ID_GROUPS } from '@llmindset/hf-mcp';
-import { extractAuthBouquetAndMix } from '../utils/auth-utils.js';
+import { extractAuthBouquetAndMix } from '../../../src/server/utils/auth-utils.js';
 
 describe('extractBouquetAndMix', () => {
 	it('should extract bouquet from headers', () => {
@@ -628,7 +628,7 @@ describe('ToolSelectionStrategy', () => {
 			const result = await strategy.selectTools(context);
 
 			expect(result.enabledToolIds).toEqual(['hf_doc_search', 'hf_doc_fetch', 'hf_model_search']);
-			expect(result.enabledToolIds.filter(id => id === 'hf_doc_fetch')).toHaveLength(1);
+			expect(result.enabledToolIds.filter((id) => id === 'hf_doc_fetch')).toHaveLength(1);
 		});
 
 		it('should work with bouquet override', async () => {

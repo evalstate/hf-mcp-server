@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseSchemaResponse, convertJsonSchemaToZod } from './gradio-endpoint-connector.js';
+import { parseSchemaResponse, convertJsonSchemaToZod } from '../../src/server/gradio-endpoint-connector.js';
 import { z } from 'zod';
 
 describe('parseSchemaResponse', () => {

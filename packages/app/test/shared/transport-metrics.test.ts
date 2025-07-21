@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isInitializeRequest } from './transport-metrics.js';
+import { isInitializeRequest } from '../../src/shared/transport-metrics.js';
 
 describe('isInitializeRequest', () => {
 	it('should identify initialize requests', () => {

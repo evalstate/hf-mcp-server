@@ -1,6 +1,6 @@
 import { StatefulTransport, type TransportOptions, type BaseSession } from './base-transport.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { logger } from '../lib/logger.js';
+import { logger } from '../utils/logger.js';
 import type { Request, Response } from 'express';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';

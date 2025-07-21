@@ -1,4 +1,4 @@
-import { logger } from '../lib/logger.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Extracts HF token, bouquet, and mix from headers and environment

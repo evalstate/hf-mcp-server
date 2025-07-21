@@ -4,10 +4,10 @@ import type { TransportInfo } from '../shared/transport-info.js';
 import { createTransport } from './transport/transport-factory.js';
 import type { BaseTransport, ServerFactory } from './transport/base-transport.js';
 import type { WebServer } from './web-server.js';
-import { logger } from './lib/logger.js';
+import { logger } from './utils/logger.js';
 import { createServerFactory } from './mcp-server.js';
 import { createProxyServerFactory } from './mcp-proxy.js';
-import { McpApiClient, type ApiClientConfig, type GradioEndpoint } from './lib/mcp-api-client.js';
+import { McpApiClient, type ApiClientConfig, type GradioEndpoint } from './utils/mcp-api-client.js';
 import { DEFAULT_SPACE_TOOLS, type SpaceTool } from '../shared/settings.js';
 
 export interface ApplicationOptions {

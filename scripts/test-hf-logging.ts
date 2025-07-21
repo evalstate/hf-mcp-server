@@ -5,7 +5,7 @@
  * Usage: tsx test-hf-logging.ts <dataset-id>
  */
 
-import { HfDatasetLogger } from '../packages/app/src/server/lib/hf-dataset-transport.js';
+import { HfDatasetLogger } from '../packages/app/src/server/utils/hf-dataset-transport.js';
 
 interface TestConfig {
 	datasetId: string;

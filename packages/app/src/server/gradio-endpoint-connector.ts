@@ -2,12 +2,13 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport, type SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js';
 import { CallToolResultSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { logger } from './lib/logger.js';
+import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import { logger } from './utils/logger.js';
 import { z } from 'zod';
-import type { GradioEndpoint } from './lib/mcp-api-client.js';
+import type { GradioEndpoint } from './utils/mcp-api-client.js';
 import { spaceInfo } from '@huggingface/hub';
 import { gradioMetrics, getMetricsSafeName } from './utils/gradio-metrics.js';
-import { GRADIO_PREFIX, GRADIO_PRIVATE_PREFIX } from '../shared/constants.js';
+import { createGradioToolName } from './utils/gradio-utils.js';
 
 // Define types for JSON Schema
 interface JsonSchemaProperty {
@@ -374,11 +375,8 @@ async function createLazyConnection(sseUrl: string, hfToken: string | undefined)
  * Registers a remote tool from a Gradio endpoint
  */
 export function registerRemoteTool(server: McpServer, connection: EndpointConnection, hfToken?: string): void {
-	// Use new naming convention: gr<index>_<sanitized_name> or grp<index>_<sanitized_name> for private
-	// Convert "evalstate/flux1_schnell" to "evalstate_flux1_schnell"
-	const sanitizedName = connection.name ? connection.name.replace(/[/\-\s.]+/g, '_').toLowerCase() : 'unknown';
-	const prefix = connection.isPrivate ? GRADIO_PRIVATE_PREFIX : GRADIO_PREFIX;
-	const remoteName = `${prefix}${(connection.originalIndex + 1).toString()}_${sanitizedName}`;
+	// Generate tool name using centralized logic
+	const remoteName = createGradioToolName(connection.name || 'unknown', connection.originalIndex, connection.isPrivate);
 	logger.trace(
 		{
 			endpointId: connection.endpointId,
@@ -436,7 +434,7 @@ export function registerRemoteTool(server: McpServer, connection: EndpointConnec
 			openWorldHint: true,
 			title: toolTitle,
 		}, // annotations parameter
-		async (params: Record<string, unknown>) => {
+		async (params: Record<string, unknown>, extra) => {
 			logger.info({ tool: connection.tool.name, params }, 'Calling remote tool');
 			try {
 				// Since we use schema fetch, we always need to create SSE connection for tool execution
@@ -446,15 +444,45 @@ export function registerRemoteTool(server: McpServer, connection: EndpointConnec
 				logger.debug({ tool: connection.tool.name }, 'Creating SSE connection for tool execution');
 				const activeClient = await createLazyConnection(connection.sseUrl, hfToken);
 
+				// Check if the client is requesting progress notifications
+				const progressToken = extra._meta?.progressToken;
+				const requestOptions: RequestOptions = {};
+
+				if (progressToken !== undefined) {
+					logger.debug({ tool: connection.tool.name, progressToken }, 'Progress notifications requested');
+					
+					// Set up progress relay from remote tool to our client
+					requestOptions.onprogress = async (progress) => {
+						logger.trace(
+							{ tool: connection.tool.name, progressToken, progress },
+							'Relaying progress notification'
+						);
+						
+						// Relay the progress notification to our client
+						await extra.sendNotification({
+							method: 'notifications/progress',
+							params: {
+								progressToken,
+								progress: progress.progress,
+								total: progress.total,
+								message: progress.message,
+							},
+						});
+					};
+				}
+
 				const result = await activeClient.request(
 					{
 						method: 'tools/call',
 						params: {
 							name: connection.tool.name,
 							arguments: params,
+							// Pass through the progress token to the remote tool
+							_meta: progressToken !== undefined ? { progressToken } : undefined,
 						},
 					},
-					CallToolResultSchema
+					CallToolResultSchema,
+					requestOptions
 				);
 				// For metrics, use the safe name utility
 				const metricsName = getMetricsSafeName(remoteName);
