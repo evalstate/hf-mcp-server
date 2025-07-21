@@ -8,7 +8,7 @@ import { z } from 'zod';
 import type { GradioEndpoint } from './utils/mcp-api-client.js';
 import { spaceInfo } from '@huggingface/hub';
 import { gradioMetrics, getMetricsSafeName } from './utils/gradio-metrics.js';
-import { GRADIO_PREFIX, GRADIO_PRIVATE_PREFIX } from '../shared/constants.js';
+import { createGradioToolName } from './utils/gradio-utils.js';
 
 // Define types for JSON Schema
 interface JsonSchemaProperty {
@@ -375,11 +375,8 @@ async function createLazyConnection(sseUrl: string, hfToken: string | undefined)
  * Registers a remote tool from a Gradio endpoint
  */
 export function registerRemoteTool(server: McpServer, connection: EndpointConnection, hfToken?: string): void {
-	// Use new naming convention: gr<index>_<sanitized_name> or grp<index>_<sanitized_name> for private
-	// Convert "evalstate/flux1_schnell" to "evalstate_flux1_schnell"
-	const sanitizedName = connection.name ? connection.name.replace(/[/\-\s.]+/g, '_').toLowerCase() : 'unknown';
-	const prefix = connection.isPrivate ? GRADIO_PRIVATE_PREFIX : GRADIO_PREFIX;
-	const remoteName = `${prefix}${(connection.originalIndex + 1).toString()}_${sanitizedName}`;
+	// Generate tool name using centralized logic
+	const remoteName = createGradioToolName(connection.name || 'unknown', connection.originalIndex, connection.isPrivate);
 	logger.trace(
 		{
 			endpointId: connection.endpointId,
