@@ -131,6 +131,24 @@ describe('createGradioToolName', () => {
 			expect(createGradioToolName('test', 1, false)).toBe('gr2_test');
 			expect(createGradioToolName('test', 10, true)).toBe('grp11_test');
 		});
+
+		it('should enforce 40-character limit', () => {
+			const longName = 'very_long_space_name_that_exceeds_forty_characters_total';
+			const result1 = createGradioToolName(longName, 0, false);
+			const result2 = createGradioToolName(longName, 999, true);
+			
+			expect(result1.length).toBeLessThanOrEqual(40);
+			expect(result2.length).toBeLessThanOrEqual(40);
+			expect(result1).toBe('gr1_very_long_space_name_that_exceeds_f');
+			expect(result2).toBe('grp1000_very_long_space_name_that_exce');
+		});
+
+		it('should handle edge cases with exactly 40 characters', () => {
+			// Test case where the name fits exactly
+			const result = createGradioToolName('exactly_thirty_one_chars_long_here', 0, false);
+			expect(result).toBe('gr1_exactly_thirty_one_chars_long_here');
+			expect(result.length).toBe(40);
+		});
 	});
 
 	describe('integration with DEFAULT_SPACE_TOOLS examples', () => {

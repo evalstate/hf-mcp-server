@@ -149,7 +149,7 @@ export class StatelessHttpTransport extends BaseTransport {
 
 			// Determine which server to use
 			const useFullServer = this.shouldHandle(requestBody);
-
+			let directResponse = true;
 			if (useFullServer) {
 				// Create new server instance using factory with request headers and bouquet
 				extractQueryParamsToHeaders(req, headers);
@@ -157,6 +157,8 @@ export class StatelessHttpTransport extends BaseTransport {
 				// Skip Gradio endpoints for initialize requests or non-Gradio tool calls
 				const skipGradio = this.skipGradioSetup(requestBody);
 				server = await this.serverFactory(headers, undefined, skipGradio);
+				directResponse = skipGradio;
+				logger.error(`setting direct response to ${directResponse}`);
 			} else {
 				// Create fresh stub responder for simple requests
 				server = new McpServer({ name: '@huggingface/internal-responder', version: '0.0.1' });
@@ -165,7 +167,7 @@ export class StatelessHttpTransport extends BaseTransport {
 			// Create new transport instance for this request
 			transport = new StreamableHTTPServerTransport({
 				sessionIdGenerator: undefined,
-				enableJsonResponse: true,
+				enableJsonResponse: directResponse,
 			});
 
 			// Setup cleanup handlers - only cleanup on client disconnect
