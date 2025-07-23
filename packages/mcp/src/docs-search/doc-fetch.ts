@@ -4,7 +4,8 @@ import { estimateTokens } from '../utilities.js';
 
 export const DOC_FETCH_CONFIG = {
 	name: 'hf_doc_fetch',
-	description: 'Fetch a document from the Hugging Face documentation library. For large documents, use offset to get subsequent chunks.',
+	description:
+		'Fetch a document from the Hugging Face documentation library. For large documents, use offset to get subsequent chunks.',
 	schema: z.object({
 		doc_url: z
 			.string()
@@ -35,6 +36,15 @@ export class DocFetchTool {
 			headingStyle: 'atx',
 			codeBlockStyle: 'fenced',
 		});
+		this.turndownService.remove('head');
+		this.turndownService.remove('script');
+		this.turndownService.remove((node) => {
+			console.log(`${node.nodeName}	`);
+			if (node.nodeName === 'a' && node.innerHTML.includes('<!-- HTML_TAG_START -->')) {
+				return true;
+			}
+			return false;
+		});
 	}
 
 	/**
@@ -60,10 +70,10 @@ export class DocFetchTool {
 			}
 
 			const htmlContent = await response.text();
-			
+
 			// Convert HTML to Markdown
 			const fullMarkdownContent = this.turndownService.turndown(htmlContent);
-			
+
 			// Apply chunking logic
 			return this.applyChunking(fullMarkdownContent, params.offset || 0);
 		} catch (error) {
@@ -77,37 +87,37 @@ export class DocFetchTool {
 	private applyChunking(markdownContent: string, offset: number): string {
 		const totalTokens = estimateTokens(markdownContent);
 		const maxTokensPerChunk = 7500;
-		
+
 		// Calculate character positions based on tokens
 		const totalChars = markdownContent.length;
 		const charsPerToken = totalChars / totalTokens;
 		const startChar = Math.floor(offset * charsPerToken);
-		
+
 		// If offset is beyond document, return error message
 		if (startChar >= totalChars) {
 			return `Error: Offset ${offset} is beyond the document length (${totalTokens} tokens total).`;
 		}
-		
+
 		// If document is small enough and no offset, return as-is
 		if (totalTokens <= maxTokensPerChunk && offset === 0) {
 			return markdownContent;
 		}
-		
+
 		const maxCharsPerChunk = Math.floor(maxTokensPerChunk * charsPerToken);
 		const endChar = Math.min(startChar + maxCharsPerChunk, totalChars);
 		const chunk = markdownContent.slice(startChar, endChar);
-		
+
 		// Calculate next offset
 		const nextOffset = offset + estimateTokens(chunk);
 		const hasMore = nextOffset < totalTokens;
-		
+
 		let result = chunk;
-		
+
 		// Add truncation message if there's more content
 		if (hasMore) {
 			result += `\n\n=== DOCUMENT TRUNCATED. CALL ${DOC_FETCH_CONFIG.name} WITH AN OFFSET OF ${nextOffset} FOR THE NEXT CHUNK ===`;
 		}
-		
+
 		return result;
 	}
 }
