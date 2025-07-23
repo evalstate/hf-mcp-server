@@ -4,7 +4,7 @@ import type { McpApiClient } from './utils/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
 import type { AppSettings } from '../shared/settings.js';
 import { logger } from './utils/logger.js';
-import { connectToGradioEndpoints, registerRemoteTool } from './gradio-endpoint-connector.js';
+import { connectToGradioEndpoints, registerRemoteTools } from './gradio-endpoint-connector.js';
 import { extractAuthBouquetAndMix } from './utils/auth-utils.js';
 
 /**
@@ -105,7 +105,7 @@ export const createProxyServerFactory = (
 		for (const result of connections) {
 			if (!result.success) continue;
 
-			registerRemoteTool(server, result.connection, hfToken);
+			registerRemoteTools(server, result.connection, hfToken);
 		}
 
 		logger.debug('Server ready with local and remote tools');
