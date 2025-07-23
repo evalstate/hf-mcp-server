@@ -214,7 +214,23 @@ export class StatelessHttpTransport extends BaseTransport {
 				'Request completed'
 			);
 		} catch (error) {
-			logger.error({ error, method: trackingName }, 'Error handling request');
+			// Extract more error information for better debugging
+			const errorInfo = {
+				message: error instanceof Error ? error.message : String(error),
+				stack: error instanceof Error ? error.stack : undefined,
+				name: error instanceof Error ? error.name : undefined,
+				...(error && typeof error === 'object' ? error : {}),
+			};
+
+			logger.error(
+				{
+					error: errorInfo,
+					method: trackingName,
+					requestBody: requestBody?.method,
+					headers: Object.keys(headers),
+				},
+				'Error handling request'
+			);
 
 			// Track failed method call
 			this.trackMethodCall(trackingName, startTime, true);
