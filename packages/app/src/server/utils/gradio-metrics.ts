@@ -25,6 +25,7 @@ export class GradioMetricsCollector {
 		failure: 0,
 		byTool: {},
 	};
+	schemaFetchErrors: Set<string> = new Set();
 
 	private constructor() {}
 
@@ -94,6 +95,15 @@ export class GradioMetricsCollector {
 		const total = this.metrics.success + this.metrics.failure;
 		const successRate = total > 0 ? ((this.metrics.success / total) * 100).toFixed(1) : '0.0';
 		return `Gradio Tool Calls - Total: ${total}, Success: ${this.metrics.success}, Failure: ${this.metrics.failure}, Success Rate: ${successRate}%`;
+	}
+
+	/** we only want to log schema fetch failures for a specific endpoint once */
+	public schemaFetchError(toolName: string): boolean {
+		if (this.schemaFetchErrors.has(toolName)) {
+			return false;
+		}
+		this.schemaFetchErrors.add(toolName);
+		return true;
 	}
 }
 

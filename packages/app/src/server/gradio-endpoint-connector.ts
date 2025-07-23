@@ -271,14 +271,17 @@ export async function connectToGradioEndpoints(
 				})
 			)
 			.catch((error: unknown): EndpointConnectionResult => {
-				logger.error(
-					{
-						endpointId,
-						subdomain: endpoint.subdomain,
-						error: error instanceof Error ? error.message : String(error),
-					},
-					'Failed to fetch schema from endpoint'
-				);
+				const log = gradioMetrics.schemaFetchError(endpoint.name);
+				if (log) {
+					logger.error(
+						{
+							endpointId,
+							subdomain: endpoint.subdomain,
+							error: error instanceof Error ? error.message : String(error),
+						},
+						'Failed to fetch schema from endpoint'
+					);
+				}
 				return {
 					success: false,
 					endpointId,
@@ -302,20 +305,6 @@ export async function connectToGradioEndpoints(
 		},
 		'Gradio endpoint schema fetch results'
 	);
-
-	// Log failed endpoints separately for debugging.
-	// switched to "debug" level as these are errored at point of failure.
-	if (failed.length > 0) {
-		failed.forEach((f) => {
-			logger.debug(
-				{
-					endpointId: f.endpointId,
-					error: f.error.message,
-				},
-				'Endpoint schema fetch failed'
-			);
-		});
-	}
 
 	return results;
 }
@@ -450,14 +439,11 @@ export function registerRemoteTool(server: McpServer, connection: EndpointConnec
 
 				if (progressToken !== undefined) {
 					logger.debug({ tool: connection.tool.name, progressToken }, 'Progress notifications requested');
-					
+
 					// Set up progress relay from remote tool to our client
 					requestOptions.onprogress = async (progress) => {
-						logger.trace(
-							{ tool: connection.tool.name, progressToken, progress },
-							'Relaying progress notification'
-						);
-						
+						logger.trace({ tool: connection.tool.name, progressToken, progress }, 'Relaying progress notification');
+
 						// Relay the progress notification to our client
 						await extra.sendNotification({
 							method: 'notifications/progress',
