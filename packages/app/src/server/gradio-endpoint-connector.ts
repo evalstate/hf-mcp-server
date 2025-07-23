@@ -1,8 +1,13 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport, type SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js';
-import { CallToolResultSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
+import {
+	CallToolResultSchema,
+	type ServerNotification,
+	type ServerRequest,
+	type Tool,
+} from '@modelcontextprotocol/sdk/types.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { RequestHandlerExtra, RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { logger } from './utils/logger.js';
 import { z } from 'zod';
 import type { GradioEndpoint } from './utils/mcp-api-client.js';
@@ -15,6 +20,7 @@ interface JsonSchemaProperty {
 	type?: string;
 	description?: string;
 	default?: unknown;
+	enum?: unknown[];
 	[key: string]: unknown;
 }
 
@@ -80,7 +86,7 @@ export function parseSchemaResponse(
 	let tools: Array<{ name: string; description?: string; inputSchema: JsonSchema }> = [];
 
 	if (Array.isArray(schemaResponse)) {
-		// Array format: [{ name: "toolName", description: "...", inputSchema: {...} }, ...]
+		// NEW-- Array format: [{ name: "toolName", description: "...", inputSchema: {...} }, ...]
 		tools = (schemaResponse as ArrayFormatTool[]).filter(
 			(tool): tool is ArrayFormatTool =>
 				typeof tool === 'object' &&
@@ -343,117 +349,77 @@ async function createLazyConnection(sseUrl: string, hfToken: string | undefined)
 }
 
 /**
- * Generates the outward-facing name for a tool
+ * Creates the display information for a tool
  */
-export function registerRemoteTool(server: McpServer, connection: EndpointConnection, hfToken?: string): void {
-	// Generate tool name using centralized logic
-	const remoteName = createGradioToolName(connection.name || 'unknown', connection.originalIndex, connection.isPrivate);
-	logger.trace(
-		{
-			endpointId: connection.endpointId,
-			originalName: connection.tool.name,
-			remoteName,
-			description: connection.tool.description,
-		},
-		'Registering remote tool'
-	);
+function createToolDisplayInfo(connection: EndpointConnection, tool: Tool): { title: string; description: string } {
+	const displayName = connection.name || 'Unknown Space';
+	const title = `${displayName} - ${tool.name}${connection.emoji ? ` ${connection.emoji}` : ''}`;
+	const description = tool.description
+		? `${tool.description} (from ${displayName})`
+		: `${tool.name} tool from ${displayName}`;
+	return { title, description };
+}
 
-	// Log the exact structure we're getting
-	logger.trace(
-		{
-			toolName: connection.tool.name,
-			inputSchema: connection.tool.inputSchema,
-		},
-		'Remote tool inputSchema structure'
-	);
+/**
+ * Creates the tool handler function
+ */
+function createToolHandler(
+	connection: EndpointConnection,
+	tool: Tool,
+	outwardFacingName: string,
+	hfToken?: string
+): (
+	params: Record<string, unknown>,
+	extra: RequestHandlerExtra<ServerRequest, ServerNotification>
+) => Promise<typeof CallToolResultSchema._type> {
+	return async (params: Record<string, unknown>, extra) => {
+		logger.info({ tool: tool.name, params }, 'Calling remote tool');
+		try {
+			// Since we use schema fetch, we always need to create SSE connection for tool execution
+			if (!connection.sseUrl) {
+				throw new Error('No SSE URL available for tool execution');
+			}
+			logger.debug({ tool: tool.name }, 'Creating SSE connection for tool execution');
+			const activeClient = await createLazyConnection(connection.sseUrl, hfToken);
 
-	// Convert JSON Schema to Zod schema
-	const schemaShape: Record<string, z.ZodTypeAny> = {};
+			// Check if the client is requesting progress notifications
+			const progressToken = extra._meta?.progressToken;
+			const requestOptions: RequestOptions = {};
 
-	if (typeof tool.inputSchema === 'object' && 'properties' in tool.inputSchema) {
-		const jsonSchema = tool.inputSchema as JsonSchema;
-		const props = jsonSchema.properties || {};
-		const required = jsonSchema.required || [];
+			if (progressToken !== undefined) {
+				logger.debug({ tool: tool.name, progressToken }, 'Progress notifications requested');
 
-		for (const [key, jsonSchemaProperty] of Object.entries(props)) {
-			const isRequired = required.includes(key);
+				// Set up progress relay from remote tool to our client
+				requestOptions.onprogress = async (progress) => {
+					logger.trace({ tool: tool.name, progressToken, progress }, 'Relaying progress notification');
 
-			// Convert to Zod schema, skipping defaults for required fields
-			let zodSchema = convertJsonSchemaToZod(jsonSchemaProperty, isRequired);
-
-			// Make optional if not in required array
-			if (!isRequired) {
-				zodSchema = zodSchema.optional();
+					// Relay the progress notification to our client
+					await extra.sendNotification({
+						method: 'notifications/progress',
+						params: {
+							progressToken,
+							progress: progress.progress,
+							total: progress.total,
+							message: progress.message,
+						},
+					});
+				};
 			}
 
-			schemaShape[key] = zodSchema;
-		}
-	}
-
-	// Create user-friendly title and description
-	const displayName = connection.name || 'Unknown Space';
-	const toolTitle = `${displayName} - ${connection.tool.name}${connection.emoji ? ` ${connection.emoji}` : ''}`;
-	const toolDescription = connection.tool.description
-		? `${connection.tool.description} (from ${displayName})`
-		: `${connection.tool.name} tool from ${displayName}`;
-
-	server.tool(
-		remoteName,
-		toolDescription,
-		schemaShape,
-		{
-			openWorldHint: true,
-			title: toolTitle,
-		}, // annotations parameter
-		async (params: Record<string, unknown>, extra) => {
-			logger.info({ tool: connection.tool.name, params }, 'Calling remote tool');
-			try {
-				// Since we use schema fetch, we always need to create SSE connection for tool execution
-				if (!connection.sseUrl) {
-					throw new Error('No SSE URL available for tool execution');
-				}
-				logger.debug({ tool: connection.tool.name }, 'Creating SSE connection for tool execution');
-				const activeClient = await createLazyConnection(connection.sseUrl, hfToken);
-
-				// Check if the client is requesting progress notifications
-				const progressToken = extra._meta?.progressToken;
-				const requestOptions: RequestOptions = {};
-
-				if (progressToken !== undefined) {
-					logger.debug({ tool: connection.tool.name, progressToken }, 'Progress notifications requested');
-
-					// Set up progress relay from remote tool to our client
-					requestOptions.onprogress = async (progress) => {
-						logger.trace({ tool: connection.tool.name, progressToken, progress }, 'Relaying progress notification');
-
-						// Relay the progress notification to our client
-						await extra.sendNotification({
-							method: 'notifications/progress',
-							params: {
-								progressToken,
-								progress: progress.progress,
-								total: progress.total,
-								message: progress.message,
-							},
-						});
-					};
-				}
-
-				const result = await activeClient.request(
-					{
-						method: 'tools/call',
-						params: {
-							name: connection.tool.name,
-							arguments: params,
-							// Pass through the progress token to the remote tool
-							_meta: progressToken !== undefined ? { progressToken } : undefined,
-						},
+			const result = await activeClient.request(
+				{
+					method: 'tools/call',
+					params: {
+						name: tool.name,
+						arguments: params,
+						_meta: progressToken !== undefined ? { progressToken } : undefined,
 					},
-					CallToolResultSchema,
-					requestOptions
-				);
-				// For metrics, use the safe name utility
-				const metricsName = getMetricsSafeName(remoteName);
+				},
+				CallToolResultSchema,
+				requestOptions
+			);
+			// For metrics, use the safe name utility
+			const metricsName = getMetricsSafeName(outwardFacingName);
 
 			if (result.isError) {
 				logger.warn({ tool: tool.name, error: result.content }, 'Gradio tool call returned error');
@@ -480,7 +446,7 @@ export function registerRemoteTool(server: McpServer, connection: EndpointConnec
 export function registerRemoteTools(server: McpServer, connection: EndpointConnection, hfToken?: string): void {
 	for (const tool of connection.tools) {
 		// Generate tool name
-		const outwardFacingName = generateToolName(connection, tool);
+		const outwardFacingName = createGradioToolName(tool.name, connection.originalIndex, connection.isPrivate);
 
 		// Create display info
 		const { title, description } = createToolDisplayInfo(connection, tool);
@@ -525,13 +491,30 @@ export function registerRemoteTools(server: McpServer, connection: EndpointConne
 	}
 }
 
-/**
- * Registers a remote tool from a Gradio endpoint (legacy single tool support)
- * @deprecated Use registerRemoteTools instead
- */
-export function registerRemoteTool(server: McpServer, connection: EndpointConnection, hfToken?: string): void {
-	// Simply delegate to the new function
-	registerRemoteTools(server, connection, hfToken);
+function convertToolSchemaToZod(tool: Tool): Record<string, z.ZodTypeAny> {
+	const schemaShape: Record<string, z.ZodTypeAny> = {};
+
+	if (typeof tool.inputSchema === 'object' && 'properties' in tool.inputSchema) {
+		const jsonSchema = tool.inputSchema as JsonSchema;
+		const props = jsonSchema.properties || {};
+		const required = jsonSchema.required || [];
+
+		for (const [key, jsonSchemaProperty] of Object.entries(props)) {
+			const isRequired = required.includes(key);
+
+			// Convert to Zod schema, skipping defaults for required fields
+			let zodSchema = convertJsonSchemaToZod(jsonSchemaProperty, isRequired);
+
+			// Make optional if not in required array
+			if (!isRequired) {
+				zodSchema = zodSchema.optional();
+			}
+
+			schemaShape[key] = zodSchema;
+		}
+	}
+
+	return schemaShape;
 }
 
 /**
@@ -563,6 +546,32 @@ export function convertJsonSchemaToZod(jsonSchemaProperty: JsonSchemaProperty, s
 				})
 				.optional(),
 		});
+	} else if (jsonSchemaProperty.enum && Array.isArray(jsonSchemaProperty.enum) && jsonSchemaProperty.enum.length > 0) {
+		// Handle enum types
+		if (jsonSchemaProperty.enum.every((v): v is string => typeof v === 'string')) {
+			const enumValues = jsonSchemaProperty.enum as [string, ...string[]];
+			zodSchema = z.enum(enumValues);
+		} else {
+			// Fallback for non-string enums - create a union of literals
+			const literals: z.ZodTypeAny[] = jsonSchemaProperty.enum.map((v) => {
+				if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null) {
+					return z.literal(v);
+				}
+				// For other types, convert to string
+				return z.literal(String(v));
+			});
+
+			if (literals.length === 1) {
+				// We know literals[0] exists because we checked length === 1
+				zodSchema = literals[0] ?? z.any();
+			} else if (literals.length >= 2) {
+				// Ensure we have at least 2 elements for union
+				zodSchema = z.union(literals as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]);
+			} else {
+				// This shouldn't happen due to our length check, but handle it anyway
+				zodSchema = z.any();
+			}
+		}
 	} else {
 		// Convert based on type
 		switch (jsonSchemaProperty.type) {
@@ -590,7 +599,7 @@ export function convertJsonSchemaToZod(jsonSchemaProperty: JsonSchemaProperty, s
 	let description = jsonSchemaProperty.description || '';
 	if (jsonSchemaProperty.format === 'a http or https url to a file' || jsonSchemaProperty.title === 'FileData') {
 		description = description
-			? `${description} (File input: provide URL or file pathYYY)`
+			? `${description} (File input: provide URL or file path)`
 			: 'a http or https url to a file';
 	}
 
@@ -598,7 +607,7 @@ export function convertJsonSchemaToZod(jsonSchemaProperty: JsonSchemaProperty, s
 		zodSchema = zodSchema.describe(description);
 	}
 
-	// Handle defaults (only if not skipping)
+	// Apply default value from the Schema
 	if (!skipDefault && 'default' in jsonSchemaProperty && jsonSchemaProperty.default !== undefined) {
 		let defaultValue = jsonSchemaProperty.default;
 

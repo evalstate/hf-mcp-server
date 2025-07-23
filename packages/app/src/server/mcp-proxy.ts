@@ -3,13 +3,8 @@ import type { ServerFactory } from './transport/base-transport.js';
 import type { McpApiClient } from './utils/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
 import type { AppSettings } from '../shared/settings.js';
-<<<<<<< HEAD
-import { logger } from './lib/logger.js';
-import { connectToGradioEndpoints, registerRemoteTools } from './gradio-endpoint-connector.js';
-=======
 import { logger } from './utils/logger.js';
-import { connectToGradioEndpoints, registerRemoteTool } from './gradio-endpoint-connector.js';
->>>>>>> origin/main
+import { connectToGradioEndpoints, registerRemoteTools } from './gradio-endpoint-connector.js';
 import { extractAuthBouquetAndMix } from './utils/auth-utils.js';
 
 /**
