@@ -40,20 +40,24 @@ export function createGradioToolName(toolName: string, index: number, isPrivate:
 	const prefix = isPrivate ? GRADIO_PRIVATE_PREFIX : GRADIO_PREFIX;
 	const indexStr = (index + 1).toString();
 
-	// Calculate available space for the sanitized name (40 - prefix - index - underscore)
-	const maxNameLength = 40 - prefix.length - indexStr.length - 1;
+	// Calculate available space for the sanitized name (45 - prefix - index - underscore)
+	const maxNameLength = 45 - prefix.length - indexStr.length - 1;
 
 	// Sanitize the tool name: replace special characters with underscores, normalize multiple underscores, and lowercase
 	let sanitizedName = toolName
 		? toolName
 				.replace(/[-\s.]+/g, '_') // Replace special chars with underscores
-				.replace(/_+/g, '_') // Normalize multiple underscores to single
 				.toLowerCase()
 		: 'unknown';
 
-	// Truncate if necessary to fit within 40 character limit
+	// Truncate from middle if necessary to fit within 45 character limit
 	if (sanitizedName.length > maxNameLength) {
-		sanitizedName = sanitizedName.substring(0, maxNameLength);
+		// Keep first 20 chars, add underscore, then keep as many chars from the end as possible
+		const keepFromEnd = maxNameLength - 20 - 1; // -1 for the underscore
+		sanitizedName = sanitizedName.substring(0, 20) + '_' + sanitizedName.slice(-keepFromEnd);
+	} else {
+		// Only normalize multiple underscores if we didn't truncate
+		sanitizedName = sanitizedName.replace(/_+/g, '_');
 	}
 
 	// Create tool name: {prefix}{1-based-index}_{sanitized_name}
