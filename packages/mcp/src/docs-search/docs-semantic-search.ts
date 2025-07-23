@@ -9,7 +9,7 @@ import { DOC_FETCH_CONFIG } from './doc-fetch.js';
 export const DOCS_SEMANTIC_SEARCH_CONFIG = {
 	name: 'hf_doc_search',
 	description:
-		'Search the Hugging Face documentation library. Use this for the most up-to-date information ' +
+		'Search documentation about all of Hugging Face products and libraries (Transformers, Datasets, Diffusers, Gradio, Hub, and more). Use this for the most up-to-date information ' +
 		'Returns excerpts grouped by Product and Document.',
 	schema: z.object({
 		query: z
