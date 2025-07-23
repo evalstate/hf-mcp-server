@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractQueryParamsToHeaders } from './query-params.js';
+import { extractQueryParamsToHeaders } from '../../../src/server/utils/query-params.js';
 import type { Request } from 'express';
 
 describe('extractQueryParamsToHeaders', () => {

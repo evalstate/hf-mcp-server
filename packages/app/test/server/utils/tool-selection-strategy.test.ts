@@ -1,15 +1,15 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
 	ToolSelectionStrategy,
 	ToolSelectionMode,
 	BOUQUETS,
 	type ToolSelectionContext,
-} from './tool-selection-strategy.js';
-import { McpApiClient, type ApiClientConfig } from './mcp-api-client.js';
-import type { AppSettings } from '../../shared/settings.js';
-import type { TransportInfo } from '../../shared/transport-info.js';
+} from '../../../src/server/utils/tool-selection-strategy.js';
+import { McpApiClient, type ApiClientConfig } from '../../../src/server/utils/mcp-api-client.js';
+import type { AppSettings } from '../../../src/shared/settings.js';
+import type { TransportInfo } from '../../../src/shared/transport-info.js';
 import { ALL_BUILTIN_TOOL_IDS, TOOL_ID_GROUPS } from '@llmindset/hf-mcp';
-import { extractAuthBouquetAndMix } from '../utils/auth-utils.js';
+import { extractAuthBouquetAndMix } from '../../../src/server/utils/auth-utils.js';
 
 describe('extractBouquetAndMix', () => {
 	it('should extract bouquet from headers', () => {
@@ -513,6 +513,175 @@ describe('ToolSelectionStrategy', () => {
 					emoji: '📊',
 				},
 			]);
+		});
+	});
+
+	describe('SEARCH_ENABLES_FETCH feature', () => {
+		const originalEnv = process.env.SEARCH_ENABLES_FETCH;
+
+		afterEach(() => {
+			// Restore original env value
+			if (originalEnv === undefined) {
+				delete process.env.SEARCH_ENABLES_FETCH;
+			} else {
+				process.env.SEARCH_ENABLES_FETCH = originalEnv;
+			}
+		});
+
+		it('should not auto-enable hf_doc_fetch when SEARCH_ENABLES_FETCH is not set', async () => {
+			delete process.env.SEARCH_ENABLES_FETCH;
+
+			const userSettings: AppSettings = {
+				builtInTools: ['hf_doc_search', 'hf_model_search'],
+				spaceTools: [],
+			};
+
+			const context: ToolSelectionContext = {
+				headers: {},
+				userSettings,
+				hfToken: 'test-token',
+			};
+
+			const result = await strategy.selectTools(context);
+
+			expect(result.enabledToolIds).toEqual(['hf_doc_search', 'hf_model_search']);
+			expect(result.enabledToolIds).not.toContain('hf_doc_fetch');
+		});
+
+		it('should not auto-enable hf_doc_fetch when SEARCH_ENABLES_FETCH is false', async () => {
+			process.env.SEARCH_ENABLES_FETCH = 'false';
+
+			const userSettings: AppSettings = {
+				builtInTools: ['hf_doc_search', 'hf_model_search'],
+				spaceTools: [],
+			};
+
+			const context: ToolSelectionContext = {
+				headers: {},
+				userSettings,
+				hfToken: 'test-token',
+			};
+
+			const result = await strategy.selectTools(context);
+
+			expect(result.enabledToolIds).toEqual(['hf_doc_search', 'hf_model_search']);
+			expect(result.enabledToolIds).not.toContain('hf_doc_fetch');
+		});
+
+		it('should auto-enable hf_doc_fetch when SEARCH_ENABLES_FETCH=true and hf_doc_search is enabled', async () => {
+			process.env.SEARCH_ENABLES_FETCH = 'true';
+
+			const userSettings: AppSettings = {
+				builtInTools: ['hf_doc_search', 'hf_model_search'],
+				spaceTools: [],
+			};
+
+			const context: ToolSelectionContext = {
+				headers: {},
+				userSettings,
+				hfToken: 'test-token',
+			};
+
+			const result = await strategy.selectTools(context);
+
+			expect(result.enabledToolIds).toContain('hf_doc_search');
+			expect(result.enabledToolIds).toContain('hf_doc_fetch');
+			expect(result.enabledToolIds).toContain('hf_model_search');
+			expect(result.enabledToolIds).toHaveLength(3);
+		});
+
+		it('should not add hf_doc_fetch when hf_doc_search is not enabled', async () => {
+			process.env.SEARCH_ENABLES_FETCH = 'true';
+
+			const userSettings: AppSettings = {
+				builtInTools: ['hf_model_search', 'hf_dataset_search'],
+				spaceTools: [],
+			};
+
+			const context: ToolSelectionContext = {
+				headers: {},
+				userSettings,
+				hfToken: 'test-token',
+			};
+
+			const result = await strategy.selectTools(context);
+
+			expect(result.enabledToolIds).not.toContain('hf_doc_search');
+			expect(result.enabledToolIds).not.toContain('hf_doc_fetch');
+			expect(result.enabledToolIds).toEqual(['hf_model_search', 'hf_dataset_search']);
+		});
+
+		it('should not duplicate hf_doc_fetch if already enabled', async () => {
+			process.env.SEARCH_ENABLES_FETCH = 'true';
+
+			const userSettings: AppSettings = {
+				builtInTools: ['hf_doc_search', 'hf_doc_fetch', 'hf_model_search'],
+				spaceTools: [],
+			};
+
+			const context: ToolSelectionContext = {
+				headers: {},
+				userSettings,
+				hfToken: 'test-token',
+			};
+
+			const result = await strategy.selectTools(context);
+
+			expect(result.enabledToolIds).toEqual(['hf_doc_search', 'hf_doc_fetch', 'hf_model_search']);
+			expect(result.enabledToolIds.filter((id) => id === 'hf_doc_fetch')).toHaveLength(1);
+		});
+
+		it('should work with bouquet override', async () => {
+			process.env.SEARCH_ENABLES_FETCH = 'true';
+
+			const context: ToolSelectionContext = {
+				headers: { 'x-mcp-bouquet': 'search' },
+				hfToken: 'test-token',
+			};
+
+			const result = await strategy.selectTools(context);
+
+			expect(result.mode).toBe(ToolSelectionMode.BOUQUET_OVERRIDE);
+			expect(result.enabledToolIds).toContain('hf_doc_search');
+			expect(result.enabledToolIds).toContain('hf_doc_fetch');
+		});
+
+		it('should work with mix mode', async () => {
+			process.env.SEARCH_ENABLES_FETCH = 'true';
+
+			const userSettings: AppSettings = {
+				builtInTools: ['hf_model_search'],
+				spaceTools: [],
+			};
+
+			const context: ToolSelectionContext = {
+				headers: { 'x-mcp-mix': 'search' },
+				userSettings,
+				hfToken: 'test-token',
+			};
+
+			const result = await strategy.selectTools(context);
+
+			expect(result.mode).toBe(ToolSelectionMode.MIX);
+			expect(result.enabledToolIds).toContain('hf_doc_search');
+			expect(result.enabledToolIds).toContain('hf_doc_fetch');
+			expect(result.enabledToolIds).toContain('hf_model_search');
+		});
+
+		it('should work with fallback mode when all tools are enabled', async () => {
+			process.env.SEARCH_ENABLES_FETCH = 'true';
+
+			const context: ToolSelectionContext = {
+				headers: {},
+				hfToken: 'test-token',
+			};
+
+			const result = await strategy.selectTools(context);
+
+			expect(result.mode).toBe(ToolSelectionMode.FALLBACK);
+			// In fallback mode, all tools are enabled, so both should already be there
+			expect(result.enabledToolIds).toContain('hf_doc_search');
+			expect(result.enabledToolIds).toContain('hf_doc_fetch');
 		});
 	});
 });

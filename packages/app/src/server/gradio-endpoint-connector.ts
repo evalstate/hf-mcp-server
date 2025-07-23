@@ -2,12 +2,13 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport, type SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js';
 import { CallToolResultSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { logger } from './lib/logger.js';
+import type { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import { logger } from './utils/logger.js';
 import { z } from 'zod';
-import type { GradioEndpoint } from './lib/mcp-api-client.js';
+import type { GradioEndpoint } from './utils/mcp-api-client.js';
 import { spaceInfo } from '@huggingface/hub';
 import { gradioMetrics, getMetricsSafeName } from './utils/gradio-metrics.js';
-import { GRADIO_PREFIX, GRADIO_PRIVATE_PREFIX } from '../shared/constants.js';
+import { createGradioToolName } from './utils/gradio-utils.js';
 
 // Define types for JSON Schema
 interface JsonSchemaProperty {
@@ -252,14 +253,17 @@ export async function connectToGradioEndpoints(
 				})
 			)
 			.catch((error: unknown): EndpointConnectionResult => {
-				logger.error(
-					{
-						endpointId,
-						subdomain: endpoint.subdomain,
-						error: error instanceof Error ? error.message : String(error),
-					},
-					'Failed to fetch schema from endpoint'
-				);
+				const log = gradioMetrics.schemaFetchError(endpoint.name);
+				if (log) {
+					logger.error(
+						{
+							endpointId,
+							subdomain: endpoint.subdomain,
+							error: error instanceof Error ? error.message : String(error),
+						},
+						'Failed to fetch schema from endpoint'
+					);
+				}
 				return {
 					success: false,
 					endpointId,
@@ -283,20 +287,6 @@ export async function connectToGradioEndpoints(
 		},
 		'Gradio endpoint schema fetch results'
 	);
-
-	// Log failed endpoints separately for debugging.
-	// switched to "debug" level as these are errored at point of failure.
-	if (failed.length > 0) {
-		failed.forEach((f) => {
-			logger.debug(
-				{
-					endpointId: f.endpointId,
-					error: f.error.message,
-				},
-				'Endpoint schema fetch failed'
-			);
-		});
-	}
 
 	return results;
 }
@@ -355,28 +345,29 @@ async function createLazyConnection(sseUrl: string, hfToken: string | undefined)
 /**
  * Generates the outward-facing name for a tool
  */
-function generateToolName(connection: EndpointConnection, tool: Tool): string {
-	const sanitizedName = tool.name;
-	const prefix = connection.isPrivate ? GRADIO_PRIVATE_PREFIX : GRADIO_PREFIX;
-	return `${prefix}${(connection.originalIndex + 1).toString()}_${sanitizedName}`;
-}
+export function registerRemoteTool(server: McpServer, connection: EndpointConnection, hfToken?: string): void {
+	// Generate tool name using centralized logic
+	const remoteName = createGradioToolName(connection.name || 'unknown', connection.originalIndex, connection.isPrivate);
+	logger.trace(
+		{
+			endpointId: connection.endpointId,
+			originalName: connection.tool.name,
+			remoteName,
+			description: connection.tool.description,
+		},
+		'Registering remote tool'
+	);
 
-/**
- * Creates the display information for a tool
- */
-function createToolDisplayInfo(connection: EndpointConnection, tool: Tool): { title: string; description: string } {
-	const displayName = connection.name || 'Unknown Space';
-	const title = `${displayName} - ${tool.name}${connection.emoji ? ` ${connection.emoji}` : ''}`;
-	const description = tool.description
-		? `${tool.description} (from ${displayName})`
-		: `${tool.name} tool from ${displayName}`;
-	return { title, description };
-}
+	// Log the exact structure we're getting
+	logger.trace(
+		{
+			toolName: connection.tool.name,
+			inputSchema: connection.tool.inputSchema,
+		},
+		'Remote tool inputSchema structure'
+	);
 
-/**
- * Converts a tool's JSON schema to Zod schema shape
- */
-function convertToolSchemaToZod(tool: Tool): Record<string, z.ZodTypeAny> {
+	// Convert JSON Schema to Zod schema
 	const schemaShape: Record<string, z.ZodTypeAny> = {};
 
 	if (typeof tool.inputSchema === 'object' && 'properties' in tool.inputSchema) {
@@ -399,40 +390,70 @@ function convertToolSchemaToZod(tool: Tool): Record<string, z.ZodTypeAny> {
 		}
 	}
 
-	return schemaShape;
-}
+	// Create user-friendly title and description
+	const displayName = connection.name || 'Unknown Space';
+	const toolTitle = `${displayName} - ${connection.tool.name}${connection.emoji ? ` ${connection.emoji}` : ''}`;
+	const toolDescription = connection.tool.description
+		? `${connection.tool.description} (from ${displayName})`
+		: `${connection.tool.name} tool from ${displayName}`;
 
-/**
- * Creates the tool handler function
- */
-function createToolHandler(
-	connection: EndpointConnection,
-	tool: Tool,
-	outwardFacingName: string,
-	hfToken?: string
-): (params: Record<string, unknown>) => Promise<typeof CallToolResultSchema._type> {
-	return async (params: Record<string, unknown>) => {
-		logger.info({ tool: tool.name, params }, 'Calling remote tool');
-		try {
-			// Since we use schema fetch, we always need to create SSE connection for tool execution
-			if (!connection.sseUrl) {
-				throw new Error('No SSE URL available for tool execution');
-			}
-			logger.debug({ tool: tool.name }, 'Creating SSE connection for tool execution');
-			const activeClient = await createLazyConnection(connection.sseUrl, hfToken);
+	server.tool(
+		remoteName,
+		toolDescription,
+		schemaShape,
+		{
+			openWorldHint: true,
+			title: toolTitle,
+		}, // annotations parameter
+		async (params: Record<string, unknown>, extra) => {
+			logger.info({ tool: connection.tool.name, params }, 'Calling remote tool');
+			try {
+				// Since we use schema fetch, we always need to create SSE connection for tool execution
+				if (!connection.sseUrl) {
+					throw new Error('No SSE URL available for tool execution');
+				}
+				logger.debug({ tool: connection.tool.name }, 'Creating SSE connection for tool execution');
+				const activeClient = await createLazyConnection(connection.sseUrl, hfToken);
 
-			const result = await activeClient.request(
-				{
-					method: 'tools/call',
-					params: {
-						name: tool.name,
-						arguments: params,
+				// Check if the client is requesting progress notifications
+				const progressToken = extra._meta?.progressToken;
+				const requestOptions: RequestOptions = {};
+
+				if (progressToken !== undefined) {
+					logger.debug({ tool: connection.tool.name, progressToken }, 'Progress notifications requested');
+
+					// Set up progress relay from remote tool to our client
+					requestOptions.onprogress = async (progress) => {
+						logger.trace({ tool: connection.tool.name, progressToken, progress }, 'Relaying progress notification');
+
+						// Relay the progress notification to our client
+						await extra.sendNotification({
+							method: 'notifications/progress',
+							params: {
+								progressToken,
+								progress: progress.progress,
+								total: progress.total,
+								message: progress.message,
+							},
+						});
+					};
+				}
+
+				const result = await activeClient.request(
+					{
+						method: 'tools/call',
+						params: {
+							name: connection.tool.name,
+							arguments: params,
+							// Pass through the progress token to the remote tool
+							_meta: progressToken !== undefined ? { progressToken } : undefined,
+						},
 					},
-				},
-				CallToolResultSchema
-			);
-			// For metrics, use the safe name utility
-			const metricsName = getMetricsSafeName(outwardFacingName);
+					CallToolResultSchema,
+					requestOptions
+				);
+				// For metrics, use the safe name utility
+				const metricsName = getMetricsSafeName(remoteName);
 
 			if (result.isError) {
 				logger.warn({ tool: tool.name, error: result.content }, 'Gradio tool call returned error');
@@ -569,8 +590,8 @@ export function convertJsonSchemaToZod(jsonSchemaProperty: JsonSchemaProperty, s
 	let description = jsonSchemaProperty.description || '';
 	if (jsonSchemaProperty.format === 'a http or https url to a file' || jsonSchemaProperty.title === 'FileData') {
 		description = description
-			? `${description} (File input: provide URL or file path)`
-			: 'File input: provide URL or file path';
+			? `${description} (File input: provide URL or file pathYYY)`
+			: 'a http or https url to a file';
 	}
 
 	if (description) {

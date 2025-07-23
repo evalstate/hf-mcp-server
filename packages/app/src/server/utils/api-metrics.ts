@@ -1,4 +1,4 @@
-import { logger } from '../lib/logger.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * API call metrics tracking for external HuggingFace API calls

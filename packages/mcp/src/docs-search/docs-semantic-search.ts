@@ -1,11 +1,16 @@
 import { z } from 'zod';
 import { HfApiCall } from '../hf-api-call.js';
-import { escapeMarkdown } from '../utilities.js';
+import { escapeMarkdown, estimateTokens } from '../utilities.js';
 import { DOC_FETCH_CONFIG } from './doc-fetch.js';
+
+/** token estimation. initial results for "how to load a image to image model in transformers" returned
+ * 121973 characters (36711 anthropic tokens) */
 
 export const DOCS_SEMANTIC_SEARCH_CONFIG = {
 	name: 'hf_doc_search',
-	description: 'Search the Hugging Face documentation library. Returns excerpts grouped by Product and Document.',
+	description:
+		'Search documentation about all of Hugging Face products and libraries (Transformers, Datasets, Diffusers, Gradio, Hub, and more). Use this for the most up-to-date information ' +
+		'Returns excerpts grouped by Product and Document.',
 	schema: z.object({
 		query: z
 			.string()
@@ -43,16 +48,24 @@ interface DocSearchApiParams {
 	product?: string;
 }
 
+// Token budget defaults
+const DEFAULT_TOKEN_BUDGET = 12500;
+const TRUNCATE_EXCERPT_LENGTH = 400; // chars for truncated excerpts
+
 /**
  * Use the Hugging Face Semantic Document Search API
  */
 export class DocSearchTool extends HfApiCall<DocSearchApiParams, DocSearchResult[]> {
+	private tokenBudget: number;
+
 	/**
-	 * @param apiUrl The URL of the Hugging Face document search API
 	 * @param hfToken Optional Hugging Face token for API access
+	 * @param apiUrl The URL of the Hugging Face document search API
+	 * @param tokenBudget Maximum number of tokens to return
 	 */
-	constructor(hfToken?: string, apiUrl = 'https://hf.co/api/docs/search') {
+	constructor(hfToken?: string, apiUrl = 'https://hf.co/api/docs/search', tokenBudget = DEFAULT_TOKEN_BUDGET) {
 		super(apiUrl, hfToken);
+		this.tokenBudget = tokenBudget;
 	}
 
 	/**
@@ -76,7 +89,7 @@ export class DocSearchTool extends HfApiCall<DocSearchApiParams, DocSearchResult
 					: `No documentation found for query '${params.query}'`;
 			}
 
-			return formatSearchResults(params.query, results, params.product);
+			return formatSearchResults(params.query, results, params.product, this.tokenBudget);
 		} catch (error) {
 			if (error instanceof Error) {
 				throw new Error(`Failed to search documentation: ${error.message}`);
@@ -139,70 +152,110 @@ function groupBySection(pageResults: DocSearchResult[]): Map<string | undefined,
 /**
  * Format excerpts from a section
  */
-function formatSectionExcerpts(section: string | undefined, results: DocSearchResult[]): string {
+function formatSectionExcerpts(
+	section: string | undefined,
+	results: DocSearchResult[],
+	useTruncatedMode: boolean,
+	hasAlreadyShownTruncation: boolean
+): { text: string; tokensUsed: number; wasContentTruncated: boolean } {
 	const lines: string[] = [];
+	let tokensUsed = 0;
+	let wasContentTruncated = false;
 
-	// Add section heading if present
+	// Add section heading if we have one
 	if (section) {
-		if (results.length > 1) {
-			lines.push(`#### Excerpts from the "${escapeMarkdown(section)}" section`);
-		} else {
-			lines.push(`#### Excerpt from the "${escapeMarkdown(section)}" section`);
-		}
-		lines.push('');
+		const heading =
+			results.length > 1
+				? `\n#### Excerpts from the "${escapeMarkdown(section)}" section`
+				: `\n#### Excerpt from the "${escapeMarkdown(section)}" section`;
+
+		lines.push(heading, '');
+		tokensUsed += estimateTokens(heading + '\n\n');
 	}
 
-	// Add all excerpts from this section
 	for (const result of results) {
-		// Clean up the text - remove HTML tags if any
-		const cleanText = result.text
+		let cleanText = result.text
 			.replace(/<[^>]*>/g, '')
 			.replace(/\n\s*\n/g, '\n')
 			.trim();
 
-		lines.push(cleanText);
-		lines.push('');
+		// Truncate if in truncated mode and we haven't shown the message yet
+		if (useTruncatedMode && cleanText.length > TRUNCATE_EXCERPT_LENGTH && !hasAlreadyShownTruncation) {
+			cleanText =
+				cleanText.substring(0, TRUNCATE_EXCERPT_LENGTH) +
+				`...\n\n*[Content truncated - use ${DOC_FETCH_CONFIG.name} for full text or narrow search terms]*`;
+			wasContentTruncated = true;
+		}
+
+		lines.push(cleanText, '');
+		tokensUsed += estimateTokens(cleanText + '\n\n');
 	}
 
-	return lines.join('\n');
+	// Remove trailing empty line
+	if (lines.length > 0 && lines[lines.length - 1] === '') {
+		lines.pop();
+	}
+
+	return { text: lines.join('\n'), tokensUsed, wasContentTruncated };
 }
 
 /**
- * Format search results grouped by product and page
+ * Format search results with simple token budget management
  */
-function formatSearchResults(query: string, results: DocSearchResult[], productFilter?: string): string {
+function formatSearchResults(
+	query: string,
+	results: DocSearchResult[],
+	productFilter?: string,
+	tokenBudget = DEFAULT_TOKEN_BUDGET
+): string {
 	const lines: string[] = [];
+	let hasShownTruncationMessage = false;
 
 	// Header
 	const filterText = productFilter ? ` (filtered by product: ${productFilter})` : '';
-	lines.push(`# Documentation Library Search Results for "${escapeMarkdown(query)}"${filterText}`);
-	lines.push('');
-	lines.push(`Found ${results.length} results`);
-	lines.push('');
+	const header = `# Documentation Library Search Results for "${escapeMarkdown(query)}"${filterText}\n\nFound ${results.length} results`;
+	lines.push(header);
 
-	// Group results
+	// Group and sort results
 	const grouped = groupResults(results);
-
-	// Sort products by count (most hits first)
 	const sortedProducts = Array.from(grouped.keys()).sort((a, b) => {
 		const productGroupA = grouped.get(a);
 		const productGroupB = grouped.get(b);
 		if (!productGroupA || !productGroupB) return 0;
-
 		const countA = Array.from(productGroupA.values()).reduce((sum, arr) => sum + arr.length, 0);
 		const countB = Array.from(productGroupB.values()).reduce((sum, arr) => sum + arr.length, 0);
-		return countB - countA; // Descending order
+		return countB - countA;
 	});
+
+	const linkOnlyResults: Array<{ product: string; url: string; title: string; count: number }> = [];
 
 	for (const product of sortedProducts) {
 		const productGroup = grouped.get(product);
 		if (!productGroup) continue;
 
-		const totalProductHits = Array.from(productGroup.values()).reduce((sum, arr) => sum + arr.length, 0);
-		lines.push(`## Results for Product: ${escapeMarkdown(product)} (${totalProductHits} results)`);
-		lines.push('');
+		// Check current size before adding anything
+		const currentText = lines.join('\n');
+		if (estimateTokens(currentText) > tokenBudget) {
+			// Over budget - add remaining products to links
+			for (const url of productGroup.keys()) {
+				const pageResults = productGroup.get(url);
+				if (!pageResults?.[0]) continue;
+				linkOnlyResults.push({
+					product,
+					url,
+					title: pageResults[0].heading1 || pageResults[0].source_page_title,
+					count: pageResults.length,
+				});
+			}
+			continue;
+		}
 
-		// Sort URLs within each product by count (most hits first)
+		// Add product header
+		const totalProductHits = Array.from(productGroup.values()).reduce((sum, arr) => sum + arr.length, 0);
+		const productHeader = `## Results for Product: ${escapeMarkdown(product)} (${totalProductHits} results)\n`;
+		lines.push(productHeader);
+
+		// Sort pages by hit count
 		const sortedUrls = Array.from(productGroup.keys()).sort((a, b) => {
 			const pageResultsA = productGroup.get(a);
 			const pageResultsB = productGroup.get(b);
@@ -212,32 +265,50 @@ function formatSearchResults(query: string, results: DocSearchResult[], productF
 
 		for (const url of sortedUrls) {
 			const pageResults = productGroup.get(url);
-			if (!pageResults || pageResults.length === 0) continue;
-			const firstResult = pageResults[0];
+			if (!pageResults?.[0]) continue;
 
-			// Skip if no results (shouldn't happen but TypeScript safety)
-			if (!firstResult) continue;
+			const pageTitle = pageResults[0].heading1 || pageResults[0].source_page_title;
 
-			// Page header with link and hit count
-			const pageTitle = firstResult.heading1 || firstResult.source_page_title;
+			// Check if we're over budget - if so, add remaining pages to links
+			const currentText = lines.join('\n');
+			if (estimateTokens(currentText) > tokenBudget) {
+				linkOnlyResults.push({ product, url, title: pageTitle, count: pageResults.length });
+				continue;
+			}
+
 			const hitCount = pageResults.length > 1 ? ` (${pageResults.length} results)` : '';
-			// Use the base URL (without anchor) for the page link
-			lines.push(`### Results from [${escapeMarkdown(pageTitle)}](${url})${hitCount}`);
-			lines.push('');
+			const pageHeader = `\n### Results from [${escapeMarkdown(pageTitle)}](${url})${hitCount}\n`;
+			lines.push(pageHeader);
 
-			// Group results by section and format them
+			// Add all sections for this page
 			const sectionGroups = groupBySection(pageResults);
-
-			// Format each section's excerpts
 			for (const [section, sectionResults] of sectionGroups) {
-				lines.push(formatSectionExcerpts(section, sectionResults));
+				const currentTokens = estimateTokens(lines.join('\n'));
+				const useTruncatedMode = currentTokens > tokenBudget * 0.7;
+
+				const result = formatSectionExcerpts(section, sectionResults, useTruncatedMode, hasShownTruncationMessage);
+
+				if (result.text.trim()) {
+					lines.push(result.text);
+					if (result.wasContentTruncated) {
+						hasShownTruncationMessage = true;
+					}
+				}
 			}
 		}
 	}
 
-	// Add suggestion to use doc fetch tool
-	lines.push('---');
-	lines.push('');
+	// Add link-only results
+	if (linkOnlyResults.length > 0) {
+		lines.push(`\n## Further results were found in:\n`);
+		for (const linkResult of linkOnlyResults) {
+			const hitText = linkResult.count > 1 ? ` (${linkResult.count} results)` : '';
+			lines.push(`- [${escapeMarkdown(linkResult.title)}](${linkResult.url})${hitText} *(${linkResult.product})*`);
+		}
+		lines.push('');
+	}
+
+	lines.push('---\n');
 	lines.push(`Use the "${DOC_FETCH_CONFIG.name}" tool to fetch a document from the library.`);
 
 	return lines.join('\n');

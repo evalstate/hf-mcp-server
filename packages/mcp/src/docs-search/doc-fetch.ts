@@ -1,15 +1,22 @@
 import { z } from 'zod';
-import { DOC_MAPPINGS } from './doc-mappings.js';
+import TurndownService from 'turndown';
+import { estimateTokens } from '../utilities.js';
 
 export const DOC_FETCH_CONFIG = {
 	name: 'hf_doc_fetch',
-	description: 'Fetch a document from the Hugging Face documentation library.',
+	description:
+		'Fetch a document from the Hugging Face documentation library. For large documents, use offset to get subsequent chunks.',
 	schema: z.object({
 		doc_url: z
 			.string()
 			.min(28, 'Url should start with https://huggingface.co/docs/')
 			.max(200, 'Query too long')
 			.describe('Hugging Face documentation URL'),
+		offset: z
+			.number()
+			.min(0)
+			.optional()
+			.describe('Token offset for large documents (use the offset from truncation message)'),
 	}),
 	annotations: {
 		title: 'Fetch a document from the Hugging Face library',
@@ -21,72 +28,96 @@ export const DOC_FETCH_CONFIG = {
 
 export type DocFetchParams = z.infer<typeof DOC_FETCH_CONFIG.schema>;
 
-/**
- * Return a (usually) markdown document for a Doc URL
- *
- * There were a few different options for this...
- * 1) Return the HTML directly. Good option would include any post-processing (but prefer markdown)
- * 2) Get the HTML and convert to markdown
- * 3) Get the HTML and follow the GitHub link to get the raw markdown file
- * 4) Use a mapping.
- *
- * There is also the risk that the GitHub HEAD is newer than the indexed version. Will leave as is for now
- * but might want to reconsider this. Mappings were built from:
- * https://github.com/huggingface/doc-builder/blob/main/.github/workflows/build_embeddings.yml
- *
- * Falls back to HTML if no mapping is found...
- *
- */
 export class DocFetchTool {
-	/**
-	 * Convert HF docs URL to GitHub raw content URL
-	 */
-	processUrl(hfUrl: string): string {
-		// Validate URL format
-		if (!hfUrl.startsWith('https://huggingface.co/docs/')) {
-			throw new Error('That was not a valid Hugging Face document URL');
-		}
+	private turndownService: TurndownService;
 
-		// Remove the base URL and any fragment identifier
-		const urlPath = hfUrl.replace('https://huggingface.co/docs/', '').split('#')[0] || '';
-
-		// Extract package name and path
-		const parts = urlPath.split('/');
-		const packageName = parts[0] || '';
-
-		// Check if package exists in mapping
-		let fetchUrl = hfUrl;
-		const mapping = DOC_MAPPINGS[packageName];
-		if (mapping) {
-			const remainingPath = parts.slice(1).join('/');
-			const filePath = remainingPath ? `${remainingPath}.md` : 'index.md';
-
-			// Construct GitHub raw URL
-			const githubUrl = `https://raw.githubusercontent.com/${mapping.repo_id}/refs/heads/main/${mapping.doc_folder}/${filePath}`;
-			fetchUrl = githubUrl;
-		}
-
-		// Build the file path
-		return fetchUrl;
+	constructor() {
+		this.turndownService = new TurndownService({
+			headingStyle: 'atx',
+			codeBlockStyle: 'fenced',
+		});
+		this.turndownService.remove('head');
+		this.turndownService.remove('script');
+		this.turndownService.remove((node) => {
+			console.log(`${node.nodeName}	`);
+			if (node.nodeName === 'a' && node.innerHTML.includes('<!-- HTML_TAG_START -->')) {
+				return true;
+			}
+			return false;
+		});
 	}
 
 	/**
-	 * Fetch markdown content from GitHub
+	 * Validate HF docs URL
 	 */
-	async fetch(url: string): Promise<string> {
-		try {
-			const githubUrl = this.processUrl(url);
+	validateUrl(hfUrl: string): void {
+		if (!hfUrl.startsWith('https://huggingface.co/docs/')) {
+			throw new Error('That was not a valid Hugging Face document URL');
+		}
+	}
 
-			const response = await fetch(githubUrl);
+	/**
+	 * Fetch content from Hugging Face docs URL and convert HTML to Markdown
+	 */
+	async fetch(params: DocFetchParams): Promise<string> {
+		try {
+			this.validateUrl(params.doc_url);
+
+			const response = await fetch(params.doc_url);
 
 			if (!response.ok) {
 				throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
 			}
 
-			const content = await response.text();
-			return content;
+			const htmlContent = await response.text();
+
+			// Convert HTML to Markdown
+			const fullMarkdownContent = this.turndownService.turndown(htmlContent);
+
+			// Apply chunking logic
+			return this.applyChunking(fullMarkdownContent, params.offset || 0);
 		} catch (error) {
 			throw new Error(`Failed to fetch document: ${error instanceof Error ? error.message : 'Unknown error'}`);
 		}
+	}
+
+	/**
+	 * Apply chunking logic to markdown content
+	 */
+	private applyChunking(markdownContent: string, offset: number): string {
+		const totalTokens = estimateTokens(markdownContent);
+		const maxTokensPerChunk = 7500;
+
+		// Calculate character positions based on tokens
+		const totalChars = markdownContent.length;
+		const charsPerToken = totalChars / totalTokens;
+		const startChar = Math.floor(offset * charsPerToken);
+
+		// If offset is beyond document, return error message
+		if (startChar >= totalChars) {
+			return `Error: Offset ${offset} is beyond the document length (${totalTokens} tokens total).`;
+		}
+
+		// If document is small enough and no offset, return as-is
+		if (totalTokens <= maxTokensPerChunk && offset === 0) {
+			return markdownContent;
+		}
+
+		const maxCharsPerChunk = Math.floor(maxTokensPerChunk * charsPerToken);
+		const endChar = Math.min(startChar + maxCharsPerChunk, totalChars);
+		const chunk = markdownContent.slice(startChar, endChar);
+
+		// Calculate next offset
+		const nextOffset = offset + estimateTokens(chunk);
+		const hasMore = nextOffset < totalTokens;
+
+		let result = chunk;
+
+		// Add truncation message if there's more content
+		if (hasMore) {
+			result += `\n\n=== DOCUMENT TRUNCATED. CALL ${DOC_FETCH_CONFIG.name} WITH AN OFFSET OF ${nextOffset} FOR THE NEXT CHUNK ===`;
+		}
+
+		return result;
 	}
 }

@@ -60,6 +60,20 @@ export class ToolSelectionStrategy {
 	}
 
 	/**
+	 * Applies SEARCH_ENABLES_FETCH logic if enabled
+	 * If hf_doc_search is enabled and SEARCH_ENABLES_FETCH=true, also enable hf_doc_fetch
+	 */
+	private applySearchEnablesFetch(enabledToolIds: string[]): string[] {
+		if (process.env.SEARCH_ENABLES_FETCH === 'true') {
+			if (enabledToolIds.includes('hf_doc_search') && !enabledToolIds.includes('hf_doc_fetch')) {
+				logger.debug('SEARCH_ENABLES_FETCH: Auto-enabling hf_doc_fetch because hf_doc_search is enabled');
+				return [...enabledToolIds, 'hf_doc_fetch'];
+			}
+		}
+		return enabledToolIds;
+	}
+
+	/**
 	 * Selects tools based on clear precedence rules:
 	 * 1. Bouquet override (highest precedence)
 	 * 2. Mix + user settings (additive)
@@ -71,10 +85,11 @@ export class ToolSelectionStrategy {
 
 		// 1. Bouquet override (highest precedence)
 		if (bouquet && BOUQUETS[bouquet]) {
-			logger.debug({ bouquet, enabledToolIds: BOUQUETS[bouquet].builtInTools }, 'Using bouquet override');
+			const enabledToolIds = this.applySearchEnablesFetch(BOUQUETS[bouquet].builtInTools);
+			logger.debug({ bouquet, enabledToolIds }, 'Using bouquet override');
 			return {
 				mode: ToolSelectionMode.BOUQUET_OVERRIDE,
-				enabledToolIds: BOUQUETS[bouquet].builtInTools,
+				enabledToolIds,
 				reason: `Bouquet override: ${bouquet}`,
 			};
 		}
@@ -85,7 +100,8 @@ export class ToolSelectionStrategy {
 		// 3. Apply mix if specified and we have base settings
 		if (mix && BOUQUETS[mix] && baseSettings) {
 			const mixedTools = [...baseSettings.builtInTools, ...BOUQUETS[mix].builtInTools];
-			const enabledToolIds = [...new Set(mixedTools)]; // dedupe
+			const dedupedTools = [...new Set(mixedTools)]; // dedupe
+			const enabledToolIds = this.applySearchEnablesFetch(dedupedTools);
 
 			logger.debug(
 				{
@@ -112,17 +128,19 @@ export class ToolSelectionStrategy {
 				? ToolSelectionMode.EXTERNAL_API
 				: ToolSelectionMode.INTERNAL_API;
 
+			const enabledToolIds = this.applySearchEnablesFetch(baseSettings.builtInTools);
+
 			logger.debug(
 				{
 					mode,
-					enabledToolIds: baseSettings.builtInTools,
+					enabledToolIds,
 				},
 				'Using user settings'
 			);
 
 			return {
 				mode,
-				enabledToolIds: baseSettings.builtInTools,
+				enabledToolIds,
 				reason: mode === ToolSelectionMode.EXTERNAL_API ? 'External API user settings' : 'Internal API user settings',
 				baseSettings,
 			};
@@ -130,9 +148,10 @@ export class ToolSelectionStrategy {
 
 		// 5. Fallback - all tools enabled
 		logger.warn('No settings available, using fallback (all tools enabled)');
+		const enabledToolIds = this.applySearchEnablesFetch([...ALL_BUILTIN_TOOL_IDS]);
 		return {
 			mode: ToolSelectionMode.FALLBACK,
-			enabledToolIds: [...ALL_BUILTIN_TOOL_IDS],
+			enabledToolIds,
 			reason: 'Fallback - no settings available',
 		};
 	}

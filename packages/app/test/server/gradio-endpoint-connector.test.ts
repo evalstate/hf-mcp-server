@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseSchemaResponse, convertJsonSchemaToZod } from './gradio-endpoint-connector.js';
+import { parseSchemaResponse, convertJsonSchemaToZod } from '../../src/server/gradio-endpoint-connector.js';
 import { z } from 'zod';
 
 describe('parseSchemaResponse', () => {
@@ -285,7 +285,7 @@ describe('convertJsonSchemaToZod', () => {
 
 		// Should be a string schema with description
 		expect(zodSchema instanceof z.ZodString).toBe(true);
-		expect((zodSchema as z.ZodString)._def.description).toBe('File input: provide URL or file path');
+		expect((zodSchema as z.ZodString)._def.description).toBe('a http or https url to a file');
 
 		// Test validation
 		expect(zodSchema.parse('https://example.com/image.jpg')).toBe('https://example.com/image.jpg');

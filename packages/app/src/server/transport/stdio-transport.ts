@@ -1,6 +1,6 @@
 import { StatefulTransport, type TransportOptions, type BaseSession } from './base-transport.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { logger } from '../lib/logger.js';
+import { logger } from '../utils/logger.js';
 
 type StdioSession = BaseSession<StdioServerTransport>;
 

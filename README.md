@@ -72,6 +72,26 @@ SSE and StreamableHTTP services are available at `/sse` and `/mcp` respectively.
 > [!TIP]
 > The Web Application allows you to switch tools on and off. For STDIO, SSE and StreamableHTTP this will send a ToolListChangedNotification to the MCP Client. In StreamableHTTPJSON mode the tool will not be listed when the client next requests the tool lists.
 
+### Running Locally
+
+You can run the MCP Server locally with either `npx` or `docker`. 
+
+```bash
+npx @llmindset/hf-mcp-server       # Start in STDIO mode
+npx @llmindset/hf-mcp-server-http  # Start in Streamable HTTP mode
+npx @llmindset/hf-mcp-server-json  # Start in Streamable HTTP (JSON RPC) mode
+```
+
+To run with docker: 
+
+```bash
+docker pull ghcr.io/evalstate/hf-mcp-server:latest
+docker run --rm -p 3000:3000 ghcr.io/evalstate/hf-mcp-server:latest
+```
+![image](https://github.com/user-attachments/assets/2fc0ef58-2c7a-4fae-82b5-e6442bfcbd99)
+
+All commands above start the Management Web interface on http://localhost:3000/. The Streamable HTTP server is accessible on  http://localhost:3000/mcp. See [Environment Variables](#Environment Variables) for configuration options. Docker defaults to Streamable HTTP (JSON RPC) mode.
+
 
 ## Development
 
@@ -147,3 +167,4 @@ The server respects the following environment variables:
 - `USER_CONFIG_API`: URL to use for User settings (defaults to Local front-end)
 - `MCP_STRICT_COMPLIANCE`: set to True for GET 405 rejects in JSON Mode (default serves a welcome page).
 - `AUTHENTICATE_TOOL`: whether to include an `Authenticate` tool to issue an OAuth challenge when called
+- `SEARCH_ENABLES_FETCH`: When set to `true`, automatically enables the `hf_doc_fetch` tool whenever `hf_doc_search` is enabled
