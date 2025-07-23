@@ -132,44 +132,44 @@ describe('createGradioToolName', () => {
 			expect(createGradioToolName('test', 10, true)).toBe('grp11_test');
 		});
 
-		it('should enforce 45-character limit with middle truncation', () => {
+		it('should enforce 49-character limit with middle truncation', () => {
 			// Test basic truncation
-			const longName = 'very_long_tool_name_that_exceeds_forty_five_characters_total';
+			const longName = 'very_long_tool_name_that_exceeds_forty_nine_characters_total_and_more';
 			const result1 = createGradioToolName(longName, 0, false);
-			expect(result1.length).toBe(45);
-			expect(result1).toBe('gr1_very_long_tool_name__ive_characters_total');
+			expect(result1.length).toBe(49);
+			expect(result1).toBe('gr1_very_long_tool_name__haracters_total_and_more');
 			
 			// Test with larger index (less room for name)
 			const result2 = createGradioToolName(longName, 999, true);
-			expect(result2.length).toBe(45);
-			expect(result2).toBe('grp1000_very_long_tool_name__characters_total');
+			expect(result2.length).toBe(49);
+			expect(result2).toBe('grp1000_very_long_tool_name__cters_total_and_more');
 			
 			// Test that ending is preserved
 			const toolWithUniqueEnd = 'common_prefix_for_tool_with_very_unique_ending_xyz123';
 			const result3 = createGradioToolName(toolWithUniqueEnd, 0, false);
-			expect(result3.length).toBe(45);
-			expect(result3).toBe('gr1_common_prefix_for_to_unique_ending_xyz123');
+			expect(result3.length).toBe(49);
+			expect(result3).toBe('gr1_common_prefix_for_to_ery_unique_ending_xyz123');
 			expect(result3.endsWith('_xyz123')).toBe(true);
 		});
 
-		it('should handle edge cases with exactly 45 characters', () => {
-			// Create a name that will result in exactly 45 chars: gr1_ + 41 chars = 45 total
-			const exactName = 'tool_name_that_is_exactly_forty_one_chars'; // 41 chars
+		it('should handle edge cases with exactly 49 characters', () => {
+			// Create a name that will result in exactly 49 chars: gr1_ + 45 chars = 49 total
+			const exactName = 'tool_name_that_is_exactly_forty_five_characte'; // 45 chars
 			const result = createGradioToolName(exactName, 0, false);
-			expect(result).toBe('gr1_tool_name_that_is_exactly_forty_one_chars');
-			expect(result.length).toBe(45);
+			expect(result).toBe('gr1_tool_name_that_is_exactly_forty_five_characte');
+			expect(result.length).toBe(49);
 		});
 
 		it('should preserve unique endings when truncating', () => {
-			// Names with same prefix but different endings
-			const tool1 = 'image_generation_model_for_processing_version_1';
-			const tool2 = 'image_generation_model_for_processing_version_2';
+			// Names with same prefix but different endings - need longer names to trigger truncation at 49
+			const tool1 = 'image_generation_model_for_advanced_processing_version_1_final';
+			const tool2 = 'image_generation_model_for_advanced_processing_version_2_final';
 			const result1 = createGradioToolName(tool1, 0, false);
 			const result2 = createGradioToolName(tool2, 0, false);
 			
 			// Both should be truncated but keep different endings
-			expect(result1).toBe('gr1_image_generation_mod_processing_version_1');
-			expect(result2).toBe('gr1_image_generation_mod_processing_version_2');
+			expect(result1).toBe('gr1_image_generation_mod_ocessing_version_1_final');
+			expect(result2).toBe('gr1_image_generation_mod_ocessing_version_2_final');
 			expect(result1).not.toBe(result2);
 		});
 	});

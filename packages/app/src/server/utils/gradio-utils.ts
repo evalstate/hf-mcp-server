@@ -40,8 +40,8 @@ export function createGradioToolName(toolName: string, index: number, isPrivate:
 	const prefix = isPrivate ? GRADIO_PRIVATE_PREFIX : GRADIO_PREFIX;
 	const indexStr = (index + 1).toString();
 
-	// Calculate available space for the sanitized name (45 - prefix - index - underscore)
-	const maxNameLength = 45 - prefix.length - indexStr.length - 1;
+	// Calculate available space for the sanitized name (49 - prefix - index - underscore)
+	const maxNameLength = 49 - prefix.length - indexStr.length - 1;
 
 	// Sanitize the tool name: replace special characters with underscores, normalize multiple underscores, and lowercase
 	let sanitizedName = toolName
