@@ -73,7 +73,6 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 	protected readonly apiUrl: string;
 	protected readonly hfToken: string | undefined;
 	protected readonly apiTimeout: number;
-
 	/** nb reversed order from superclasses on basis that hfToken is more likely to be configured */
 	constructor(apiUrl: string, hfToken?: string) {
 		this.apiUrl = apiUrl;
@@ -179,4 +178,5 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 		const url = this.buildUrl(params);
 		return this.fetchFromApi<T>(url, options);
 	}
+
 }

@@ -50,6 +50,7 @@ import type { ServerFactory } from './transport/base-transport.js';
 import type { McpApiClient } from './utils/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
 import { logger } from './utils/logger.js';
+import { logSearchQuery } from './utils/query-logger.js';
 import { DEFAULT_SPACE_TOOLS, type AppSettings } from '../shared/settings.js';
 import { extractAuthBouquetAndMix } from './utils/auth-utils.js';
 import { ToolSelectionStrategy, type ToolSelectionContext } from './utils/tool-selection-strategy.js';
@@ -210,6 +211,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			async (params: SearchParams) => {
 				const semanticSearch = new SpaceSearchTool(hfToken);
 				const searchResult = await semanticSearch.search(params.query, params.limit, params.mcp);
+				logSearchQuery(SEMANTIC_SEARCH_TOOL_CONFIG.name, params.query, { limit: params.limit, mcp: params.mcp });
 				return {
 					content: [
 						{ type: 'text', text: formatSearchResults(params.query, searchResult.results, searchResult.totalCount) },
@@ -226,6 +228,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			async (params: ModelSearchParams) => {
 				const modelSearch = new ModelSearchTool(hfToken);
 				const results = await modelSearch.searchWithParams(params);
+				logSearchQuery(MODEL_SEARCH_TOOL_CONFIG.name, params.query || `sort:${params.sort || 'trendingScore'}`, params);
 				return {
 					content: [{ type: 'text', text: results }],
 				};
@@ -257,6 +260,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 					params.results_limit,
 					params.concise_only
 				);
+				logSearchQuery(PAPER_SEARCH_TOOL_CONFIG.name, params.query, { results_limit: params.results_limit, concise_only: params.concise_only });
 				return {
 					content: [{ type: 'text', text: results }],
 				};
@@ -271,6 +275,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			async (params: DatasetSearchParams) => {
 				const datasetSearch = new DatasetSearchTool(hfToken);
 				const results = await datasetSearch.searchWithParams(params);
+				logSearchQuery(DATASET_SEARCH_TOOL_CONFIG.name, params.query || `sort:${params.sort || 'trendingScore'}`, params);
 				return {
 					content: [{ type: 'text', text: results }],
 				};
@@ -299,6 +304,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			async (params: DocSearchParams) => {
 				const docSearch = new DocSearchTool(hfToken);
 				const results = await docSearch.search(params);
+				logSearchQuery(DOCS_SEMANTIC_SEARCH_CONFIG.name, params.query, { product: params.product });
 				return {
 					content: [{ type: 'text', text: results }],
 				};

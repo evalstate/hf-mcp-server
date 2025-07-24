@@ -11,6 +11,13 @@ export interface HfDatasetTransportOptions {
 	batchSize?: number;
 	flushInterval?: number; // in milliseconds
 	uploadFunction?: typeof UploadFileFunction;
+	logType?: string; // For console output labeling
+}
+
+export interface HfTransportOptions {
+	batchSize?: number;
+	flushInterval?: number;
+	logType?: string; // 'Query' or 'Logs'
 }
 
 export interface LogEntry {
@@ -32,15 +39,16 @@ export class HfDatasetLogger {
 	private sessionId: string;
 	private uploadFunction: typeof UploadFileFunction;
 	private readonly maxBufferSize: number = 1000;
+	private logType: string;
 
 	constructor(options: HfDatasetTransportOptions) {
 		this.loggingToken = options.loggingToken;
 		this.datasetId = options.datasetId;
 		this.batchSize = options.batchSize || 100;
-		const isTest = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
-		this.flushInterval = isTest ? options.flushInterval || 1000 : Math.max(options.flushInterval || 300000, 300000);
+		this.flushInterval = calculateFlushInterval(options.flushInterval);
 		this.sessionId = randomUUID();
 		this.uploadFunction = options.uploadFunction || uploadFile;
+		this.logType = options.logType || 'Logs';
 
 		// Start the flush timer
 		this.startFlushTimer();
@@ -48,8 +56,8 @@ export class HfDatasetLogger {
 		// Register shutdown handlers
 		this.registerShutdownHandlers();
 
-		// Log initialization
-		console.log(`[HF Dataset Logger] Initialized - Dataset: ${this.datasetId}, Session: ${this.sessionId}`);
+		// Log initialization with flush interval
+		console.log(`[HF Dataset ${this.logType}] Initialized - Dataset: ${this.datasetId}, Session: ${this.sessionId}, FlushInterval: ${this.flushInterval}ms, BatchSize: ${this.batchSize}`);
 	}
 
 	processLog(logEntry: LogEntry): void {
@@ -60,23 +68,29 @@ export class HfDatasetLogger {
 
 			this.logBuffer.push(logEntry);
 
+			console.log(`[HF Dataset ${this.logType}] Log received - Buffer: ${this.logBuffer.length}/${this.batchSize}`);
+
 			if (this.logBuffer.length >= this.batchSize) {
+				console.log(`[HF Dataset ${this.logType}] Triggering flush due to batch size (${this.batchSize})`);
 				void this.flush();
 			}
 		} catch (error) {
-			console.error('[HF Dataset Logger] Error processing log:', error);
+			console.error(`[HF Dataset ${this.logType}] Error processing log:`, error);
 		}
 	}
 
 	private startFlushTimer(): void {
 		this.flushTimer = setInterval(() => {
 			if (this.logBuffer.length > 0) {
+				console.log(`[HF Dataset ${this.logType}] Timer flush triggered - Buffer: ${this.logBuffer.length} logs`);
 				void this.flush();
 			}
 		}, this.flushInterval);
 	}
 
 	private async flush(): Promise<void> {
+		console.log(`[HF Dataset ${this.logType}] Flush called - Buffer: ${this.logBuffer.length}, InProgress: ${this.uploadInProgress}`);
+		
 		if (this.uploadInProgress || this.logBuffer.length === 0) {
 			return;
 		}
@@ -85,12 +99,14 @@ export class HfDatasetLogger {
 		this.logBuffer = [];
 		this.uploadInProgress = true;
 
+		console.log(`[HF Dataset ${this.logType}] Starting upload of ${logsToUpload.length} logs`);
+
 		try {
 			await this.uploadLogs(logsToUpload);
-			console.log(`[HF Dataset Logger] ✅ Uploaded ${logsToUpload.length} logs to ${this.datasetId}`);
+			console.log(`[HF Dataset ${this.logType}] ✅ Uploaded ${logsToUpload.length} logs to ${this.datasetId}`);
 		} catch (error) {
 			// Just log the error and drop the logs - no retry logic
-			console.error('[HF Dataset Logger] ❌ Upload failed, dropping logs:', error);
+			console.error(`[HF Dataset ${this.logType}] ❌ Upload failed, dropping logs:`, error);
 		} finally {
 			this.uploadInProgress = false;
 		}
@@ -105,7 +121,7 @@ export class HfDatasetLogger {
 
 		// Create JSONL content directly in memory
 		const logData = logs
-			.map((log) => safeStringifyLog(log, this.sessionId))
+			.map((log) => safeStringifyLog(log, this.sessionId, this.logType))
 			.filter(Boolean) // Remove empty strings from null/undefined logs
 			.join('\n');
 
@@ -150,7 +166,7 @@ export class HfDatasetLogger {
 		if (this.isShuttingDown) return;
 		this.isShuttingDown = true;
 
-		console.log('[HF Dataset Logger] Shutting down...');
+		console.log(`[HF Dataset ${this.logType}] Shutting down...`);
 
 		// Clear the flush timer
 		if (this.flushTimer) {
@@ -161,7 +177,7 @@ export class HfDatasetLogger {
 		try {
 			await this.flush();
 		} catch (error) {
-			console.error('[HF Dataset Logger] Error during final log flush:', error);
+			console.error(`[HF Dataset ${this.logType}] Error during final log flush:`, error);
 		}
 	}
 
@@ -179,14 +195,22 @@ export class HfDatasetLogger {
 	}
 }
 
-interface TransportOptions {
-	batchSize?: number;
-	flushInterval?: number;
+
+// Helper function to calculate flush interval with environment awareness
+function calculateFlushInterval(optionsInterval?: number): number {
+	const envInterval = parseInt(process.env.LOGGING_FLUSH_INTERVAL || '300000', 10);
+	const interval = optionsInterval || envInterval;
+	const isTest = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+	const isDev = process.env.NODE_ENV === 'development';
+	
+	if (isTest) return interval || 1000;
+	if (isDev) return interval;
+	return Math.max(interval, 300000); // Enforce minimum in production
 }
 
 // Helper function to create a no-op transport
-function createNoOpTransport(reason: string): Transform {
-	console.warn(`[HF Dataset Logger] Dataset logging disabled: ${reason}`);
+function createNoOpTransport(reason: string, logType = 'Logs'): Transform {
+	console.warn(`[HF Dataset ${logType}] Dataset logging disabled: ${reason}`);
 	return build(function (source) {
 		source.on('data', function (_obj: unknown) {
 			// No-op
@@ -194,38 +218,69 @@ function createNoOpTransport(reason: string): Transform {
 	});
 }
 
-// Helper function to safely stringify log entries
-function safeStringifyLog(log: LogEntry, sessionId: string): string {
+// Helper function to safely stringify log entries with consistent structure
+function safeStringifyLog(log: LogEntry, sessionId: string, logType: string): string {
 	if (!log) return ''; // Skip null/undefined logs
-	return safeStringify.default({
-		...log,
+	
+	if (logType === 'Query') {
+		// Preserve query log structure as-is, just add transport sessionId
+		return safeStringify.default({
+			...log,
+			timestamp: new Date(log.time || Date.now()).toISOString(),
+			sessionId,
+		});
+	}
+	
+	// Standardize regular log structure for HF dataset viewer
+	const standardizedLog = {
+		message: log.msg || 'No message',
+		level: log.level,
 		timestamp: new Date(log.time || Date.now()).toISOString(),
 		sessionId,
+		data: (() => {
+			// Extract all fields except the standard ones and stringify them
+			const { msg: _msg, level: _level, time: _time, pid: _pid, hostname: _hostname, ...extraData } = log;
+			return Object.keys(extraData).length > 0 ? JSON.stringify(extraData) : undefined;
+		})(),
+	};
+	
+	// Remove undefined fields for cleaner output
+	Object.keys(standardizedLog).forEach(key => {
+		if (standardizedLog[key as keyof typeof standardizedLog] === undefined) {
+			delete standardizedLog[key as keyof typeof standardizedLog];
+		}
 	});
+	
+	return safeStringify.default(standardizedLog);
 }
 
 // Factory function for Pino transport using pino-abstract-transport
-export default async function (opts: TransportOptions = {}): Promise<Transform> {
+export default async function (opts: HfTransportOptions = {}): Promise<Transform> {
+	const logType = opts.logType || 'Logs';
+	
 	// Early returns for no-op cases
 	if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') {
-		return createNoOpTransport('disabled during tests');
+		return createNoOpTransport('disabled during tests', logType);
 	}
 
-	const datasetId = process.env.LOGGING_DATASET_ID;
+	// Use different dataset ID based on log type
+	const datasetId = logType === 'Query' 
+		? process.env.QUERY_DATASET_ID 
+		: process.env.LOGGING_DATASET_ID;
 	if (!datasetId) {
-		return createNoOpTransport('no dataset ID configured');
+		return createNoOpTransport('no dataset ID configured', logType);
 	}
 
 	const loggingToken = process.env.LOGGING_HF_TOKEN || process.env.DEFAULT_HF_TOKEN;
 	if (!loggingToken) {
 		console.warn(
-			'[HF Dataset Logger] No HF token available (LOGGING_HF_TOKEN or DEFAULT_HF_TOKEN). Dataset logging disabled.'
+			`[HF Dataset ${logType}] No HF token available (LOGGING_HF_TOKEN or DEFAULT_HF_TOKEN). Dataset logging disabled.`
 		);
-		return createNoOpTransport('no HF token available');
+		return createNoOpTransport('no HF token available', logType);
 	}
 
 	// Log that we're using HF dataset logging
-	console.log(`[HF Dataset Logger] Logging to dataset: ${datasetId}`);
+	console.log(`[HF Dataset ${logType}] Logging to dataset: ${datasetId}`);
 
 	try {
 		// Create the HF dataset logger instance
@@ -233,10 +288,9 @@ export default async function (opts: TransportOptions = {}): Promise<Transform> 
 			loggingToken,
 			datasetId,
 			batchSize: opts.batchSize || parseInt(process.env.LOGGING_BATCH_SIZE || '100', 10),
-			flushInterval:
-				opts.flushInterval || Math.max(parseInt(process.env.LOGGING_FLUSH_INTERVAL || '300000', 10), 300000),
+			flushInterval: calculateFlushInterval(opts.flushInterval),
+			logType,
 		});
-
 		// Return a proper Pino transport using async iterator pattern (recommended)
 		return build(
 			async function (source) {
@@ -246,7 +300,7 @@ export default async function (opts: TransportOptions = {}): Promise<Transform> 
 						hfLogger.processLog(obj);
 					} catch (error) {
 						// Never let transport errors affect the main logger
-						console.error('[HF Dataset Logger] Transport error (ignoring):', error);
+						console.error(`[HF Dataset ${logType}] Transport error (ignoring):`, error);
 					}
 				}
 			},
@@ -256,13 +310,13 @@ export default async function (opts: TransportOptions = {}): Promise<Transform> 
 					try {
 						await hfLogger.destroy();
 					} catch (error) {
-						console.error('[HF Dataset Logger] Error during close (ignoring):', error);
+						console.error(`[HF Dataset ${logType}] Error during close (ignoring):`, error);
 					}
 				},
 			}
 		);
 	} catch (error) {
-		console.error('[HF Dataset Logger] Failed to initialize, falling back to no-op:', error);
-		return createNoOpTransport('initialization failed');
+		console.error(`[HF Dataset ${logType}] Failed to initialize, falling back to no-op:`, error);
+		return createNoOpTransport('initialization failed', logType);
 	}
 }
