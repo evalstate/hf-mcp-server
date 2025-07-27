@@ -93,4 +93,34 @@ describe('extractQueryParamsToHeaders', () => {
 		expect(headers['authorization']).toBe('Bearer token123');
 		expect(headers['content-type']).toBe('application/json');
 	});
+
+	it('should extract gradio query parameter to header', () => {
+		const req = {
+			query: { gradio: 'evalstate/flux1_schnell,foo/bar' },
+		} as unknown as Request;
+
+		const headers: Record<string, string> = {};
+		extractQueryParamsToHeaders(req, headers);
+
+		expect(headers['x-mcp-gradio']).toBe('evalstate/flux1_schnell,foo/bar');
+		expect(headers['x-mcp-bouquet']).toBeUndefined();
+		expect(headers['x-mcp-mix']).toBeUndefined();
+	});
+
+	it('should extract gradio, bouquet, and mix together', () => {
+		const req = {
+			query: { 
+				bouquet: 'docs',
+				mix: 'search',
+				gradio: 'evalstate/flux1_schnell'
+			},
+		} as unknown as Request;
+
+		const headers: Record<string, string> = {};
+		extractQueryParamsToHeaders(req, headers);
+
+		expect(headers['x-mcp-bouquet']).toBe('docs');
+		expect(headers['x-mcp-mix']).toBe('search');
+		expect(headers['x-mcp-gradio']).toBe('evalstate/flux1_schnell');
+	});
 });
