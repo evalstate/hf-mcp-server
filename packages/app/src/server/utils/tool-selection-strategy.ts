@@ -67,8 +67,11 @@ export class ToolSelectionStrategy {
 	 */
 	private parseGradioEndpoints(gradioParam: string): SpaceTool[] {
 		const spaceTools: SpaceTool[] = [];
-		const entries = gradioParam.split(',').map(s => s.trim()).filter(s => s.length > 0);
-		
+		const entries = gradioParam
+			.split(',')
+			.map((s) => s.trim())
+			.filter((s) => s.length > 0);
+
 		for (const entry of entries) {
 			// Validate exactly one slash
 			const slashCount = (entry.match(/\//g) || []).length;
@@ -76,20 +79,20 @@ export class ToolSelectionStrategy {
 				logger.warn(`Skipping invalid gradio entry "${entry}": must contain exactly one slash`);
 				continue;
 			}
-			
+
 			// Convert domain/space to subdomain format (replace / and . with -)
-			const subdomain = entry.replace(/[/.]/g, '-');
-			
+			const subdomain = entry.replace(/[/._]/g, '-');
+
 			spaceTools.push({
 				_id: `gradio_${subdomain}`,
 				name: entry,
 				subdomain: subdomain,
-				emoji: '🔧'
+				emoji: '🔧',
 			});
-			
+
 			logger.debug(`Added gradio endpoint: ${entry} -> ${subdomain}`);
 		}
-		
+
 		return spaceTools;
 	}
 
@@ -180,7 +183,10 @@ export class ToolSelectionStrategy {
 			return {
 				mode,
 				enabledToolIds,
-				reason: mode === ToolSelectionMode.EXTERNAL_API ? `External API user settings${gradioSpaceTools.length > 0 ? ` + ${gradioSpaceTools.length} gradio endpoints` : ''}` : `Internal API user settings${gradioSpaceTools.length > 0 ? ` + ${gradioSpaceTools.length} gradio endpoints` : ''}`,
+				reason:
+					mode === ToolSelectionMode.EXTERNAL_API
+						? `External API user settings${gradioSpaceTools.length > 0 ? ` + ${gradioSpaceTools.length} gradio endpoints` : ''}`
+						: `Internal API user settings${gradioSpaceTools.length > 0 ? ` + ${gradioSpaceTools.length} gradio endpoints` : ''}`,
 				baseSettings,
 				gradioSpaceTools: gradioSpaceTools.length > 0 ? gradioSpaceTools : undefined,
 			};

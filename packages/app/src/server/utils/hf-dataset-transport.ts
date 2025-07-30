@@ -57,7 +57,9 @@ export class HfDatasetLogger {
 		this.registerShutdownHandlers();
 
 		// Log initialization with flush interval
-		console.log(`[HF Dataset ${this.logType}] Initialized - Dataset: ${this.datasetId}, Session: ${this.sessionId}, FlushInterval: ${this.flushInterval}ms, BatchSize: ${this.batchSize}`);
+		console.log(
+			`[HF Dataset ${this.logType}] Initialized - Dataset: ${this.datasetId}, Session: ${this.sessionId}, FlushInterval: ${this.flushInterval}ms, BatchSize: ${this.batchSize}`
+		);
 	}
 
 	processLog(logEntry: LogEntry): void {
@@ -67,8 +69,6 @@ export class HfDatasetLogger {
 			}
 
 			this.logBuffer.push(logEntry);
-
-			console.log(`[HF Dataset ${this.logType}] Log received - Buffer: ${this.logBuffer.length}/${this.batchSize}`);
 
 			if (this.logBuffer.length >= this.batchSize) {
 				console.log(`[HF Dataset ${this.logType}] Triggering flush due to batch size (${this.batchSize})`);
@@ -89,8 +89,10 @@ export class HfDatasetLogger {
 	}
 
 	private async flush(): Promise<void> {
-		console.log(`[HF Dataset ${this.logType}] Flush called - Buffer: ${this.logBuffer.length}, InProgress: ${this.uploadInProgress}`);
-		
+		console.log(
+			`[HF Dataset ${this.logType}] Flush called - Buffer: ${this.logBuffer.length}, InProgress: ${this.uploadInProgress}`
+		);
+
 		if (this.uploadInProgress || this.logBuffer.length === 0) {
 			return;
 		}
@@ -195,14 +197,13 @@ export class HfDatasetLogger {
 	}
 }
 
-
 // Helper function to calculate flush interval with environment awareness
 function calculateFlushInterval(optionsInterval?: number): number {
 	const envInterval = parseInt(process.env.LOGGING_FLUSH_INTERVAL || '300000', 10);
 	const interval = optionsInterval || envInterval;
 	const isTest = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
 	const isDev = process.env.NODE_ENV === 'development';
-	
+
 	if (isTest) return interval || 1000;
 	if (isDev) return interval;
 	return Math.max(interval, 300000); // Enforce minimum in production
@@ -221,7 +222,7 @@ function createNoOpTransport(reason: string, logType = 'Logs'): Transform {
 // Helper function to safely stringify log entries with consistent structure
 function safeStringifyLog(log: LogEntry, sessionId: string, logType: string): string {
 	if (!log) return ''; // Skip null/undefined logs
-	
+
 	if (logType === 'Query') {
 		// Preserve query log structure as-is, just add transport sessionId
 		return safeStringify.default({
@@ -230,7 +231,7 @@ function safeStringifyLog(log: LogEntry, sessionId: string, logType: string): st
 			sessionId,
 		});
 	}
-	
+
 	// Standardize regular log structure for HF dataset viewer
 	const standardizedLog = {
 		message: log.msg || 'No message',
@@ -243,30 +244,28 @@ function safeStringifyLog(log: LogEntry, sessionId: string, logType: string): st
 			return Object.keys(extraData).length > 0 ? JSON.stringify(extraData) : undefined;
 		})(),
 	};
-	
+
 	// Remove undefined fields for cleaner output
-	Object.keys(standardizedLog).forEach(key => {
+	Object.keys(standardizedLog).forEach((key) => {
 		if (standardizedLog[key as keyof typeof standardizedLog] === undefined) {
 			delete standardizedLog[key as keyof typeof standardizedLog];
 		}
 	});
-	
+
 	return safeStringify.default(standardizedLog);
 }
 
 // Factory function for Pino transport using pino-abstract-transport
 export default async function (opts: HfTransportOptions = {}): Promise<Transform> {
 	const logType = opts.logType || 'Logs';
-	
+
 	// Early returns for no-op cases
 	if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') {
 		return createNoOpTransport('disabled during tests', logType);
 	}
 
 	// Use different dataset ID based on log type
-	const datasetId = logType === 'Query' 
-		? process.env.QUERY_DATASET_ID 
-		: process.env.LOGGING_DATASET_ID;
+	const datasetId = logType === 'Query' ? process.env.QUERY_DATASET_ID : process.env.LOGGING_DATASET_ID;
 	if (!datasetId) {
 		return createNoOpTransport('no dataset ID configured', logType);
 	}

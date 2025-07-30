@@ -28,6 +28,7 @@ export function isGradioTool(toolName: string): boolean {
  * @param toolName - The tool name (e.g., "flux1_schnell", "EasyGhibli")
  * @param index - Zero-based index position (will be converted to 1-based)
  * @param isPrivate - Whether this is a private space (determines gr vs grp prefix)
+ * @param toolIndex - Optional tool index within the endpoint for uniqueness when truncating
  * @returns The generated tool name following Gradio naming convention
  *
  * @example
@@ -35,7 +36,7 @@ export function isGradioTool(toolName: string): boolean {
  * createGradioToolName('EasyGhibli', 1, false) // 'gr2_easyghibli'
  * createGradioToolName('private.model', 2, true) // 'grp3_private_model'
  */
-export function createGradioToolName(toolName: string, index: number, isPrivate: boolean | undefined): string {
+export function createGradioToolName(toolName: string, index: number, isPrivate: boolean | undefined, toolIndex?: number): string {
 	// Choose prefix based on privacy status
 	const prefix = isPrivate ? GRADIO_PRIVATE_PREFIX : GRADIO_PREFIX;
 	const indexStr = (index + 1).toString();
@@ -50,15 +51,24 @@ export function createGradioToolName(toolName: string, index: number, isPrivate:
 				.toLowerCase()
 		: 'unknown';
 
-	// Truncate from middle if necessary to fit within 45 character limit
+	// Handle based on length
 	if (sanitizedName.length > maxNameLength) {
-		// Keep first 20 chars, add underscore, then keep as many chars from the end as possible
-		const keepFromEnd = maxNameLength - 20 - 1; // -1 for the underscore
-		sanitizedName = sanitizedName.substring(0, 20) + '_' + sanitizedName.slice(-keepFromEnd);
-	} else {
-		// Only normalize multiple underscores if we didn't truncate
-		sanitizedName = sanitizedName.replace(/_+/g, '_');
+		// Over limit: insert tool index at beginning if provided, then truncate
+		if (toolIndex !== undefined) {
+			// Insert tool index after the underscore: gr1_0_toolname
+			const toolIndexPrefix = `${toolIndex}_`;
+			const availableForName = maxNameLength - toolIndexPrefix.length;
+			
+			// Keep first 20 chars, add underscore, then keep as many chars from the end as possible
+			const keepFromEnd = availableForName - 20 - 1; // -1 for the underscore
+			sanitizedName = toolIndexPrefix + sanitizedName.substring(0, 20) + '_' + sanitizedName.slice(-keepFromEnd);
+		} else {
+			// No tool index, just do middle truncation as before
+			const keepFromEnd = maxNameLength - 20 - 1; // -1 for the underscore
+			sanitizedName = sanitizedName.substring(0, 20) + '_' + sanitizedName.slice(-keepFromEnd);
+		}
 	}
+	// Under limit: keep as-is, no normalization
 
 	// Create tool name: {prefix}{1-based-index}_{sanitized_name}
 	return `${prefix}${indexStr}_${sanitizedName}`;

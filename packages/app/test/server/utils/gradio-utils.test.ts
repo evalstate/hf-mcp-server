@@ -115,9 +115,11 @@ describe('createGradioToolName', () => {
 		});
 
 		it('should sanitize tool names correctly', () => {
+			// Initial sanitization still happens (spaces, dots, dashes -> underscores)
+			// But no underscore normalization
 			expect(createGradioToolName('model-name.v2', 0, false)).toBe('gr1_model_name_v2');
 			expect(createGradioToolName('my space test', 1, false)).toBe('gr2_my_space_test');
-			expect(createGradioToolName('multi--dash__test', 0, false)).toBe('gr1_multi_dash_test');
+			expect(createGradioToolName('multi--dash__test', 0, false)).toBe('gr1_multi_dash__test');
 		});
 
 		it('should handle edge cases', () => {
@@ -171,6 +173,78 @@ describe('createGradioToolName', () => {
 			expect(result1).toBe('gr1_image_generation_mod_ocessing_version_1_final');
 			expect(result2).toBe('gr1_image_generation_mod_ocessing_version_2_final');
 			expect(result1).not.toBe(result2);
+		});
+
+		it('should not collide when one name is at limit and another exceeds by one char', () => {
+			// Test case where one name is exactly at the limit and another is one char over
+			// With index 29 (becomes "gr30"), we have 44 chars available for the name
+			const tool1 = 'image_utilities_mcp_update_text_image_______'; // 44 chars - exactly at limit
+			const tool2 = 'image_utilities_mcp_update_text_image________'; // 45 chars - exceeds by 1
+			const result1 = createGradioToolName(tool1, 29, false);
+			const result2 = createGradioToolName(tool2, 29, false);
+			
+			// No normalization for tool1, tool2 is truncated
+			expect(result1).toBe('gr30_image_utilities_mcp_update_text_image_______');
+			expect(result2).toBe('gr30_image_utilities_mcp__date_text_image________');
+			expect(result1).not.toBe(result2);
+			
+			// First keeps its length, second is truncated to exactly 49
+			expect(result1.length).toBe(49);
+			expect(result2.length).toBe(49);
+		});
+
+		it('should prepend tool index to truncated names when provided', () => {
+			// Test that toolIndex is prepended when truncation occurs
+			const longName = 'very_long_tool_name_that_exceeds_forty_nine_characters_total_and_more';
+			
+			// Without toolIndex
+			const result1 = createGradioToolName(longName, 0, false);
+			expect(result1).toBe('gr1_very_long_tool_name__haracters_total_and_more');
+			expect(result1.length).toBe(49);
+			
+			// With toolIndex 0
+			const result2 = createGradioToolName(longName, 0, false, 0);
+			expect(result2).toBe('gr1_0_very_long_tool_name__racters_total_and_more');
+			expect(result2.length).toBe(49);
+			
+			// With toolIndex 1
+			const result3 = createGradioToolName(longName, 0, false, 1);
+			expect(result3).toBe('gr1_1_very_long_tool_name__racters_total_and_more');
+			expect(result3.length).toBe(49);
+			
+			// Different tools should have different names
+			expect(result2).not.toBe(result3);
+		});
+
+		it('should handle similar tool names with different indices correctly', () => {
+			// Test multiple similar tool names that would collide without toolIndex
+			const baseName = 'image_utilities_mcp_update_text_image________';
+			
+			const tools = [0, 1, 2, 3].map(toolIdx => 
+				createGradioToolName(baseName, 29, false, toolIdx)
+			);
+			
+			// All should be unique
+			const uniqueTools = new Set(tools);
+			expect(uniqueTools.size).toBe(4);
+			
+			// Each should start with its tool index after the prefix
+			expect(tools[0]).toBe('gr30_0_image_utilities_mcp__te_text_image________');
+			expect(tools[1]).toBe('gr30_1_image_utilities_mcp__te_text_image________');
+			expect(tools[2]).toBe('gr30_2_image_utilities_mcp__te_text_image________');
+			expect(tools[3]).toBe('gr30_3_image_utilities_mcp__te_text_image________');
+		});
+
+		it('should not add toolIndex when not truncating', () => {
+			// Short names should not get toolIndex appended
+			const shortName = 'simple_tool';
+			
+			const result1 = createGradioToolName(shortName, 0, false, 0);
+			const result2 = createGradioToolName(shortName, 0, false, 1);
+			
+			// Both should be the same since no truncation happened
+			expect(result1).toBe('gr1_simple_tool');
+			expect(result2).toBe('gr1_simple_tool');
 		});
 	});
 

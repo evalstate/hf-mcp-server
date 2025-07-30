@@ -50,7 +50,7 @@ import type { ServerFactory } from './transport/base-transport.js';
 import type { McpApiClient } from './utils/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
 import { logger } from './utils/logger.js';
-import { logSearchQuery } from './utils/query-logger.js';
+import { logSearchQuery, logPromptQuery } from './utils/query-logger.js';
 import { DEFAULT_SPACE_TOOLS, type AppSettings } from '../shared/settings.js';
 import { extractAuthBouquetAndMix } from './utils/auth-utils.js';
 import { ToolSelectionStrategy, type ToolSelectionContext } from './utils/tool-selection-strategy.js';
@@ -164,6 +164,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			async (params: UserSummaryParams) => {
 				const userSummary = new UserSummaryPrompt(hfToken);
 				const summaryText = await userSummary.generateSummary(params);
+				logPromptQuery(USER_SUMMARY_PROMPT_CONFIG.name, params.user_id, { user_id: params.user_id });
 
 				return {
 					description: `User summary for ${params.user_id}`,
@@ -187,6 +188,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			async (params: PaperSummaryParams) => {
 				const paperSummary = new PaperSummaryPrompt(hfToken);
 				const summaryText = await paperSummary.generateSummary(params);
+				logPromptQuery(PAPER_SUMMARY_PROMPT_CONFIG.name, params.paper_id, { paper_id: params.paper_id });
 
 				return {
 					description: `Paper summary for ${params.paper_id}`,
@@ -243,6 +245,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			async (params: ModelDetailParams) => {
 				const modelDetail = new ModelDetailTool(hfToken, undefined);
 				const results = await modelDetail.getDetails(params.model_id);
+				logPromptQuery(MODEL_DETAIL_TOOL_CONFIG.name, params.model_id, { model_id: params.model_id });
 				return {
 					content: [{ type: 'text', text: results }],
 				};
@@ -290,6 +293,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			async (params: DatasetDetailParams) => {
 				const datasetDetail = new DatasetDetailTool(hfToken, undefined);
 				const results = await datasetDetail.getDetails(params.dataset_id);
+				logPromptQuery(DATASET_DETAIL_TOOL_CONFIG.name, params.dataset_id, { dataset_id: params.dataset_id });
 				return {
 					content: [{ type: 'text', text: results }],
 				};
