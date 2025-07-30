@@ -96,4 +96,16 @@ export function logSearchQuery(toolName: string, query: string, data: Record<str
 	});
 }
 
+/**
+ * Simple helper to log prompts (model details, dataset details, user/paper summaries)
+ */
+export function logPromptQuery(toolName: string, query: string, data: Record<string, unknown>): void {
+	logQuery({
+		query,
+		toolName,
+		parameters: JSON.stringify(data),
+		status: 'success',
+	});
+}
+
 export { queryLogger };
