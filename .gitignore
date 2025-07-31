@@ -32,3 +32,4 @@ dist-ssr
 *.sln
 *.sw?
 hf-mcp-server.code-workspace
+.env.test
