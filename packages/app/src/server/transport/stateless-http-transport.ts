@@ -1,7 +1,13 @@
-import { BaseTransport, type TransportOptions, STATELESS_MODE, type SessionMetadata } from './base-transport.js';
+import {
+	BaseTransport,
+	type TransportOptions,
+	STATELESS_MODE,
+	type SessionMetadata,
+	type ServerFactory,
+} from './base-transport.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { logger } from '../utils/logger.js';
-import type { Request, Response } from 'express';
+import type { Request, Response, Express } from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import path from 'path';
@@ -10,15 +16,39 @@ import { isJSONRPCNotification } from '@modelcontextprotocol/sdk/types.js';
 import { extractQueryParamsToHeaders } from '../utils/query-params.js';
 import { isBrowser } from '../utils/browser-detection.js';
 import { OAUTH_RESOURCE } from '../../shared/constants.js';
+import { randomUUID } from 'node:crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Analytics session without server (server is null in analytics mode)
+interface AnalyticsSession {
+	transport: null;
+	server: null;
+	metadata: SessionMetadata;
+}
+
 /**
  * Stateless HTTP JSON transport implementation
  * Creates a new server AND transport instance for each request to ensure complete isolation
+ *
+ * In analytics mode (ANALYTICS_MODE=true), maintains session tracking for analytics purposes
+ * without affecting the stateless nature of request processing
  */
 export class StatelessHttpTransport extends BaseTransport {
+	private readonly analyticsMode: boolean;
+	private analyticsSessions: Map<string, AnalyticsSession> = new Map();
+
+	constructor(serverFactory: ServerFactory, app: Express) {
+		super(serverFactory, app);
+		this.analyticsMode = process.env.ANALYTICS_MODE === 'true';
+
+		if (this.analyticsMode) {
+			logger.info(
+				'Analytics mode enabled for stateless HTTP transport - no cleanup needed, can handle millions of sessions'
+			);
+		}
+	}
 	/**
 	 * Determines if a request should be handled by the full server
 	 * or can be handled by the stub responder
@@ -52,6 +82,8 @@ export class StatelessHttpTransport extends BaseTransport {
 			void this.handleJsonRpcRequest(req, res);
 		});
 
+		// Analytics mode doesn't need cleanup - can handle millions of sessions
+
 		// Serve the MCP welcome page on GET requests (or 405 if strict compliance is enabled)
 		this.app.get('/mcp', (req: Request, res: Response) => {
 			// Check for strict compliance mode or non-browser client
@@ -84,14 +116,10 @@ export class StatelessHttpTransport extends BaseTransport {
 			res.sendFile(mcpWelcomePath);
 		});
 
-		// Explicitly reject DELETE requests
-		this.app.delete('/mcp', (_req: Request, res: Response) => {
+		// Handle DELETE requests for analytics tracking
+		this.app.delete('/mcp', (req: Request, res: Response) => {
 			this.trackRequest();
-			this.trackError(405);
-			logger.warn('Rejected DELETE request to /mcp in stateless mode');
-			res
-				.status(405)
-				.json(JsonRpcErrors.methodNotAllowed(null, 'Method not allowed. Use POST for stateless JSON-RPC requests.'));
+			void this.handleDeleteRequest(req, res);
 		});
 
 		logger.info('HTTP JSON transport initialized (stateless mode)');
@@ -102,6 +130,7 @@ export class StatelessHttpTransport extends BaseTransport {
 		const startTime = Date.now();
 		let server: McpServer | null = null;
 		let transport: StreamableHTTPServerTransport | null = null;
+		let sessionId: string | undefined;
 
 		// Check HF token validity if present
 		const headers = req.headers as Record<string, string>;
@@ -120,6 +149,32 @@ export class StatelessHttpTransport extends BaseTransport {
 			return;
 		}
 
+		// Analytics mode session tracking
+		if (this.analyticsMode) {
+			sessionId = headers['mcp-session-id'] || (req.query.sessionId as string);
+			// Handle session creation/resumption
+			if (requestBody?.method === 'initialize') {
+				// Create new session
+				sessionId = randomUUID();
+				this.createAnalyticsSession(sessionId, authResult.shouldContinue && headers['authorization'] ? true : false);
+
+				// Add session ID to response headers
+				res.setHeader('MCP-Session-ID', sessionId);
+			} else if (sessionId) {
+				// Try to resume existing session
+				if (this.analyticsSessions.has(sessionId)) {
+					this.updateAnalyticsSessionActivity(sessionId);
+				} else {
+					// Session not found - track failed resumption and return 404
+					this.metrics.trackSessionResumeFailed();
+					this.trackError(404);
+					logger.debug({ sessionId }, 'Analytics session not found for resumption');
+					res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(req.body)));
+					return;
+				}
+			}
+		}
+
 		// Track new connection for metrics (each request is a "connection" in stateless mode)
 		this.trackNewConnection();
 
@@ -136,6 +191,11 @@ export class StatelessHttpTransport extends BaseTransport {
 				if (clientInfo?.name && clientInfo?.version) {
 					this.associateSessionWithClient({ name: clientInfo.name, version: clientInfo.version });
 					this.updateClientActivity({ name: clientInfo.name, version: clientInfo.version });
+
+					// Update analytics session with client info
+					if (this.analyticsMode && sessionId) {
+						this.updateAnalyticsSessionClientInfo(sessionId, { name: clientInfo.name, version: clientInfo.version });
+					}
 				}
 
 				logger.debug(
@@ -256,6 +316,36 @@ export class StatelessHttpTransport extends BaseTransport {
 		}
 	}
 
+	private async handleDeleteRequest(req: Request, res: Response): Promise<void> {
+		if (!this.analyticsMode) {
+			this.trackError(405);
+			logger.warn('Rejected DELETE request to /mcp in stateless mode (analytics disabled)');
+			res
+				.status(405)
+				.json(JsonRpcErrors.methodNotAllowed(null, 'Method not allowed. Use POST for stateless JSON-RPC requests.'));
+			return;
+		}
+
+		const sessionId = (req.headers['mcp-session-id'] as string) || (req.query.sessionId as string);
+
+		if (!sessionId) {
+			this.trackError(400);
+			res.status(400).json(JsonRpcErrors.invalidRequest(null, 'Session ID required for DELETE requests'));
+			return;
+		}
+
+		if (this.analyticsSessions.has(sessionId)) {
+			this.analyticsSessions.delete(sessionId);
+			this.metrics.trackSessionDeleted();
+			logger.info({ sessionId }, 'Analytics session deleted via DELETE request');
+			res.status(200).json({ jsonrpc: '2.0', result: { deleted: true } });
+		} else {
+			this.trackError(404);
+			logger.debug({ sessionId }, 'Analytics session not found for deletion');
+			res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, null));
+		}
+	}
+
 	/**
 	 * Mark transport as shutting down
 	 */
@@ -264,16 +354,14 @@ export class StatelessHttpTransport extends BaseTransport {
 		logger.debug('Stateless HTTP transport shutdown signaled');
 	}
 
-	cleanup(): Promise<void> {
-		// No persistent resources to clean up in stateless mode
-		logger.info('HTTP JSON transport cleanup complete');
-		return Promise.resolve();
-	}
-
 	/**
 	 * Get the number of active connections - returns STATELESS_MODE for stateless transport
 	 */
 	getActiveConnectionCount(): number {
+		// In analytics mode, return the number of tracked sessions
+		if (this.analyticsMode) {
+			return this.analyticsSessions.size;
+		}
 		// Stateless transports don't track active connections
 		return STATELESS_MODE;
 	}
@@ -282,7 +370,57 @@ export class StatelessHttpTransport extends BaseTransport {
 	 * Get all active sessions - returns empty array for stateless transport
 	 */
 	override getSessions(): SessionMetadata[] {
+		// In analytics mode, return tracked sessions
+		if (this.analyticsMode) {
+			return Array.from(this.analyticsSessions.values()).map((session) => session.metadata);
+		}
 		// Stateless transport doesn't maintain sessions
 		return [];
+	}
+
+	/**
+	 * Clean up resources
+	 */
+	async cleanup(): Promise<void> {
+		// Clear analytics sessions if needed
+		this.analyticsSessions.clear();
+		logger.info('HTTP JSON transport cleanup complete');
+		return Promise.resolve();
+	}
+
+	// Analytics mode methods
+	private createAnalyticsSession(sessionId: string, isAuthenticated: boolean): void {
+		const session: AnalyticsSession = {
+			transport: null,
+			server: null, // Server is null in analytics mode
+			metadata: {
+				id: sessionId,
+				connectedAt: new Date(),
+				lastActivity: new Date(),
+				requestCount: 1,
+				isAuthenticated,
+				capabilities: {},
+			},
+		};
+
+		this.analyticsSessions.set(sessionId, session);
+		this.metrics.trackSessionCreated();
+
+		logger.debug({ sessionId, isAuthenticated }, 'Analytics session created');
+	}
+
+	private updateAnalyticsSessionActivity(sessionId: string): void {
+		const session = this.analyticsSessions.get(sessionId);
+		if (session) {
+			session.metadata.lastActivity = new Date();
+			session.metadata.requestCount++;
+		}
+	}
+
+	private updateAnalyticsSessionClientInfo(sessionId: string, clientInfo: { name: string; version: string }): void {
+		const session = this.analyticsSessions.get(sessionId);
+		if (session) {
+			session.metadata.clientInfo = clientInfo;
+		}
 	}
 }

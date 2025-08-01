@@ -17,6 +17,13 @@ export interface TransportMetrics {
 		cleaned?: number; // Only for stateful transports
 	};
 
+	// Session lifecycle metrics (only for stateful transports)
+	sessions?: {
+		created: number;
+		resumedFailed: number;
+		deleted: number;
+	};
+
 	// Request metrics
 	requests: {
 		total: number;
@@ -138,6 +145,13 @@ export interface TransportMetricsResponse {
 		cleaned?: number;
 	};
 
+	// Session lifecycle metrics (only for stateful transports)
+	sessionLifecycle?: {
+		created: number;
+		resumedFailed: number;
+		deleted: number;
+	};
+
 	requests: {
 		total: number;
 		averagePerMinute: number;
@@ -213,6 +227,7 @@ export function formatMetricsForAPI(
 		currentTime: currentTime.toISOString(),
 		uptimeSeconds,
 		connections: metrics.connections,
+		sessionLifecycle: metrics.sessions,
 		requests: metrics.requests,
 		pings: metrics.pings
 			? {
@@ -265,6 +280,11 @@ export function createEmptyMetrics(): TransportMetrics {
 			authenticated: 0,
 			denied: 0,
 			anonymous: 0,
+		},
+		sessions: {
+			created: 0,
+			resumedFailed: 0,
+			deleted: 0,
 		},
 		requests: {
 			total: 0,
@@ -529,6 +549,34 @@ export class MetricsCounter {
 			this.metrics.connections.unauthorized = 0;
 		}
 		this.metrics.connections.unauthorized++;
+	}
+
+	/**
+	 * Track a new session being created
+	 */
+	trackSessionCreated(): void {
+		if (this.metrics.sessions) {
+			this.metrics.sessions.created++;
+		}
+	}
+
+
+	/**
+	 * Track a failed session resumption attempt
+	 */
+	trackSessionResumeFailed(): void {
+		if (this.metrics.sessions) {
+			this.metrics.sessions.resumedFailed++;
+		}
+	}
+
+	/**
+	 * Track a session being deleted/cleaned up
+	 */
+	trackSessionDeleted(): void {
+		if (this.metrics.sessions) {
+			this.metrics.sessions.deleted++;
+		}
 	}
 
 	/**

@@ -33,6 +33,7 @@ export interface SessionMetadata {
 	connectedAt: Date;
 	lastActivity: Date;
 	requestCount: number;
+	isAuthenticated: boolean;
 	clientInfo?: {
 		name: string;
 		version: string;
@@ -538,6 +539,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	protected trackSessionCreated(sessionId: string): void {
 		this.trackNewConnection();
 		this.metrics.updateActiveConnections(this.sessions.size);
+		this.metrics.trackSessionCreated();
 		// Track as unknown client initially - will be updated when client info is available
 		const session = this.sessions.get(sessionId);
 		if (session) {
@@ -551,6 +553,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 	 */
 	protected trackSessionCleaned(session?: TSession): void {
 		this.metrics.trackSessionCleaned();
+		this.metrics.trackSessionDeleted();
 		this.metrics.updateActiveConnections(this.sessions.size);
 
 		// Disconnect client if we have client info

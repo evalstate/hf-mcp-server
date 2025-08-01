@@ -25,6 +25,7 @@ export class StdioTransport extends StatefulTransport<StdioSession> {
 				connectedAt: new Date(),
 				lastActivity: new Date(),
 				requestCount: 0,
+				isAuthenticated: false, // STDIO doesn't have authentication headers
 				capabilities: {},
 			},
 		};

@@ -235,6 +235,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 						connectedAt: new Date(),
 						lastActivity: new Date(),
 						requestCount: 0,
+						isAuthenticated: !!requestHeaders?.['authorization'],
 						capabilities: {},
 					},
 				};
@@ -282,7 +283,6 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 	 * Remove a stale session - implementation for StatefulTransport
 	 */
 	protected async removeStaleSession(sessionId: string): Promise<void> {
-		logger.info({ sessionId }, 'Removing stale session');
 		await this.cleanupSession(sessionId);
 	}
 
