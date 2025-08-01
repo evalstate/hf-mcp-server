@@ -78,6 +78,7 @@ export function logQuery(entry: Omit<QueryLogEntry, 'sessionId' | 'timestamp'>):
 	const logEntry: QueryLogEntry = {
 		...entry,
 		sessionId: crypto.randomUUID(),
+		timestamp: '',
 	};
 
 	queryLogger.info(logEntry);
