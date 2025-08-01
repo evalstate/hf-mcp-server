@@ -248,6 +248,14 @@ export function StatefulTransportMetrics({ metrics }: StatefulTransportMetricsPr
 								<TableCell className="font-medium text-sm">Requests per Minute</TableCell>
 								<TableCell className="text-sm font-mono">{metrics.requests.averagePerMinute}</TableCell>
 							</TableRow>
+							{metrics.sessionLifecycle && (
+								<TableRow>
+									<TableCell className="font-medium text-sm">Sessions New/Res-fail/Del</TableCell>
+									<TableCell className="text-sm font-mono" colSpan={3}>
+										{metrics.sessionLifecycle.created}/{metrics.sessionLifecycle.resumedFailed}/{metrics.sessionLifecycle.deleted}
+									</TableCell>
+								</TableRow>
+							)}
 							<TableRow>
 								<TableCell className="font-medium text-sm">Client Errors (4xx)</TableCell>
 								<TableCell className="text-sm font-mono">{metrics.errors.expected}</TableCell>
@@ -283,18 +291,18 @@ export function StatefulTransportMetrics({ metrics }: StatefulTransportMetricsPr
 									</TableRow>
 								</>
 							)}
-							{metrics.gradioMetrics && (
-								<>
-									<TableRow>
-										<TableCell className="font-medium text-sm">Gradio Success/Fail</TableCell>
-										<TableCell className="text-sm font-mono">
-											{metrics.gradioMetrics.success}/{metrics.gradioMetrics.failure}
-										</TableCell>
-										<TableCell className="font-medium text-sm">-</TableCell>
-										<TableCell className="text-sm font-mono">-</TableCell>
-									</TableRow>
-								</>
-							)}
+							{/* Gradio Metrics - Always shown */}
+							<TableRow>
+								<TableCell className="font-medium text-sm">Gradio Success/Fail</TableCell>
+								<TableCell className="text-sm font-mono">
+									{metrics.gradioMetrics ? 
+										`${metrics.gradioMetrics.success}/${metrics.gradioMetrics.failure}` : 
+										'0/0'
+									}
+								</TableCell>
+								<TableCell className="font-medium text-sm">-</TableCell>
+								<TableCell className="text-sm font-mono">-</TableCell>
+							</TableRow>
 						</TableBody>
 					</Table>
 				</div>

@@ -39,7 +39,6 @@ export class DocFetchTool {
 		this.turndownService.remove('head');
 		this.turndownService.remove('script');
 		this.turndownService.remove((node) => {
-			console.log(`${node.nodeName}	`);
 			if (node.nodeName === 'a' && node.innerHTML.includes('<!-- HTML_TAG_START -->')) {
 				return true;
 			}

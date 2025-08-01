@@ -6,7 +6,7 @@ import { Copy, Settings } from 'lucide-react';
 export function SettingsCopyPage() {
 	// Handler for copying MCP URL
 	const handleCopyMcpUrl = async () => {
-		const mcpUrl = `https://hf.co/mcp`;
+		const mcpUrl = `https://huggingface.co/mcp?login`;
 
 		try {
 			await navigator.clipboard.writeText(mcpUrl);

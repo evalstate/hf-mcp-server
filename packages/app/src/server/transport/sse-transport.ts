@@ -63,6 +63,10 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 
 					// Clean up old connection before creating new one
 					await this.closeConnection(existingSessionId);
+				} else {
+					// Session not found - track failed resumption
+					this.metrics.trackSessionResumeFailed();
+					logger.debug({ sessionId: existingSessionId }, 'Session not found for reconnection');
 				}
 			}
 
@@ -99,6 +103,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 					connectedAt: new Date(),
 					lastActivity: new Date(),
 					requestCount: 0,
+					isAuthenticated: authResult.shouldContinue && !!headers['authorization'],
 					capabilities: {},
 				},
 			};

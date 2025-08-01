@@ -44,4 +44,4 @@ mcp:
         version: 1.0.62
     test_all_hf:
       transport: http
-      url: http://localhost:3001/mcp?bouquet=bouquet=all
+      url: http://localhost:3001/mcp?bouquet=all

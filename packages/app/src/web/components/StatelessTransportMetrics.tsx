@@ -148,7 +148,9 @@ export function StatelessTransportMetrics({ metrics }: StatelessTransportMetrics
 						<p className="text-sm font-medium text-muted-foreground">Transport Type</p>
 						<div className="flex items-center gap-2">
 							<p className="text-sm font-mono">Stateless HTTP JSON</p>
-							<Badge variant="secondary">stateless</Badge>
+							<Badge variant="secondary">
+								{metrics.sessionLifecycle ? 'analytics' : 'stateless'}
+							</Badge>
 						</div>
 					</div>
 					<div>
@@ -212,19 +214,31 @@ export function StatelessTransportMetrics({ metrics }: StatelessTransportMetrics
 									</TableRow>
 								</>
 							)}
-							{/* Gradio Metrics */}
-							{metrics.gradioMetrics && (
-								<>
-									<TableRow>
-										<TableCell className="font-medium text-sm">Gradio Success/Fail</TableCell>
+							{/* Gradio Metrics - Always shown */}
+							<TableRow>
+								<TableCell className="font-medium text-sm">Gradio Success/Fail</TableCell>
+								<TableCell className="text-sm font-mono">
+									{metrics.gradioMetrics ? 
+										`${metrics.gradioMetrics.success}/${metrics.gradioMetrics.failure}` : 
+										'0/0'
+									}
+								</TableCell>
+								
+								{/* Session lifecycle metrics (analytics mode) - adjacent cells when present */}
+								{metrics.sessionLifecycle ? (
+									<>
+										<TableCell className="font-medium text-sm">Sessions New/Res-fail/Del</TableCell>
 										<TableCell className="text-sm font-mono">
-											{metrics.gradioMetrics.success}/{metrics.gradioMetrics.failure}
+											{metrics.sessionLifecycle.created}/{metrics.sessionLifecycle.resumedFailed}/{metrics.sessionLifecycle.deleted}
 										</TableCell>
+									</>
+								) : (
+									<>
 										<TableCell className="font-medium text-sm">-</TableCell>
 										<TableCell className="text-sm font-mono">-</TableCell>
-									</TableRow>
-								</>
-							)}
+									</>
+								)}
+							</TableRow>
 						</TableBody>
 					</Table>
 				</div>

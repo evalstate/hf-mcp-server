@@ -1,16 +1,18 @@
 #!/bin/bash
-# Start server with test environment variables from .env.test
+# Start server with environment variables from specified file
 
-# Load variables from .env.test if it exists
-if [ -f .env.test ]; then
-    echo "Loading environment from .env.test..."
+# Get env file from parameter, default to .env.test
+ENV_FILE=${1:-.env.test}
+
+# Load variables from specified env file if it exists
+if [ -f "$ENV_FILE" ]; then
+    echo "Loading environment from $ENV_FILE..."
     set -a
-    source .env.test
+    source "$ENV_FILE"
     set +a
 else
-    echo "No .env.test found, using defaults..."
+    echo "No $ENV_FILE found, using defaults..."
 fi
 
-echo "Starting server with test configuration..."
+echo "Starting server with configuration from $ENV_FILE..."
 pnpm start:json
-
