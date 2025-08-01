@@ -8,7 +8,7 @@ const activeTransport = process.env.TRANSPORT || '';
 
 const destination = activeTransport.toUpperCase() === 'STDIO' ? 2 : 1; // 2 = stderr, 1 = stdout
 
-const logLevel = (process.env.LOG_LEVEL || 'info') as Level;
+const logLevel = (process.env.LOG_LEVEL?.toLowerCase() || 'info') as Level;
 const hfLoggingEnabled = !!process.env.LOGGING_DATASET_ID;
 
 // Get the current file's directory in ES modules

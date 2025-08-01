@@ -119,7 +119,10 @@ export class HfDatasetLogger {
 		const filename = `logs-${timestamp}-${this.sessionId}.jsonl`;
 
 		const dateFolder = new Date().toISOString().split('T')[0];
-		const pathInRepo = `logs/${dateFolder}/${filename}`;
+		const folder = this.logType === 'Query' ? 'queries' : 'logs';
+		const pathInRepo = `${folder}/${dateFolder}/${filename}`;
+		
+		console.log(`[HF Dataset ${this.logType}] Uploading to path: ${pathInRepo}`);
 
 		// Create JSONL content directly in memory
 		const logData = logs
