@@ -32,3 +32,6 @@ dist-ssr
 *.sln
 *.sw?
 hf-mcp-server.code-workspace
+.env.test
+packages/e2e-python/fastagent.secrets.yaml
+packages/e2e-python/fastagent.jsonl

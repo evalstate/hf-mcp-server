@@ -8,6 +8,7 @@ import type { Request } from 'express';
 export function extractQueryParamsToHeaders(req: Request, headers: Record<string, string>): void {
 	const bouquet = req.query.bouquet as string | undefined;
 	const mix = req.query.mix as string | undefined;
+	const gradio = req.query.gradio as string | undefined;
 	const forceauth = req.query.forceauth as string | undefined;
 	const login = req.query.login;
 	const auth = req.query.auth;
@@ -17,6 +18,9 @@ export function extractQueryParamsToHeaders(req: Request, headers: Record<string
 	}
 	if (mix) {
 		headers['x-mcp-mix'] = mix;
+	}
+	if (gradio) {
+		headers['x-mcp-gradio'] = gradio;
 	}
 
 	// Check if forceauth, login, or auth appears in the URL (with or without values)

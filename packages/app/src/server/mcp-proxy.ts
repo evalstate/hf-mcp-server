@@ -6,6 +6,38 @@ import type { AppSettings } from '../shared/settings.js';
 import { logger } from './utils/logger.js';
 import { connectToGradioEndpoints, registerRemoteTools } from './gradio-endpoint-connector.js';
 import { extractAuthBouquetAndMix } from './utils/auth-utils.js';
+import type { SpaceTool } from '../shared/settings.js';
+
+/**
+ * Parses gradio parameter and converts domain/space format to SpaceTool objects
+ */
+function parseGradioEndpoints(gradioParam: string): SpaceTool[] {
+	const spaceTools: SpaceTool[] = [];
+	const entries = gradioParam.split(',').map(s => s.trim()).filter(s => s.length > 0);
+	
+	for (const entry of entries) {
+		// Validate exactly one slash
+		const slashCount = (entry.match(/\//g) || []).length;
+		if (slashCount !== 1) {
+			logger.warn(`Skipping invalid gradio entry "${entry}": must contain exactly one slash`);
+			continue;
+		}
+		
+		// Convert domain/space to subdomain format (replace / and . with -)
+		const subdomain = entry.replace(/[/.]/g, '-');
+		
+		spaceTools.push({
+			_id: `gradio_${subdomain}`,
+			name: entry,
+			subdomain: subdomain,
+			emoji: '🔧'
+		});
+		
+		logger.debug(`Added gradio endpoint: ${entry} -> ${subdomain}`);
+	}
+	
+	return spaceTools;
+}
 
 /**
  * Creates a proxy ServerFactory that adds remote tools to the original server.
@@ -22,8 +54,8 @@ export const createProxyServerFactory = (
 	): Promise<McpServer> => {
 		logger.debug('=== PROXY FACTORY CALLED ===', { skipGradio });
 
-		// Extract auth and bouquet using shared utility
-		const { hfToken, bouquet } = extractAuthBouquetAndMix(headers);
+		// Extract auth, bouquet, and gradio using shared utility
+		const { hfToken, bouquet, gradio } = extractAuthBouquetAndMix(headers);
 
 		// Skip expensive operations for requests that skip Gradio
 		let settings = userSettings;
@@ -47,21 +79,27 @@ export const createProxyServerFactory = (
 			return server;
 		}
 
-		// Get Gradio endpoints from settings
-		const gradioEndpoints =
-			settings?.spaceTools?.map((spaceTool) => ({
-				name: spaceTool.name,
-				subdomain: spaceTool.subdomain,
-				id: spaceTool._id,
-				emoji: spaceTool.emoji,
-			})) || [];
+		// Parse gradio parameter and merge with settings
+		const gradioSpaceTools = gradio ? parseGradioEndpoints(gradio) : [];
+		const existingSpaceTools = settings?.spaceTools || [];
+		const allSpaceTools = [...existingSpaceTools, ...gradioSpaceTools];
+
+		// Convert to GradioEndpoint format
+		const gradioEndpoints = allSpaceTools.map((spaceTool) => ({
+			name: spaceTool.name,
+			subdomain: spaceTool.subdomain,
+			id: spaceTool._id,
+			emoji: spaceTool.emoji,
+		}));
 
 		logger.debug(
 			{
-				rawEndpoints: gradioEndpoints,
-				endpointCount: gradioEndpoints.length,
+				existingCount: existingSpaceTools.length,
+				gradioCount: gradioSpaceTools.length,
+				totalEndpoints: gradioEndpoints.length,
+				gradioParam: gradio,
 			},
-			'Raw Gradio endpoints from API client'
+			'Merged Gradio endpoints from settings and query parameter'
 		);
 
 		// Filter out endpoints with empty subdomain and construct URLs

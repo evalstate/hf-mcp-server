@@ -1,5 +1,5 @@
 import { logger } from './logger.js';
-import type { AppSettings } from '../../shared/settings.js';
+import type { AppSettings, SpaceTool } from '../../shared/settings.js';
 import { ALL_BUILTIN_TOOL_IDS, TOOL_ID_GROUPS } from '@llmindset/hf-mcp';
 import type { McpApiClient } from './mcp-api-client.js';
 import { extractAuthBouquetAndMix } from '../utils/auth-utils.js';
@@ -24,6 +24,7 @@ export interface ToolSelectionResult {
 	reason: string;
 	baseSettings?: AppSettings;
 	mixedBouquet?: string;
+	gradioSpaceTools?: SpaceTool[];
 }
 
 export const BOUQUETS: Record<string, AppSettings> = {
@@ -60,6 +61,42 @@ export class ToolSelectionStrategy {
 	}
 
 	/**
+	 * Parses gradio parameter and converts domain/space format to SpaceTool objects
+	 * @param gradioParam Comma-delimited list of domain/space entries
+	 * @returns Array of SpaceTool objects
+	 */
+	private parseGradioEndpoints(gradioParam: string): SpaceTool[] {
+		const spaceTools: SpaceTool[] = [];
+		const entries = gradioParam
+			.split(',')
+			.map((s) => s.trim())
+			.filter((s) => s.length > 0);
+
+		for (const entry of entries) {
+			// Validate exactly one slash
+			const slashCount = (entry.match(/\//g) || []).length;
+			if (slashCount !== 1) {
+				logger.warn(`Skipping invalid gradio entry "${entry}": must contain exactly one slash`);
+				continue;
+			}
+
+			// Convert domain/space to subdomain format (replace / and . with -)
+			const subdomain = entry.replace(/[/._]/g, '-');
+
+			spaceTools.push({
+				_id: `gradio_${subdomain}`,
+				name: entry,
+				subdomain: subdomain,
+				emoji: '🔧',
+			});
+
+			logger.debug(`Added gradio endpoint: ${entry} -> ${subdomain}`);
+		}
+
+		return spaceTools;
+	}
+
+	/**
 	 * Applies SEARCH_ENABLES_FETCH logic if enabled
 	 * If hf_doc_search is enabled and SEARCH_ENABLES_FETCH=true, also enable hf_doc_fetch
 	 */
@@ -81,16 +118,20 @@ export class ToolSelectionStrategy {
 	 * 4. Fallback (all tools)
 	 */
 	async selectTools(context: ToolSelectionContext): Promise<ToolSelectionResult> {
-		const { bouquet, mix } = extractAuthBouquetAndMix(context.headers);
+		const { bouquet, mix, gradio } = extractAuthBouquetAndMix(context.headers);
+
+		// Parse gradio endpoints if provided
+		const gradioSpaceTools = gradio ? this.parseGradioEndpoints(gradio) : [];
 
 		// 1. Bouquet override (highest precedence)
 		if (bouquet && BOUQUETS[bouquet]) {
 			const enabledToolIds = this.applySearchEnablesFetch(BOUQUETS[bouquet].builtInTools);
-			logger.debug({ bouquet, enabledToolIds }, 'Using bouquet override');
+			logger.debug({ bouquet, enabledToolIds, gradioCount: gradioSpaceTools.length }, 'Using bouquet override');
 			return {
 				mode: ToolSelectionMode.BOUQUET_OVERRIDE,
 				enabledToolIds,
-				reason: `Bouquet override: ${bouquet}`,
+				reason: `Bouquet override: ${bouquet}${gradioSpaceTools.length > 0 ? ` + ${gradioSpaceTools.length} gradio endpoints` : ''}`,
+				gradioSpaceTools: gradioSpaceTools.length > 0 ? gradioSpaceTools : undefined,
 			};
 		}
 
@@ -116,9 +157,10 @@ export class ToolSelectionStrategy {
 			return {
 				mode: ToolSelectionMode.MIX,
 				enabledToolIds,
-				reason: `User settings + mix(${mix})`,
+				reason: `User settings + mix(${mix})${gradioSpaceTools.length > 0 ? ` + ${gradioSpaceTools.length} gradio endpoints` : ''}`,
 				baseSettings,
 				mixedBouquet: mix,
+				gradioSpaceTools: gradioSpaceTools.length > 0 ? gradioSpaceTools : undefined,
 			};
 		}
 
@@ -141,8 +183,12 @@ export class ToolSelectionStrategy {
 			return {
 				mode,
 				enabledToolIds,
-				reason: mode === ToolSelectionMode.EXTERNAL_API ? 'External API user settings' : 'Internal API user settings',
+				reason:
+					mode === ToolSelectionMode.EXTERNAL_API
+						? `External API user settings${gradioSpaceTools.length > 0 ? ` + ${gradioSpaceTools.length} gradio endpoints` : ''}`
+						: `Internal API user settings${gradioSpaceTools.length > 0 ? ` + ${gradioSpaceTools.length} gradio endpoints` : ''}`,
 				baseSettings,
+				gradioSpaceTools: gradioSpaceTools.length > 0 ? gradioSpaceTools : undefined,
 			};
 		}
 
@@ -152,7 +198,8 @@ export class ToolSelectionStrategy {
 		return {
 			mode: ToolSelectionMode.FALLBACK,
 			enabledToolIds,
-			reason: 'Fallback - no settings available',
+			reason: `Fallback - no settings available${gradioSpaceTools.length > 0 ? ` + ${gradioSpaceTools.length} gradio endpoints` : ''}`,
+			gradioSpaceTools: gradioSpaceTools.length > 0 ? gradioSpaceTools : undefined,
 		};
 	}
 

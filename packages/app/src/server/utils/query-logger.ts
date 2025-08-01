@@ -78,7 +78,6 @@ export function logQuery(entry: Omit<QueryLogEntry, 'sessionId' | 'timestamp'>):
 	const logEntry: QueryLogEntry = {
 		...entry,
 		sessionId: crypto.randomUUID(),
-		timestamp: new Date().toISOString(),
 	};
 
 	queryLogger.info(logEntry);
@@ -88,6 +87,18 @@ export function logQuery(entry: Omit<QueryLogEntry, 'sessionId' | 'timestamp'>):
  * Simple helper to log successful search queries
  */
 export function logSearchQuery(toolName: string, query: string, data: Record<string, unknown>): void {
+	logQuery({
+		query,
+		toolName,
+		parameters: JSON.stringify(data),
+		status: 'success',
+	});
+}
+
+/**
+ * Simple helper to log prompts (model details, dataset details, user/paper summaries)
+ */
+export function logPromptQuery(toolName: string, query: string, data: Record<string, unknown>): void {
 	logQuery({
 		query,
 		toolName,
