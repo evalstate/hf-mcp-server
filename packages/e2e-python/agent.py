@@ -13,7 +13,7 @@ fast = FastAgent("mcp server tests")
 async def main():
     # use the --model command line switch or agent arguments to change model
     async with fast.run() as agent:
-
+        await agent.interactive()
 
         # anonymous tool calling
         await agent.anon("***CALL_TOOL hf_whoami {}")

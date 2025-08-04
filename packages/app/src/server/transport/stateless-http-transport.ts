@@ -151,15 +151,15 @@ export class StatelessHttpTransport extends BaseTransport {
 
 		// Analytics mode session tracking
 		if (this.analyticsMode) {
-			sessionId = headers['mcp-session-id'] || (req.query.sessionId as string);
+			sessionId = headers['mcp-session-id'];
 			// Handle session creation/resumption
 			if (requestBody?.method === 'initialize') {
 				// Create new session
 				sessionId = randomUUID();
-				this.createAnalyticsSession(sessionId, authResult.shouldContinue && headers['authorization'] ? true : false);
+				this.createAnalyticsSession(sessionId, authResult.userIdentified);
 
 				// Add session ID to response headers
-				res.setHeader('MCP-Session-ID', sessionId);
+				res.setHeader('Mcp-Session-Id', sessionId);
 			} else if (sessionId) {
 				// Try to resume existing session
 				if (this.analyticsSessions.has(sessionId)) {
@@ -188,6 +188,7 @@ export class StatelessHttpTransport extends BaseTransport {
 			// Track client info for initialize requests
 			if (requestBody?.method === 'initialize' && requestBody?.params) {
 				const clientInfo = requestBody.params.clientInfo as { name?: string; version?: string } | undefined;
+
 				if (clientInfo?.name && clientInfo?.version) {
 					this.associateSessionWithClient({ name: clientInfo.name, version: clientInfo.version });
 					this.updateClientActivity({ name: clientInfo.name, version: clientInfo.version });
@@ -210,13 +211,34 @@ export class StatelessHttpTransport extends BaseTransport {
 			// Determine which server to use
 			const useFullServer = this.shouldHandle(requestBody);
 			let directResponse = true;
+
+			// Get session metadata for query logging
+			const isAuthenticated = authResult.userIdentified;
+			const analyticsSession = sessionId ? this.analyticsSessions.get(sessionId) : undefined;
+
+			// For initialize requests, get client info directly from the request
+			let clientInfo = analyticsSession?.metadata.clientInfo;
+			if (requestBody?.method === 'initialize' && requestBody?.params) {
+				const initClientInfo = requestBody.params.clientInfo as { name?: string; version?: string } | undefined;
+				if (initClientInfo?.name && initClientInfo?.version) {
+					clientInfo = { name: initClientInfo.name, version: initClientInfo.version };
+				}
+			}
+
 			if (useFullServer) {
 				// Create new server instance using factory with request headers and bouquet
 				extractQueryParamsToHeaders(req, headers);
 
 				// Skip Gradio endpoints for initialize requests or non-Gradio tool calls
 				const skipGradio = this.skipGradioSetup(requestBody);
-				server = await this.serverFactory(headers, undefined, skipGradio);
+
+				// Pass session info to server factory for query logging
+				const sessionInfoForLogging = {
+					clientSessionId: sessionId,
+					isAuthenticated: analyticsSession?.metadata.isAuthenticated ?? isAuthenticated,
+					clientInfo,
+				};
+				server = await this.serverFactory(headers, undefined, skipGradio, sessionInfoForLogging);
 
 				// For Gradio tool calls, disable direct response to enable streaming/progress notifications
 				directResponse = !this.isGradioToolCall(requestBody);
@@ -326,7 +348,8 @@ export class StatelessHttpTransport extends BaseTransport {
 			return;
 		}
 
-		const sessionId = (req.headers['mcp-session-id'] as string) || (req.query.sessionId as string);
+		const headers = req.headers as Record<string, string>;
+		const sessionId = headers['mcp-session-id'];
 
 		if (!sessionId) {
 			this.trackError(400);

@@ -71,7 +71,7 @@ export class HfDatasetLogger {
 			this.logBuffer.push(logEntry);
 
 			if (this.logBuffer.length >= this.batchSize) {
-				console.log(`[HF Dataset ${this.logType}] Triggering flush due to batch size (${this.batchSize})`);
+				//		console.log(`[HF Dataset ${this.logType}] Triggering flush due to batch size (${this.batchSize})`);
 				void this.flush();
 			}
 		} catch (error) {
@@ -89,9 +89,9 @@ export class HfDatasetLogger {
 	}
 
 	private async flush(): Promise<void> {
-		console.log(
-			`[HF Dataset ${this.logType}] Flush called - Buffer: ${this.logBuffer.length}, InProgress: ${this.uploadInProgress}`
-		);
+		//		console.log(
+		//			`[HF Dataset ${this.logType}] Flush called - Buffer: ${this.logBuffer.length}, InProgress: ${this.uploadInProgress}`
+		//		);
 
 		if (this.uploadInProgress || this.logBuffer.length === 0) {
 			return;
@@ -121,7 +121,7 @@ export class HfDatasetLogger {
 		const dateFolder = new Date().toISOString().split('T')[0];
 		const folder = this.logType === 'Query' ? 'queries' : 'logs';
 		const pathInRepo = `${folder}/${dateFolder}/${filename}`;
-		
+
 		console.log(`[HF Dataset ${this.logType}] Uploading to path: ${pathInRepo}`);
 
 		// Create JSONL content directly in memory
@@ -227,12 +227,12 @@ function safeStringifyLog(log: LogEntry, sessionId: string, logType: string): st
 	if (!log) return ''; // Skip null/undefined logs
 
 	if (logType === 'Query') {
-		// Preserve query log structure as-is, just add transport sessionId
-		return safeStringify.default({
-			...log,
-			timestamp: new Date(log.time || Date.now()).toISOString(),
-			sessionId,
-		});
+		// For query logs, we need to extract the actual query log entry from pino's wrapper
+		// Pino adds level, time, pid, hostname, and our data is in the remaining fields
+		const { level: _level, time: _time, pid: _pid, hostname: _hostname, msg: _msg, ...queryLogEntry } = log;
+
+		// Return the query log entry without pino's metadata
+		return safeStringify.default(queryLogEntry);
 	}
 
 	// Standardize regular log structure for HF dataset viewer

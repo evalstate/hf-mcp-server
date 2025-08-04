@@ -17,10 +17,20 @@ export interface QueryLogEntry {
 	query: string;
 	toolName: string;
 	parameters: string; // JSON string of parameters for consistent format
-	sessionId: string;
+	mcpServerSessionId: string; // MCP Server to Dataset connection
+	clientSessionId?: string | null; // Client to MCP Server connection
 	timestamp: string;
 	status: 'success' | 'error';
 	error?: string;
+	// SessionMetadata fields
+	isAuthenticated?: boolean;
+	name?: string | null; // ClientInfo.name
+	version?: string | null; // ClientInfo.version
+	// Response information
+	totalResults?: number;
+	resultsShared?: number;
+	responseCharCount?: number;
+	requestJson?: string; // Full JSON of the request
 }
 
 function createQueryLogger(): Logger | null {
@@ -67,18 +77,24 @@ function createQueryLogger(): Logger | null {
 
 const queryLogger: Logger | null = createQueryLogger();
 
+// Stable session ID for this MCP server instance (process lifetime)
+const mcpServerSessionId = crypto.randomUUID();
+
+function getMcpServerSessionId(): string {
+	return mcpServerSessionId;
+}
+
 /**
  * Log a search query with consistent structure
  */
-export function logQuery(entry: Omit<QueryLogEntry, 'sessionId' | 'timestamp'>): void {
+export function logQuery(entry: Omit<QueryLogEntry, 'timestamp'>): void {
 	if (!queryLogger) {
 		return;
 	}
 
 	const logEntry: QueryLogEntry = {
 		...entry,
-		sessionId: crypto.randomUUID(),
-		timestamp: '',
+		timestamp: new Date().toISOString(),
 	};
 
 	queryLogger.info(logEntry);
@@ -87,24 +103,74 @@ export function logQuery(entry: Omit<QueryLogEntry, 'sessionId' | 'timestamp'>):
 /**
  * Simple helper to log successful search queries
  */
-export function logSearchQuery(toolName: string, query: string, data: Record<string, unknown>): void {
+export function logSearchQuery(
+	toolName: string,
+	query: string,
+	data: Record<string, unknown>,
+	options?: {
+		clientSessionId?: string;
+		isAuthenticated?: boolean;
+		clientName?: string;
+		clientVersion?: string;
+		totalResults?: number;
+		resultsShared?: number;
+		responseCharCount?: number;
+	}
+): void {
+	// Use a stable mcpServerSessionId per process/transport instance
+	const mcpServerSessionId = getMcpServerSessionId();
+	
 	logQuery({
 		query,
 		toolName,
 		parameters: JSON.stringify(data),
 		status: 'success',
+		requestJson: JSON.stringify({ toolName, query, ...data }),
+		mcpServerSessionId,
+		clientSessionId: options?.clientSessionId || null,
+		isAuthenticated: options?.isAuthenticated ?? false,
+		name: options?.clientName || null,
+		version: options?.clientVersion || null,
+		totalResults: options?.totalResults,
+		resultsShared: options?.resultsShared,
+		responseCharCount: options?.responseCharCount,
 	});
 }
 
 /**
  * Simple helper to log prompts (model details, dataset details, user/paper summaries)
  */
-export function logPromptQuery(toolName: string, query: string, data: Record<string, unknown>): void {
+export function logPromptQuery(
+	toolName: string,
+	query: string,
+	data: Record<string, unknown>,
+	options?: {
+		clientSessionId?: string;
+		isAuthenticated?: boolean;
+		clientName?: string;
+		clientVersion?: string;
+		totalResults?: number;
+		resultsShared?: number;
+		responseCharCount?: number;
+	}
+): void {
+	// Use a stable mcpServerSessionId per process/transport instance
+	const mcpServerSessionId = getMcpServerSessionId();
+	
 	logQuery({
 		query,
 		toolName,
 		parameters: JSON.stringify(data),
 		status: 'success',
+		requestJson: JSON.stringify({ toolName, query, ...data }),
+		mcpServerSessionId,
+		clientSessionId: options?.clientSessionId || null,
+		isAuthenticated: options?.isAuthenticated ?? false,
+		name: options?.clientName || null,
+		version: options?.clientVersion || null,
+		totalResults: options?.totalResults,
+		resultsShared: options?.resultsShared,
+		responseCharCount: options?.responseCharCount,
 	});
 }
 
