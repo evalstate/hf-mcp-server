@@ -98,17 +98,18 @@ export class HfDatasetLogger {
 		}
 
 		const logsToUpload = [...this.logBuffer];
-		this.logBuffer = [];
 		this.uploadInProgress = true;
 
 		console.log(`[HF Dataset ${this.logType}] Starting upload of ${logsToUpload.length} logs`);
 
 		try {
 			await this.uploadLogs(logsToUpload);
+			// Only clear buffer after successful upload
+			this.logBuffer = [];
 			console.log(`[HF Dataset ${this.logType}] ✅ Uploaded ${logsToUpload.length} logs to ${this.datasetId}`);
 		} catch (error) {
-			// Just log the error and drop the logs - no retry logic
-			console.error(`[HF Dataset ${this.logType}] ❌ Upload failed, dropping logs:`, error);
+			// Keep logs in buffer for retry on next flush cycle
+			console.error(`[HF Dataset ${this.logType}] ❌ Upload failed, will retry on next flush:`, error);
 		} finally {
 			this.uploadInProgress = false;
 		}
@@ -206,10 +207,12 @@ function calculateFlushInterval(optionsInterval?: number): number {
 	const interval = optionsInterval || envInterval;
 	const isTest = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
 	const isDev = process.env.NODE_ENV === 'development';
+	const isAnalytics = process.env.ANALYTICS_MODE === 'true';
 
 	if (isTest) return interval || 1000;
 	if (isDev) return interval;
-	return Math.max(interval, 300000); // Enforce minimum in production
+	if (isAnalytics) return interval; // Allow custom intervals in analytics mode
+	return Math.max(interval, 300000); // Enforce minimum in production only
 }
 
 // Helper function to create a no-op transport
@@ -227,19 +230,21 @@ function safeStringifyLog(log: LogEntry, sessionId: string, logType: string): st
 	if (!log) return ''; // Skip null/undefined logs
 
 	if (logType === 'Query') {
-		// For query logs, we need to extract the actual query log entry from pino's wrapper
-		// Pino adds level, time, pid, hostname, and our data is in the remaining fields
-		const { level: _level, time: _time, pid: _pid, hostname: _hostname, msg: _msg, ...queryLogEntry } = log;
+		// For query logs, preserve pino's time field but strip other pino metadata
+		// Pino adds level, time, pid, hostname, msg - we want to keep time but strip the rest
+		const { level: _level, pid: _pid, hostname: _hostname, msg: _msg, ...queryLogEntry } = log;
 
-		// Return the query log entry without pino's metadata
+		// Return the query log entry with pino's time field preserved
 		return safeStringify.default(queryLogEntry);
 	}
 
-	// Standardize regular log structure for HF dataset viewer
+	// For standard logs, preserve pino defaults while creating structured format
 	const standardizedLog = {
 		message: log.msg || 'No message',
 		level: log.level,
-		timestamp: new Date(log.time || Date.now()).toISOString(),
+		time: log.time, // Preserve pino's time field
+		pid: log.pid, // Preserve process ID
+		hostname: log.hostname, // Preserve hostname
 		sessionId,
 		data: (() => {
 			// Extract all fields except the standard ones and stringify them

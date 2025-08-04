@@ -15,4 +15,4 @@ else
 fi
 
 echo "Starting server with configuration from $ENV_FILE..."
-pnpm start:json
+pnpm dev:json

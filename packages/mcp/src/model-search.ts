@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { HfApiCall } from './hf-api-call.js';
 import { formatDate, formatNumber } from './utilities.js';
+import type { ToolResult } from './types/tool-result.js';
 
 export const TAGS_TO_RETURN = 20;
 // Model Search Tool Configuration
@@ -82,7 +83,7 @@ export class ModelSearchTool extends HfApiCall<ModelApiParams, ModelApiResult[]>
 	/**
 	 * Search for models with detailed parameters
 	 */
-	async searchWithParams(params: Partial<ModelSearchParams>): Promise<string> {
+	async searchWithParams(params: Partial<ModelSearchParams>): Promise<ToolResult> {
 		try {
 			// Convert our params to the HF API format
 			const apiParams: ModelApiParams = {};
@@ -120,7 +121,11 @@ export class ModelSearchTool extends HfApiCall<ModelApiParams, ModelApiResult[]>
 			const models = await this.callApi<ModelApiResult[]>(apiParams);
 
 			if (models.length === 0) {
-				return `No models found for the given criteria.`;
+				return {
+					formatted: `No models found for the given criteria.`,
+					totalResults: 0,
+					resultsShared: 0
+				};
 			}
 
 			return formatSearchResults(models, params);
@@ -135,7 +140,7 @@ export class ModelSearchTool extends HfApiCall<ModelApiParams, ModelApiResult[]>
 	/**
 	 * Search for models with a specific filter (e.g., arxiv:XXXX.XXXXX)
 	 */
-	async searchWithFilter(filter: string, limit: number = 10): Promise<string> {
+	async searchWithFilter(filter: string, limit: number = 10): Promise<ToolResult> {
 		try {
 			const apiParams: ModelApiParams = {
 				filter: filter,
@@ -148,7 +153,11 @@ export class ModelSearchTool extends HfApiCall<ModelApiParams, ModelApiResult[]>
 			const models = await this.callApi<ModelApiResult[]>(apiParams);
 
 			if (models.length === 0) {
-				return `No models found referencing ${filter}.`;
+				return {
+					formatted: `No models found referencing ${filter}.`,
+					totalResults: 0,
+					resultsShared: 0
+				};
 			}
 
 			return formatSearchResults(models, { limit });
@@ -162,7 +171,7 @@ export class ModelSearchTool extends HfApiCall<ModelApiParams, ModelApiResult[]>
 }
 
 // Formatting Function
-function formatSearchResults(models: ModelApiResult[], params: Partial<ModelSearchParams>): string {
+function formatSearchResults(models: ModelApiResult[], params: Partial<ModelSearchParams>): ToolResult {
 	const r: string[] = [];
 
 	// Build search description
@@ -227,5 +236,9 @@ function formatSearchResults(models: ModelApiResult[], params: Partial<ModelSear
 		r.push('');
 	}
 
-	return r.join('\n');
+	return {
+		formatted: r.join('\n'),
+		totalResults: models.length,
+		resultsShared: models.length
+	};
 }

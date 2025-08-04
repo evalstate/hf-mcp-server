@@ -267,8 +267,8 @@ export class PaperSummaryPrompt extends HfApiCall<Record<string, string>, PaperD
 			const modelSearch = new ModelSearchTool(this.hfToken);
 			// Use the filter parameter to search for models referencing this paper
 			const modelResults = await modelSearch.searchWithFilter(`arxiv:${arxivId}`, 25);
-			if (modelResults && !modelResults.includes('No models found')) {
-				results.models = `## Related Models\n\n${modelResults}`;
+			if (modelResults && !modelResults.formatted.includes('No models found')) {
+				results.models = `## Related Models\n\n${modelResults.formatted}`;
 			}
 		} catch (error) {
 			console.warn(`Failed to fetch related models for paper ${arxivId}:`, error);
@@ -279,8 +279,8 @@ export class PaperSummaryPrompt extends HfApiCall<Record<string, string>, PaperD
 			const datasetSearch = new DatasetSearchTool(this.hfToken);
 			// Use the filter parameter to search for datasets referencing this paper
 			const datasetResults = await datasetSearch.searchWithFilter(`arxiv:${arxivId}`, 25);
-			if (datasetResults && !datasetResults.includes('No datasets found')) {
-				results.datasets = `## Related Datasets\n\n${datasetResults}`;
+			if (datasetResults && !datasetResults.formatted.includes('No datasets found')) {
+				results.datasets = `## Related Datasets\n\n${datasetResults.formatted}`;
 			}
 		} catch (error) {
 			console.warn(`Failed to fetch related datasets for paper ${arxivId}:`, error);
@@ -291,8 +291,8 @@ export class PaperSummaryPrompt extends HfApiCall<Record<string, string>, PaperD
 			const spaceSearch = new SpaceSearchTool(this.hfToken);
 			// Use the filter parameter to search for spaces referencing this paper
 			const spaceResults = await spaceSearch.searchWithFilter(`arxiv:${arxivId}`, 25, 2);
-			if (spaceResults && !spaceResults.includes('No matching Hugging Face Spaces found')) {
-				results.spaces = `## Related Spaces\n\n${spaceResults}`;
+			if (spaceResults && !spaceResults.formatted.includes('No matching Hugging Face Spaces found')) {
+				results.spaces = `## Related Spaces\n\n${spaceResults.formatted}`;
 			}
 		} catch (error) {
 			console.warn(`Failed to fetch related spaces for paper ${arxivId}:`, error);

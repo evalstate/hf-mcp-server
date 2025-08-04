@@ -16,5 +16,8 @@ export * from './paper-summary.js';
 export * from './docs-search/docs-semantic-search.js';
 export * from './docs-search/doc-fetch.js';
 
+// Export shared types
+export * from './types/tool-result.js';
+
 // Export tool IDs for external use - these are the canonical tool identifiers
 export * from './tool-ids.js';

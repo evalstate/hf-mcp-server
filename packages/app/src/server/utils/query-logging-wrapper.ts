@@ -9,7 +9,7 @@ const mcpServerSessionId = randomUUID();
  */
 export function withQueryLogging<T extends unknown[], R>(
 	originalMethod: (...args: T) => Promise<R>,
-	toolName: string,
+	methodName: string,
 	extractQuery: (...args: T) => string,
 	extractParams: (...args: T) => Record<string, unknown>,
 	getLoggingOptions?: () => {
@@ -49,10 +49,9 @@ export function withQueryLogging<T extends unknown[], R>(
 			// Log successful query
 			logQuery({
 				query,
-				toolName,
+				methodName,
 				parameters: JSON.stringify(params),
-				status: 'success',
-				requestJson: JSON.stringify({ toolName, query, ...params }),
+				requestJson: JSON.stringify({ methodName, query, ...params }),
 				mcpServerSessionId,
 				totalResults,
 				responseCharCount,
@@ -67,11 +66,9 @@ export function withQueryLogging<T extends unknown[], R>(
 			// Log failed query
 			logQuery({
 				query,
-				toolName,
+				methodName,
 				parameters: JSON.stringify(params),
-				status: 'error',
-				error: error instanceof Error ? error.message : String(error),
-				requestJson: JSON.stringify({ toolName, query, ...params }),
+				requestJson: JSON.stringify({ methodName, query, ...params }),
 				mcpServerSessionId,
 				clientSessionId: loggingOptions.clientSessionId || null,
 				isAuthenticated: loggingOptions.isAuthenticated ?? false,

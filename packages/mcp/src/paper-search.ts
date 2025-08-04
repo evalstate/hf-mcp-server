@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { HfApiCall } from './hf-api-call.js';
 import { formatUnknownDate } from './utilities.js';
+import type { ToolResult } from './types/tool-result.js';
 
 // https://github.com/huggingface/huggingface_hub/blob/a26b93e8ba0b51ce76ce5c2044896587c47c6b60/src/huggingface_hub/hf_api.py#L1481-L1542
 // Raw JSON response for https://hf.co/api/papers/search?q=llama%203%20herd Llama Herd is ~50,000 tokens
@@ -93,15 +94,23 @@ export class PaperSearchTool extends HfApiCall<PaperSearchParams, PaperSearchRes
 	 * Searches for papers on the Hugging Face Hub
 	 * @param query Search query string (e.g. "llama", "attention")
 	 * @param limit Maximum number of results to return
-	 * @returns Formatted string with paper information
+	 * @returns ToolResult with formatted paper information and metrics
 	 */
-	async search(query: string, limit: number = RESULTS_TO_RETURN, conciseOnly: boolean = false): Promise<string> {
+	async search(query: string, limit: number = RESULTS_TO_RETURN, conciseOnly: boolean = false): Promise<ToolResult> {
 		try {
-			if (!query) return 'No query';
+			if (!query) return {
+				formatted: 'No query',
+				totalResults: 0,
+				resultsShared: 0
+			};
 
 			const papers = await this.callApi<PaperSearchResult[]>({ q: query });
 
-			if (papers.length === 0) return `No papers found for query '${query}'`;
+			if (papers.length === 0) return {
+				formatted: `No papers found for query '${query}'`,
+				totalResults: 0,
+				resultsShared: 0
+			};
 			return formatSearchResults(query, papers.slice(0, limit), papers.length, conciseOnly);
 		} catch (error) {
 			if (error instanceof Error) {
@@ -122,7 +131,7 @@ function formatSearchResults(
 	papers: PaperSearchResult[],
 	totalCount: number,
 	conciseOnly: boolean = false
-): string {
+): ToolResult {
 	const r: string[] = [];
 	const showingText =
 		papers.length < totalCount
@@ -169,7 +178,11 @@ function formatSearchResults(
 	}
 	r.push('');
 	r.push('---');
-	return r.join('\n');
+	return {
+		formatted: r.join('\n'),
+		totalResults: totalCount,
+		resultsShared: papers.length
+	};
 }
 
 export function authors(authors: Author[] | undefined, authorsToShow: number = DEFAULT_AUTHORS_TO_SHOW): string {

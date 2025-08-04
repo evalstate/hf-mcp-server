@@ -17,6 +17,7 @@ import { extractQueryParamsToHeaders } from '../utils/query-params.js';
 import { isBrowser } from '../utils/browser-detection.js';
 import { OAUTH_RESOURCE } from '../../shared/constants.js';
 import { randomUUID } from 'node:crypto';
+import { logSystemEvent } from '../utils/query-logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -160,6 +161,16 @@ export class StatelessHttpTransport extends BaseTransport {
 
 				// Add session ID to response headers
 				res.setHeader('Mcp-Session-Id', sessionId);
+
+				// Log initialize event
+				const initClientInfo = requestBody?.params?.clientInfo as { name?: string; version?: string } | undefined;
+				logSystemEvent('initialize', sessionId, {
+					clientSessionId: sessionId,
+					isAuthenticated: authResult.userIdentified,
+					clientName: initClientInfo?.name,
+					clientVersion: initClientInfo?.version,
+					requestJson: requestBody.params || '{}',
+				});
 			} else if (sessionId) {
 				// Try to resume existing session
 				if (this.analyticsSessions.has(sessionId)) {
@@ -358,9 +369,22 @@ export class StatelessHttpTransport extends BaseTransport {
 		}
 
 		if (this.analyticsSessions.has(sessionId)) {
+			// Get session info before deletion for logging
+			const analyticsSession = this.analyticsSessions.get(sessionId);
+
 			this.analyticsSessions.delete(sessionId);
 			this.metrics.trackSessionDeleted();
 			logger.info({ sessionId }, 'Analytics session deleted via DELETE request');
+
+			// Log session delete event
+			logSystemEvent('session_delete', sessionId, {
+				clientSessionId: sessionId,
+				isAuthenticated: analyticsSession?.metadata.isAuthenticated,
+				clientName: analyticsSession?.metadata.clientInfo?.name,
+				clientVersion: analyticsSession?.metadata.clientInfo?.version,
+				requestJson: { method: 'session_delete', sessionId },
+			});
+
 			res.status(200).json({ jsonrpc: '2.0', result: { deleted: true } });
 		} else {
 			this.trackError(404);

@@ -185,7 +185,12 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 					USER_SUMMARY_PROMPT_CONFIG.name,
 					params.user_id,
 					{ user_id: params.user_id },
-					getLoggingOptions()
+					{
+						...getLoggingOptions(),
+						totalResults: 1,
+						resultsShared: 1,
+						responseCharCount: summaryText.length,
+					}
 				);
 
 				return {
@@ -214,7 +219,12 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 					PAPER_SUMMARY_PROMPT_CONFIG.name,
 					params.paper_id,
 					{ paper_id: params.paper_id },
-					getLoggingOptions()
+					{
+						...getLoggingOptions(),
+						totalResults: 1,
+						resultsShared: 1,
+						responseCharCount: summaryText.length,
+					}
 				);
 
 				return {
@@ -240,20 +250,20 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			async (params: SearchParams) => {
 				const semanticSearch = new SpaceSearchTool(hfToken);
 				const searchResult = await semanticSearch.search(params.query, params.limit, params.mcp);
-				const formattedResult = formatSearchResults(params.query, searchResult.results, searchResult.totalCount);
+				const result = formatSearchResults(params.query, searchResult.results, searchResult.totalCount);
 				logSearchQuery(
 					SEMANTIC_SEARCH_TOOL_CONFIG.name,
 					params.query,
 					{ limit: params.limit, mcp: params.mcp },
 					{
 						...getLoggingOptions(),
-						totalResults: searchResult.totalCount,
-						resultsShared: searchResult.results.length,
-						responseCharCount: formattedResult.length,
+						totalResults: result.totalResults,
+						resultsShared: result.resultsShared,
+						responseCharCount: result.formatted.length,
 					}
 				);
 				return {
-					content: [{ type: 'text', text: formattedResult }],
+					content: [{ type: 'text', text: result.formatted }],
 				};
 			}
 		);
@@ -265,18 +275,20 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			MODEL_SEARCH_TOOL_CONFIG.annotations,
 			async (params: ModelSearchParams) => {
 				const modelSearch = new ModelSearchTool(hfToken);
-				const results = await modelSearch.searchWithParams(params);
+				const result = await modelSearch.searchWithParams(params);
 				logSearchQuery(
 					MODEL_SEARCH_TOOL_CONFIG.name,
 					params.query || `sort:${params.sort || 'trendingScore'}`,
 					params,
 					{
 						...getLoggingOptions(),
-						responseCharCount: results.length,
+						totalResults: result.totalResults,
+						resultsShared: result.resultsShared,
+						responseCharCount: result.formatted.length,
 					}
 				);
 				return {
-					content: [{ type: 'text', text: results }],
+					content: [{ type: 'text', text: result.formatted }],
 				};
 			}
 		);
@@ -288,18 +300,20 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			MODEL_DETAIL_TOOL_CONFIG.annotations,
 			async (params: ModelDetailParams) => {
 				const modelDetail = new ModelDetailTool(hfToken, undefined);
-				const results = await modelDetail.getDetails(params.model_id);
+				const result = await modelDetail.getDetails(params.model_id);
 				logPromptQuery(
 					MODEL_DETAIL_TOOL_CONFIG.name,
 					params.model_id,
 					{ model_id: params.model_id },
 					{
 						...getLoggingOptions(),
-						responseCharCount: results.length,
+						totalResults: result.totalResults,
+						resultsShared: result.resultsShared,
+						responseCharCount: result.formatted.length,
 					}
 				);
 				return {
-					content: [{ type: 'text', text: results }],
+					content: [{ type: 'text', text: result.formatted }],
 				};
 			}
 		);
@@ -310,7 +324,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			PAPER_SEARCH_TOOL_CONFIG.schema.shape,
 			PAPER_SEARCH_TOOL_CONFIG.annotations,
 			async (params: z.infer<typeof PAPER_SEARCH_TOOL_CONFIG.schema>) => {
-				const results = await new PaperSearchTool(hfToken).search(
+				const result = await new PaperSearchTool(hfToken).search(
 					params.query,
 					params.results_limit,
 					params.concise_only
@@ -321,11 +335,13 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 					{ results_limit: params.results_limit, concise_only: params.concise_only },
 					{
 						...getLoggingOptions(),
-						responseCharCount: results.length,
+						totalResults: result.totalResults,
+						resultsShared: result.resultsShared,
+						responseCharCount: result.formatted.length,
 					}
 				);
 				return {
-					content: [{ type: 'text', text: results }],
+					content: [{ type: 'text', text: result.formatted }],
 				};
 			}
 		);
@@ -337,18 +353,20 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			DATASET_SEARCH_TOOL_CONFIG.annotations,
 			async (params: DatasetSearchParams) => {
 				const datasetSearch = new DatasetSearchTool(hfToken);
-				const results = await datasetSearch.searchWithParams(params);
+				const result = await datasetSearch.searchWithParams(params);
 				logSearchQuery(
 					DATASET_SEARCH_TOOL_CONFIG.name,
 					params.query || `sort:${params.sort || 'trendingScore'}`,
 					params,
 					{
 						...getLoggingOptions(),
-						responseCharCount: results.length,
+						totalResults: result.totalResults,
+						resultsShared: result.resultsShared,
+						responseCharCount: result.formatted.length,
 					}
 				);
 				return {
-					content: [{ type: 'text', text: results }],
+					content: [{ type: 'text', text: result.formatted }],
 				};
 			}
 		);
@@ -360,18 +378,20 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			DATASET_DETAIL_TOOL_CONFIG.annotations,
 			async (params: DatasetDetailParams) => {
 				const datasetDetail = new DatasetDetailTool(hfToken, undefined);
-				const results = await datasetDetail.getDetails(params.dataset_id);
+				const result = await datasetDetail.getDetails(params.dataset_id);
 				logPromptQuery(
 					DATASET_DETAIL_TOOL_CONFIG.name,
 					params.dataset_id,
 					{ dataset_id: params.dataset_id },
 					{
 						...getLoggingOptions(),
-						responseCharCount: results.length,
+						totalResults: result.totalResults,
+						resultsShared: result.resultsShared,
+						responseCharCount: result.formatted.length,
 					}
 				);
 				return {
-					content: [{ type: 'text', text: results }],
+					content: [{ type: 'text', text: result.formatted }],
 				};
 			}
 		);
@@ -383,18 +403,20 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			DOCS_SEMANTIC_SEARCH_CONFIG.annotations,
 			async (params: DocSearchParams) => {
 				const docSearch = new DocSearchTool(hfToken);
-				const results = await docSearch.search(params);
+				const result = await docSearch.search(params);
 				logSearchQuery(
 					DOCS_SEMANTIC_SEARCH_CONFIG.name,
 					params.query,
 					{ product: params.product },
 					{
 						...getLoggingOptions(),
-						responseCharCount: results.length,
+						totalResults: result.totalResults,
+						resultsShared: result.resultsShared,
+						responseCharCount: result.formatted.length,
 					}
 				);
 				return {
-					content: [{ type: 'text', text: results }],
+					content: [{ type: 'text', text: result.formatted }],
 				};
 			}
 		);

@@ -14,18 +14,15 @@ const __dirname = dirname(__filename);
  * Structure for query logs - consistent fields for HF dataset viewer
  */
 export interface QueryLogEntry {
-	query: string;
-	toolName: string;
-	parameters: string; // JSON string of parameters for consistent format
 	mcpServerSessionId: string; // MCP Server to Dataset connection
 	clientSessionId?: string | null; // Client to MCP Server connection
-	timestamp: string;
-	status: 'success' | 'error';
-	error?: string;
-	// SessionMetadata fields
-	isAuthenticated?: boolean;
 	name?: string | null; // ClientInfo.name
 	version?: string | null; // ClientInfo.version
+	methodName: string;
+	query: string;
+	parameters: string; // JSON string of parameters for consistent format
+	// SessionMetadata fields
+	isAuthenticated?: boolean;
 	// Response information
 	totalResults?: number;
 	resultsShared?: number;
@@ -87,24 +84,19 @@ function getMcpServerSessionId(): string {
 /**
  * Log a search query with consistent structure
  */
-export function logQuery(entry: Omit<QueryLogEntry, 'timestamp'>): void {
+export function logQuery(entry: QueryLogEntry): void {
 	if (!queryLogger) {
 		return;
 	}
 
-	const logEntry: QueryLogEntry = {
-		...entry,
-		timestamp: new Date().toISOString(),
-	};
-
-	queryLogger.info(logEntry);
+	queryLogger.info(entry);
 }
 
 /**
  * Simple helper to log successful search queries
  */
 export function logSearchQuery(
-	toolName: string,
+	methodName: string,
 	query: string,
 	data: Record<string, unknown>,
 	options?: {
@@ -119,13 +111,12 @@ export function logSearchQuery(
 ): void {
 	// Use a stable mcpServerSessionId per process/transport instance
 	const mcpServerSessionId = getMcpServerSessionId();
-	
+
 	logQuery({
 		query,
-		toolName,
+		methodName,
 		parameters: JSON.stringify(data),
-		status: 'success',
-		requestJson: JSON.stringify({ toolName, query, ...data }),
+		requestJson: JSON.stringify({ methodName, query, ...data }),
 		mcpServerSessionId,
 		clientSessionId: options?.clientSessionId || null,
 		isAuthenticated: options?.isAuthenticated ?? false,
@@ -141,7 +132,7 @@ export function logSearchQuery(
  * Simple helper to log prompts (model details, dataset details, user/paper summaries)
  */
 export function logPromptQuery(
-	toolName: string,
+	methodName: string,
 	query: string,
 	data: Record<string, unknown>,
 	options?: {
@@ -156,13 +147,12 @@ export function logPromptQuery(
 ): void {
 	// Use a stable mcpServerSessionId per process/transport instance
 	const mcpServerSessionId = getMcpServerSessionId();
-	
+
 	logQuery({
 		query,
-		toolName,
+		methodName,
 		parameters: JSON.stringify(data),
-		status: 'success',
-		requestJson: JSON.stringify({ toolName, query, ...data }),
+		requestJson: JSON.stringify({ methodName, query, ...data }),
 		mcpServerSessionId,
 		clientSessionId: options?.clientSessionId || null,
 		isAuthenticated: options?.isAuthenticated ?? false,
@@ -171,6 +161,39 @@ export function logPromptQuery(
 		totalResults: options?.totalResults,
 		resultsShared: options?.resultsShared,
 		responseCharCount: options?.responseCharCount,
+	});
+}
+
+/**
+ * Simple helper to log system events (initialize, session_delete)
+ */
+export function logSystemEvent(
+	methodName: string,
+	sessionId: string,
+	options?: {
+		clientSessionId?: string;
+		isAuthenticated?: boolean;
+		clientName?: string;
+		clientVersion?: string;
+		requestJson?: unknown;
+	}
+): void {
+	// Use a stable mcpServerSessionId per process/transport instance
+	const mcpServerSessionId = getMcpServerSessionId();
+
+	logQuery({
+		query: sessionId, // Use sessionId as the "query" for system events
+		methodName,
+		parameters: JSON.stringify({ sessionId }),
+		resultsShared: -1,
+		totalResults: -1,
+		responseCharCount: -1,
+		requestJson: options?.requestJson ? JSON.stringify(options.requestJson) : JSON.stringify({ methodName, sessionId }),
+		isAuthenticated: options?.isAuthenticated ?? false,
+		name: options?.clientName || null,
+		version: options?.clientVersion || null,
+		clientSessionId: options?.clientSessionId || null,
+		mcpServerSessionId,
 	});
 }
 

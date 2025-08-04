@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { HfApiCall } from './hf-api-call.js';
 import { formatDate, formatNumber } from './utilities.js';
+import type { ToolResult } from './types/tool-result.js';
 const TAGS_TO_RETURN = 20;
 // Dataset Search Tool Configuration
 export const DATASET_SEARCH_TOOL_CONFIG = {
@@ -83,7 +84,7 @@ export class DatasetSearchTool extends HfApiCall<DatasetApiParams, DatasetApiRes
 	/**
 	 * Search for datasets with detailed parameters
 	 */
-	async searchWithParams(params: Partial<DatasetSearchParams>): Promise<string> {
+	async searchWithParams(params: Partial<DatasetSearchParams>): Promise<ToolResult> {
 		try {
 			// Convert our params to the HF API format
 			const apiParams: DatasetApiParams = {};
@@ -118,7 +119,11 @@ export class DatasetSearchTool extends HfApiCall<DatasetApiParams, DatasetApiRes
 			const datasets = await this.callApi<DatasetApiResult[]>(apiParams);
 
 			if (datasets.length === 0) {
-				return `No datasets found for the given criteria.`;
+				return {
+					formatted: `No datasets found for the given criteria.`,
+					totalResults: 0,
+					resultsShared: 0
+				};
 			}
 
 			return formatSearchResults(datasets, params);
@@ -133,7 +138,7 @@ export class DatasetSearchTool extends HfApiCall<DatasetApiParams, DatasetApiRes
 	/**
 	 * Search for datasets with a specific filter (e.g., arxiv:XXXX.XXXXX)
 	 */
-	async searchWithFilter(filter: string, limit: number = 10): Promise<string> {
+	async searchWithFilter(filter: string, limit: number = 10): Promise<ToolResult> {
 		try {
 			const apiParams: DatasetApiParams = {
 				filter: filter,
@@ -146,7 +151,11 @@ export class DatasetSearchTool extends HfApiCall<DatasetApiParams, DatasetApiRes
 			const datasets = await this.callApi<DatasetApiResult[]>(apiParams);
 
 			if (datasets.length === 0) {
-				return `No datasets found referencing ${filter}.`;
+				return {
+					formatted: `No datasets found referencing ${filter}.`,
+					totalResults: 0,
+					resultsShared: 0
+				};
 			}
 
 			return formatSearchResults(datasets, { limit });
@@ -160,7 +169,7 @@ export class DatasetSearchTool extends HfApiCall<DatasetApiParams, DatasetApiRes
 }
 
 // Formatting Function
-function formatSearchResults(datasets: DatasetApiResult[], params: Partial<DatasetSearchParams>): string {
+function formatSearchResults(datasets: DatasetApiResult[], params: Partial<DatasetSearchParams>): ToolResult {
 	const r: string[] = [];
 
 	// Build search description
@@ -233,5 +242,9 @@ function formatSearchResults(datasets: DatasetApiResult[], params: Partial<Datas
 		r.push('');
 	}
 
-	return r.join('\n');
+	return {
+		formatted: r.join('\n'),
+		totalResults: datasets.length,
+		resultsShared: datasets.length
+	};
 }

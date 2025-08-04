@@ -15,6 +15,7 @@ async def main():
     async with fast.run() as agent:
         await agent.interactive()
 
+
         # anonymous tool calling
         await agent.anon("***CALL_TOOL hf_whoami {}")
         await agent.anon("***CALL_TOOL model_search {}")

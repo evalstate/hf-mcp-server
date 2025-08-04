@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { datasetInfo } from '@huggingface/hub';
 import { formatDate, formatNumber } from './utilities.js';
+import type { ToolResult } from './types/tool-result.js';
 
 // Dataset Detail Tool Configuration
 export const DATASET_DETAIL_TOOL_CONFIG = {
@@ -79,9 +80,9 @@ export class DatasetDetailTool {
 	 * Get detailed information about a specific dataset
 	 *
 	 * @param datasetId The dataset ID to get details for (e.g., squad, glue, imdb)
-	 * @returns Formatted string with dataset details
+	 * @returns ToolResult with formatted dataset details
 	 */
-	async getDetails(datasetId: string): Promise<string> {
+	async getDetails(datasetId: string): Promise<ToolResult> {
 		try {
 			// Define additional fields we want to retrieve (only those available in the hub library)
 			const additionalFields = ['author', 'downloadsAllTime', 'tags', 'description', 'cardData'] as const;
@@ -158,7 +159,7 @@ export class DatasetDetailTool {
 }
 
 // Formatting Function
-function formatDatasetDetails(dataset: DatasetInformation): string {
+function formatDatasetDetails(dataset: DatasetInformation): ToolResult {
 	const r: string[] = [];
 	const [authorFromName] = dataset.name.includes('/') ? dataset.name.split('/') : ['', dataset.name];
 
@@ -253,5 +254,9 @@ function formatDatasetDetails(dataset: DatasetInformation): string {
 	// Link is reliable - based on dataset name which is required
 	r.push(`**Link:** [https://hf.co/datasets/${dataset.name}](https://hf.co/datasets/${dataset.name})`);
 
-	return r.join('\n');
+	return {
+		formatted: r.join('\n'),
+		totalResults: 1,  // Dataset was found
+		resultsShared: 1  // All details shared
+	};
 }
