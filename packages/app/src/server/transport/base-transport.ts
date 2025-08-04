@@ -17,7 +17,12 @@ import { isGradioTool } from '../utils/gradio-utils.js';
 export type ServerFactory = (
 	headers: Record<string, string> | null,
 	userSettings?: AppSettings,
-	skipGradio?: boolean
+	skipGradio?: boolean,
+	sessionInfo?: {
+		clientSessionId?: string;
+		isAuthenticated?: boolean;
+		clientInfo?: { name: string; version: string };
+	}
 ) => Promise<McpServer>;
 
 export interface TransportOptions {
@@ -260,13 +265,12 @@ export abstract class BaseTransport {
 	}
 
 	/**
-	 * TODO -- UPDATE THIS WHEN WE ADD OAUTH; we can avoid multiple calls to whoami etc.
 	 * Validate HF token and track authentication metrics
 	 * Returns true if request should continue, false if 401 should be returned
 	 */
 	protected async validateAuthAndTrackMetrics(
 		headers: Record<string, string>
-	): Promise<{ shouldContinue: boolean; statusCode?: number }> {
+	): Promise<{ shouldContinue: boolean; statusCode?: number; userIdentified: boolean }> {
 		const { hfToken } = extractAuthBouquetAndMix(headers);
 
 		if (hfToken) {
@@ -274,7 +278,7 @@ export abstract class BaseTransport {
 				await whoAmI({ credentials: { accessToken: hfToken } });
 				// Track authenticated connection
 				this.metrics.trackAuthenticatedConnection();
-				return { shouldContinue: true };
+				return { shouldContinue: true, userIdentified: true };
 			} catch (error) {
 				// Check for 401 status in multiple possible locations
 				const errorObj = error as { statusCode?: number; status?: number };
@@ -289,20 +293,20 @@ export abstract class BaseTransport {
 					logger.debug('Invalid HF token - returning 401');
 					// Track unauthorized connection
 					this.metrics.trackUnauthorizedConnection();
-					return { shouldContinue: false, statusCode: 401 };
+					return { shouldContinue: false, statusCode: 401, userIdentified: false };
 				}
 				// For other errors (network issues, 500s, etc.), continue processing
 				// but don't track as authenticated since we couldn't validate
 				logger.debug({ error }, 'Non-401 error from whoAmI, continuing without auth tracking');
 				// Don't track any auth metrics for this case - token exists but validation failed for non-auth reasons
-				return { shouldContinue: true };
+				return { shouldContinue: true, userIdentified: false };
 			}
 		} else {
 			// Track anonymous connection
 			this.metrics.trackAnonymousConnection();
 			const shouldContinue: boolean = !headers['x-mcp-force-auth'];
 			if (!shouldContinue) logger.trace(`NO TOKEN, FORCE AUTH? ${headers['x-mcp-force-auth']}`);
-			return { shouldContinue };
+			return { shouldContinue, userIdentified: false };
 		}
 	}
 }

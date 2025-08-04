@@ -19,7 +19,7 @@ const __dirname = dirname(__filename);
 function createLogger(): Logger {
 	const baseOptions: LoggerOptions = {
 		level: logLevel,
-		...(!isDev && { timestamp: pino.stdTimeFunctions.isoTime }),
+		timestamp: pino.stdTimeFunctions.isoTime, // Always use ISO time for better readability
 	};
 
 	// Setup HF logging if enabled
@@ -78,7 +78,7 @@ const logger: Logger = createLogger();
 export function forceLoggerToStderr(): void {
 	const stderrOptions: LoggerOptions = {
 		level: logLevel,
-		...(!isDev && { timestamp: pino.stdTimeFunctions.isoTime }),
+		timestamp: pino.stdTimeFunctions.isoTime, // Always use ISO time for better readability
 	};
 
 	if (isDev) {

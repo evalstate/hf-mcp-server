@@ -17,6 +17,7 @@ import { extractQueryParamsToHeaders } from '../utils/query-params.js';
 import { isBrowser } from '../utils/browser-detection.js';
 import { OAUTH_RESOURCE } from '../../shared/constants.js';
 import { randomUUID } from 'node:crypto';
+import { logSystemEvent } from '../utils/query-logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -151,15 +152,25 @@ export class StatelessHttpTransport extends BaseTransport {
 
 		// Analytics mode session tracking
 		if (this.analyticsMode) {
-			sessionId = headers['mcp-session-id'] || (req.query.sessionId as string);
+			sessionId = headers['mcp-session-id'];
 			// Handle session creation/resumption
 			if (requestBody?.method === 'initialize') {
 				// Create new session
 				sessionId = randomUUID();
-				this.createAnalyticsSession(sessionId, authResult.shouldContinue && headers['authorization'] ? true : false);
+				this.createAnalyticsSession(sessionId, authResult.userIdentified);
 
 				// Add session ID to response headers
-				res.setHeader('MCP-Session-ID', sessionId);
+				res.setHeader('Mcp-Session-Id', sessionId);
+
+				// Log initialize event
+				const initClientInfo = requestBody?.params?.clientInfo as { name?: string; version?: string } | undefined;
+				logSystemEvent('initialize', sessionId, {
+					clientSessionId: sessionId,
+					isAuthenticated: authResult.userIdentified,
+					clientName: initClientInfo?.name,
+					clientVersion: initClientInfo?.version,
+					requestJson: requestBody.params || '{}',
+				});
 			} else if (sessionId) {
 				// Try to resume existing session
 				if (this.analyticsSessions.has(sessionId)) {
@@ -188,6 +199,7 @@ export class StatelessHttpTransport extends BaseTransport {
 			// Track client info for initialize requests
 			if (requestBody?.method === 'initialize' && requestBody?.params) {
 				const clientInfo = requestBody.params.clientInfo as { name?: string; version?: string } | undefined;
+
 				if (clientInfo?.name && clientInfo?.version) {
 					this.associateSessionWithClient({ name: clientInfo.name, version: clientInfo.version });
 					this.updateClientActivity({ name: clientInfo.name, version: clientInfo.version });
@@ -210,13 +222,34 @@ export class StatelessHttpTransport extends BaseTransport {
 			// Determine which server to use
 			const useFullServer = this.shouldHandle(requestBody);
 			let directResponse = true;
+
+			// Get session metadata for query logging
+			const isAuthenticated = authResult.userIdentified;
+			const analyticsSession = sessionId ? this.analyticsSessions.get(sessionId) : undefined;
+
+			// For initialize requests, get client info directly from the request
+			let clientInfo = analyticsSession?.metadata.clientInfo;
+			if (requestBody?.method === 'initialize' && requestBody?.params) {
+				const initClientInfo = requestBody.params.clientInfo as { name?: string; version?: string } | undefined;
+				if (initClientInfo?.name && initClientInfo?.version) {
+					clientInfo = { name: initClientInfo.name, version: initClientInfo.version };
+				}
+			}
+
 			if (useFullServer) {
 				// Create new server instance using factory with request headers and bouquet
 				extractQueryParamsToHeaders(req, headers);
 
 				// Skip Gradio endpoints for initialize requests or non-Gradio tool calls
 				const skipGradio = this.skipGradioSetup(requestBody);
-				server = await this.serverFactory(headers, undefined, skipGradio);
+
+				// Pass session info to server factory for query logging
+				const sessionInfoForLogging = {
+					clientSessionId: sessionId,
+					isAuthenticated: analyticsSession?.metadata.isAuthenticated ?? isAuthenticated,
+					clientInfo,
+				};
+				server = await this.serverFactory(headers, undefined, skipGradio, sessionInfoForLogging);
 
 				// For Gradio tool calls, disable direct response to enable streaming/progress notifications
 				directResponse = !this.isGradioToolCall(requestBody);
@@ -326,7 +359,8 @@ export class StatelessHttpTransport extends BaseTransport {
 			return;
 		}
 
-		const sessionId = (req.headers['mcp-session-id'] as string) || (req.query.sessionId as string);
+		const headers = req.headers as Record<string, string>;
+		const sessionId = headers['mcp-session-id'];
 
 		if (!sessionId) {
 			this.trackError(400);
@@ -335,9 +369,22 @@ export class StatelessHttpTransport extends BaseTransport {
 		}
 
 		if (this.analyticsSessions.has(sessionId)) {
+			// Get session info before deletion for logging
+			const analyticsSession = this.analyticsSessions.get(sessionId);
+
 			this.analyticsSessions.delete(sessionId);
 			this.metrics.trackSessionDeleted();
 			logger.info({ sessionId }, 'Analytics session deleted via DELETE request');
+
+			// Log session delete event
+			logSystemEvent('session_delete', sessionId, {
+				clientSessionId: sessionId,
+				isAuthenticated: analyticsSession?.metadata.isAuthenticated,
+				clientName: analyticsSession?.metadata.clientInfo?.name,
+				clientVersion: analyticsSession?.metadata.clientInfo?.version,
+				requestJson: { method: 'session_delete', sessionId },
+			});
+
 			res.status(200).json({ jsonrpc: '2.0', result: { deleted: true } });
 		} else {
 			this.trackError(404);

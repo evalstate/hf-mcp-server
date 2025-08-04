@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { HfApiCall } from './hf-api-call.js';
 import { escapeMarkdown } from './utilities.js';
+import type { ToolResult } from './types/tool-result.js';
 
 // Define the SearchResult interface
 export interface SpaceSearchResult {
@@ -99,7 +100,7 @@ export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SpaceSearchRes
 	 * Search for spaces with a specific filter (e.g., arxiv:XXXX.XXXXX)
 	 * Note: For spaces, we need to use the regular API endpoint with filter parameter
 	 */
-	async searchWithFilter(filter: string, limit: number = 10, headerLevel: number = 1): Promise<string> {
+	async searchWithFilter(filter: string, limit: number = 10, headerLevel: number = 1): Promise<ToolResult> {
 		try {
 			// For spaces, we need to use the regular spaces API endpoint with filter
 			const url = new URL('https://huggingface.co/api/spaces');
@@ -111,7 +112,11 @@ export class SpaceSearchTool extends HfApiCall<SpaceSearchParams, SpaceSearchRes
 			const results = await this.fetchFromApi<SpaceSearchResult[]>(url);
 
 			if (results.length === 0) {
-				return `No matching Hugging Face Spaces found referencing ${filter}.`;
+				return {
+					formatted: `No matching Hugging Face Spaces found referencing ${filter}.`,
+					totalResults: 0,
+					resultsShared: 0
+				};
 			}
 
 			// Format results using the existing formatter
@@ -133,16 +138,20 @@ export type SearchParams = z.infer<typeof SEMANTIC_SEARCH_TOOL_CONFIG.schema>;
 /**
  * Formats search results as a markdown table for MCP friendly output
  * @param results The search results to format
- * @returns A markdown formatted string with the search results
+ * @returns A ToolResult with formatted string and metrics
  */
 export const formatSearchResults = (
 	query: string,
 	results: SpaceSearchResult[],
 	totalCount: number,
 	headerLevel: number = 1
-): string => {
+): ToolResult => {
 	if (results.length === 0) {
-		return `No matching Hugging Face Spaces found for the query '${query}'. Try a different query.`;
+		return {
+			formatted: `No matching Hugging Face Spaces found for the query '${query}'. Try a different query.`,
+			totalResults: 0,
+			resultsShared: 0
+		};
 	}
 
 	const showingText =
@@ -173,5 +182,9 @@ export const formatSearchResults = (
 			`| ${relevance} |\n`;
 	}
 
-	return markdown;
+	return {
+		formatted: markdown,
+		totalResults: totalCount,
+		resultsShared: results.length
+	};
 };

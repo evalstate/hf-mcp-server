@@ -26,7 +26,9 @@ describe('DocSearchTool', () => {
 			});
 
 			const result = await docSearchTool.search({ query: 'nonexistent' });
-			expect(result).toBe(`No documentation found for query 'nonexistent'`);
+			expect(result.formatted).toBe(`No documentation found for query 'nonexistent'`);
+			expect(result.totalResults).toBe(0);
+			expect(result.resultsShared).toBe(0);
 		});
 
 		it('should return no results message with product filter', async () => {
@@ -36,7 +38,9 @@ describe('DocSearchTool', () => {
 			});
 
 			const result = await docSearchTool.search({ query: 'nonexistent', product: 'hub' });
-			expect(result).toBe(`No documentation found for query 'nonexistent' in product 'hub'`);
+			expect(result.formatted).toBe(`No documentation found for query 'nonexistent' in product 'hub'`);
+			expect(result.totalResults).toBe(0);
+			expect(result.resultsShared).toBe(0);
 		});
 
 		it('should format results grouped by product and page', async () => {
@@ -74,37 +78,39 @@ describe('DocSearchTool', () => {
 			const result = await docSearchTool.search({ query: 'analytics' });
 
 			// Check header
-			expect(result).toContain('# Documentation Library Search Results for "analytics"');
-			expect(result).toContain('Found 3 results');
+			expect(result.formatted).toContain('# Documentation Library Search Results for "analytics"');
+			expect(result.formatted).toContain('Found 3 results');
+			expect(result.totalResults).toBe(3);
+			expect(result.resultsShared).toBe(3);
 
 			// Check product grouping - hub should come before dataset-viewer (hub has 2 results, dataset-viewer has 1)
-			const hubIndex = result.indexOf('## Results for Product: hub');
-			const datasetViewerIndex = result.indexOf('## Results for Product: dataset-viewer');
+			const hubIndex = result.formatted.indexOf('## Results for Product: hub');
+			const datasetViewerIndex = result.formatted.indexOf('## Results for Product: dataset-viewer');
 			expect(hubIndex).toBeLessThan(datasetViewerIndex);
 			expect(hubIndex).toBeGreaterThan(-1);
 			expect(datasetViewerIndex).toBeGreaterThan(-1);
 
 			// Check that result counts are shown
-			expect(result).toContain('## Results for Product: hub (2 results)');
-			expect(result).toContain('## Results for Product: dataset-viewer (1 results)');
+			expect(result.formatted).toContain('## Results for Product: hub (2 results)');
+			expect(result.formatted).toContain('## Results for Product: dataset-viewer (1 results)');
 
 			// Check page links (without anchors)
-			expect(result).toContain(
+			expect(result.formatted).toContain(
 				'### Results from [Analytics](https://huggingface.co/docs/hub/enterprise-hub-analytics)'
 			);
-			expect(result).toContain('### Results from [Quickstart](https://huggingface.co/docs/dataset-viewer/quick_start)');
+			expect(result.formatted).toContain('### Results from [Quickstart](https://huggingface.co/docs/dataset-viewer/quick_start)');
 
 			// Check excerpts with heading2
-			expect(result).toContain('#### Excerpt from the "Export Analytics as CSV" section');
-			expect(result).toContain('#### Excerpt from the "View Analytics" section');
+			expect(result.formatted).toContain('#### Excerpt from the "Export Analytics as CSV" section');
+			expect(result.formatted).toContain('#### Excerpt from the "View Analytics" section');
 
 			// Check excerpt content appears as plain text
-			expect(result).toContain('Download a comprehensive CSV file containing analytics');
-			expect(result).toContain('View analytics for your repositories');
-			expect(result).toContain('In this quickstart, you will learn how to use the dataset viewer REST API');
+			expect(result.formatted).toContain('Download a comprehensive CSV file containing analytics');
+			expect(result.formatted).toContain('View analytics for your repositories');
+			expect(result.formatted).toContain('In this quickstart, you will learn how to use the dataset viewer REST API');
 
 			// Check footer
-			expect(result).toContain('Use the "' + DOC_FETCH_CONFIG.name + '" tool to fetch a document from the library.');
+			expect(result.formatted).toContain('Use the "' + DOC_FETCH_CONFIG.name + '" tool to fetch a document from the library.');
 		});
 
 		it('should handle results without heading2', async () => {
@@ -126,8 +132,10 @@ describe('DocSearchTool', () => {
 			const result = await docSearchTool.search({ query: 'transformers' });
 
 			// Should not contain "Excerpt from" when heading2 is missing
-			expect(result).not.toContain('#### Excerpt from');
-			expect(result).toContain('This is a simple text without heading2');
+			expect(result.formatted).not.toContain('#### Excerpt from');
+			expect(result.formatted).toContain('This is a simple text without heading2');
+			expect(result.totalResults).toBe(1);
+			expect(result.resultsShared).toBe(1);
 		});
 
 		it('should properly escape markdown special characters', async () => {
@@ -150,9 +158,11 @@ describe('DocSearchTool', () => {
 			const result = await docSearchTool.search({ query: 'special' });
 
 			// Check that special characters are escaped in headings and page titles
-			expect(result).toContain('Special \\* Characters');
+			expect(result.formatted).toContain('Special \\* Characters');
 			// Note: heading2 appears in header text, but brackets don't get escaped
-			expect(result).toContain('#### Excerpt from the "Section with [brackets]" section');
+			expect(result.formatted).toContain('#### Excerpt from the "Section with [brackets]" section');
+			expect(result.totalResults).toBe(1);
+			expect(result.resultsShared).toBe(1);
 		});
 
 		it('should clean HTML tags from text', async () => {
@@ -174,9 +184,11 @@ describe('DocSearchTool', () => {
 			const result = await docSearchTool.search({ query: 'html' });
 
 			// HTML tags should be removed
-			expect(result).toContain('Text with HTML tags and');
-			expect(result).not.toContain('<div');
-			expect(result).not.toContain('<img');
+			expect(result.formatted).toContain('Text with HTML tags and');
+			expect(result.formatted).not.toContain('<div');
+			expect(result.formatted).not.toContain('<img');
+			expect(result.totalResults).toBe(1);
+			expect(result.resultsShared).toBe(1);
 		});
 
 		it('should sort multiple products and pages correctly by count', async () => {
@@ -229,23 +241,25 @@ describe('DocSearchTool', () => {
 			const result = await docSearchTool.search({ query: 'test' });
 
 			// Check product order by count: hub (3) > transformers (1) = datasets (1)
-			const hubIndex = result.indexOf('## Results for Product: hub');
-			const transformersIndex = result.indexOf('## Results for Product: transformers');
-			const datasetsIndex = result.indexOf('## Results for Product: datasets');
+			const hubIndex = result.formatted.indexOf('## Results for Product: hub');
+			const transformersIndex = result.formatted.indexOf('## Results for Product: transformers');
+			const datasetsIndex = result.formatted.indexOf('## Results for Product: datasets');
 
 			expect(hubIndex).toBeLessThan(transformersIndex);
 			expect(hubIndex).toBeLessThan(datasetsIndex);
 
 			// Check that hub shows total count
-			expect(result).toContain('## Results for Product: hub (3 results)');
+			expect(result.formatted).toContain('## Results for Product: hub (3 results)');
 
 			// Check page order within hub product: page1 (2 results) should come before page2 (1 result)
-			const page1Index = result.indexOf('https://huggingface.co/docs/hub/page1');
-			const page2Index = result.indexOf('https://huggingface.co/docs/hub/page2');
+			const page1Index = result.formatted.indexOf('https://huggingface.co/docs/hub/page1');
+			const page2Index = result.formatted.indexOf('https://huggingface.co/docs/hub/page2');
 			expect(page1Index).toBeLessThan(page2Index);
 
 			// Check that page1 shows its multiple results count
-			expect(result).toContain('### Results from [Page 1](https://huggingface.co/docs/hub/page1) (2 results)');
+			expect(result.formatted).toContain('### Results from [Page 1](https://huggingface.co/docs/hub/page1) (2 results)');
+			expect(result.totalResults).toBe(5);
+			expect(result.resultsShared).toBe(5);
 		});
 
 		it('should include product filter in API call when provided', async () => {
@@ -295,16 +309,18 @@ describe('DocSearchTool', () => {
 			const result = await docSearchTool.search({ query: 'analytics' });
 
 			// All three results should be grouped under one page heading (without anchor)
-			expect(result).toContain('### Results from [Analytics](https://huggingface.co/docs/hub/analytics) (3 results)');
+			expect(result.formatted).toContain('### Results from [Analytics](https://huggingface.co/docs/hub/analytics) (3 results)');
 
 			// All three excerpts should appear under the same page
-			expect(result).toContain('First result from section 1');
-			expect(result).toContain('Second result from section 2');
-			expect(result).toContain('Third result from section 3');
+			expect(result.formatted).toContain('First result from section 1');
+			expect(result.formatted).toContain('Second result from section 2');
+			expect(result.formatted).toContain('Third result from section 3');
 
 			// There should only be one "Results from" heading for this page
-			const resultsFromCount = (result.match(/### Results from/g) || []).length;
+			const resultsFromCount = (result.formatted.match(/### Results from/g) || []).length;
 			expect(resultsFromCount).toBe(1);
+			expect(result.totalResults).toBe(3);
+			expect(result.resultsShared).toBe(3);
 		});
 
 		it('should handle API errors gracefully', async () => {
@@ -349,33 +365,35 @@ describe('DocSearchTool', () => {
 			const result = await smallBudgetTool.search({ query: 'test' });
 
 			// Should contain the header
-			expect(result).toContain('# Documentation Library Search Results for "test"');
-			expect(result).toContain('Found 8 results');
+			expect(result.formatted).toContain('# Documentation Library Search Results for "test"');
+			expect(result.formatted).toContain('Found 8 results');
 
 			// Early results should have full content
-			expect(result).toContain('This is a very long text that repeats');
+			expect(result.formatted).toContain('This is a very long text that repeats');
 
 			// Debug: let's see what the result looks like
-			console.log('Result length:', result.length);
-			console.log('Estimated tokens:', Math.ceil(result.length / 3.3));
+			console.log('Result length:', result.formatted.length);
+			console.log('Estimated tokens:', Math.ceil(result.formatted.length / 3.3));
 			
 			// Check that early pages have content 
-			expect(result).toContain('#### Excerpt from the "Section 0" section');
-			expect(result).toContain('This is a very long text that repeats');
+			expect(result.formatted).toContain('#### Excerpt from the "Section 0" section');
+			expect(result.formatted).toContain('This is a very long text that repeats');
 			
 			// With token budget, we should see either truncation or link-only section
-			const hasTruncation = result.includes(`*[Content truncated - use ${DOC_FETCH_CONFIG.name} for full text or narrow search terms]*`);
-			const hasAdditionalResults = result.includes('## Further results were found in:');
+			const hasTruncation = result.formatted.includes(`*[Content truncated - use ${DOC_FETCH_CONFIG.name} for full text or narrow search terms]*`);
+			const hasAdditionalResults = result.formatted.includes('## Further results were found in:');
 			
 			
 			// At least one of these should indicate budget management
 			expect(hasTruncation || hasAdditionalResults).toBeTruthy();
 
 			// Should still contain the footer
-			expect(result).toContain(`Use the "${DOC_FETCH_CONFIG.name}" tool to fetch a document from the library.`);
+			expect(result.formatted).toContain(`Use the "${DOC_FETCH_CONFIG.name}" tool to fetch a document from the library.`);
 
 			// Result should be around our smaller token budget (5k tokens = ~16.5k chars)
-			expect(result.length).toBeLessThan(25000); // Should be controlled by token budget
+			expect(result.formatted.length).toBeLessThan(25000); // Should be controlled by token budget
+			expect(result.totalResults).toBe(8);
+			expect(result.resultsShared).toBe(8);
 		});
 	});
 
@@ -413,18 +431,20 @@ describe('DocSearchTool', () => {
 			const result = await docSearchTool.search({ query: 'test' });
 
 			// Verify grouping structure in output
-			expect(result).toContain('## Results for Product: hub');
-			expect(result).toContain('## Results for Product: transformers');
+			expect(result.formatted).toContain('## Results for Product: hub');
+			expect(result.formatted).toContain('## Results for Product: transformers');
 
 			// Verify that both results from the same page are together
-			const result1Index = result.indexOf('Result 1');
-			const result2Index = result.indexOf('Result 2');
-			const result3Index = result.indexOf('Result 3');
+			const result1Index = result.formatted.indexOf('Result 1');
+			const result2Index = result.formatted.indexOf('Result 2');
+			const result3Index = result.formatted.indexOf('Result 3');
 
 			// Results 1 and 2 should be close together (same page)
 			expect(Math.abs(result2Index - result1Index)).toBeLessThan(100);
 			// Result 3 should be further away (different product)
 			expect(Math.abs(result3Index - result1Index)).toBeGreaterThan(50);
+			expect(result.totalResults).toBe(3);
+			expect(result.resultsShared).toBe(3);
 		});
 	});
 });

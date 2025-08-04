@@ -339,7 +339,7 @@ export class UserSummaryPrompt extends HfApiCall<Record<string, string>, UserOve
 				sort: 'downloads',
 			});
 
-			return `## Models\n\n${results}`;
+			return `## Models\n\n${results.formatted}`;
 		} catch (error) {
 			console.warn(`Failed to fetch models for user ${userId}:`, error);
 			return null;
@@ -358,7 +358,7 @@ export class UserSummaryPrompt extends HfApiCall<Record<string, string>, UserOve
 				sort: 'downloads',
 			});
 
-			return `## Datasets\n\n${results}`;
+			return `## Datasets\n\n${results.formatted}`;
 		} catch (error) {
 			console.warn(`Failed to fetch datasets for user ${userId}:`, error);
 			return null;
@@ -392,7 +392,7 @@ export class UserSummaryPrompt extends HfApiCall<Record<string, string>, UserOve
 			const { formatSearchResults } = await import('./space-search.js');
 			const formattedResults = formatSearchResults(userId, userSpaces, userSpaces.length);
 
-			return `## Spaces\n\n${formattedResults}`;
+			return `## Spaces\n\n${formattedResults.formatted}`;
 		} catch (error) {
 			console.warn(`Failed to fetch spaces for user ${userId}:`, error);
 			return null;
@@ -408,11 +408,11 @@ export class UserSummaryPrompt extends HfApiCall<Record<string, string>, UserOve
 			const results = await paperSearch.search(fullname, 10, false);
 
 			// Check if results indicate no papers found
-			if (results.includes('No papers found')) {
+			if (results.formatted.includes('No papers found')) {
 				return null;
 			}
 
-			return `## Papers\n\n${results}`;
+			return `## Papers\n\n${results.formatted}`;
 		} catch (error) {
 			console.warn(`Failed to fetch papers for ${fullname}:`, error);
 			return null;

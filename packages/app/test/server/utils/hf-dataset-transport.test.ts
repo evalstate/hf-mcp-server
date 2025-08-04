@@ -133,7 +133,44 @@ describe('HfDatasetLogger', () => {
 
 			// Logger should still be functional after failure
 			expect(logger.getStatus().uploadInProgress).toBe(false);
-			expect(logger.getStatus().bufferSize).toBe(0); // Logs should be dropped
+			expect(logger.getStatus().bufferSize).toBe(1); // Logs should be retained for retry
+		});
+
+		it('should retry logs after 409 conflict error', async () => {
+			let attemptCount = 0;
+			const conflictThenSuccessUpload = async (params: unknown): Promise<CommitOutput> => {
+				attemptCount++;
+				if (attemptCount === 1) {
+					// First attempt: simulate 409 conflict
+					const error = new Error('Conflict');
+					(error as unknown as { status: number }).status = 409;
+					throw error;
+				}
+				// Second attempt: succeed
+				return {
+					commit: { url: 'test-url', oid: 'test-oid' },
+					hookOutput: 'test-hook-output',
+				};
+			};
+
+			logger = createTestLogger({ 
+				uploadFunction: conflictThenSuccessUpload, 
+				batchSize: 10, // Prevent auto-flush
+				flushInterval: 60000 // Prevent timer flush
+			});
+
+			// Add logs
+			logger.processLog({ level: 30, time: Date.now(), msg: 'Test 409 retry' });
+
+			// First flush should fail with 409
+			await (logger as unknown as { flush: () => Promise<void> }).flush();
+			expect(logger.getStatus().bufferSize).toBe(1); // Logs retained
+			expect(attemptCount).toBe(1); // First attempt made
+
+			// Second flush should succeed
+			await (logger as unknown as { flush: () => Promise<void> }).flush();
+			expect(logger.getStatus().bufferSize).toBe(0); // Logs uploaded successfully
+			expect(attemptCount).toBe(2); // Two attempts made
 		});
 
 		it('should not allow concurrent uploads', async () => {

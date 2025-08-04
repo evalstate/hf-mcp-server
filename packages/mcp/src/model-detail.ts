@@ -1,6 +1,7 @@
 import { modelInfo } from '@huggingface/hub';
 import { z } from 'zod';
 import { formatDate, formatNumber } from './utilities.js';
+import type { ToolResult } from './types/tool-result.js';
 
 const SPACES_TO_INCLUDE = 12;
 // Model Detail Tool Configuration
@@ -102,9 +103,9 @@ export class ModelDetailTool {
 	 * Get detailed information about a specific model
 	 *
 	 * @param modelId The model ID to get details for (e.g., microsoft/DialoGPT-large)
-	 * @returns Formatted string with model details
+	 * @returns ToolResult with formatted model details
 	 */
-	async getDetails(modelId: string): Promise<string> {
+	async getDetails(modelId: string): Promise<ToolResult> {
 		try {
 			// Define additional fields we want to retrieve (only those available in the hub library)
 			const additionalFields = [
@@ -252,7 +253,7 @@ export class ModelDetailTool {
 }
 
 // Formatting Function
-function formatModelDetails(model: ModelInformation): string {
+function formatModelDetails(model: ModelInformation): ToolResult {
 	const r: string[] = [];
 	const [authorFromName] = model.name.includes('/') ? model.name.split('/') : ['', model.name];
 
@@ -404,5 +405,9 @@ function formatModelDetails(model: ModelInformation): string {
 	// Link is reliable - based on model name which is required
 	r.push(`**Link:** [https://hf.co/${model.name}](https://hf.co/${model.name})`);
 
-	return r.join('\n');
+	return {
+		formatted: r.join('\n'),
+		totalResults: 1,  // Model was found
+		resultsShared: 1  // All details shared
+	};
 }

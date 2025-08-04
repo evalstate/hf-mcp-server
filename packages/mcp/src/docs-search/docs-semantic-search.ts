@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { HfApiCall } from '../hf-api-call.js';
 import { escapeMarkdown, estimateTokens } from '../utilities.js';
 import { DOC_FETCH_CONFIG } from './doc-fetch.js';
+import type { ToolResult } from '../types/tool-result.js';
 
 /** token estimation. initial results for "how to load a image to image model in transformers" returned
  * 121973 characters (36711 anthropic tokens) */
@@ -72,9 +73,13 @@ export class DocSearchTool extends HfApiCall<DocSearchApiParams, DocSearchResult
 	 * @param query Search query string (e.g. "rate limits", "analytics")
 	 * @param product Optional product filter
 	 */
-	async search(params: DocSearchParams): Promise<string> {
+	async search(params: DocSearchParams): Promise<ToolResult> {
 		try {
-			if (!params.query) return 'No query provided';
+			if (!params.query) return {
+				formatted: 'No query provided',
+				totalResults: 0,
+				resultsShared: 0
+			};
 
 			const apiParams: DocSearchApiParams = { q: params.query.toLowerCase() };
 			if (params.product) {
@@ -84,9 +89,13 @@ export class DocSearchTool extends HfApiCall<DocSearchApiParams, DocSearchResult
 			const results = await this.callApi<DocSearchResult[]>(apiParams);
 
 			if (results.length === 0) {
-				return params.product
-					? `No documentation found for query '${params.query}' in product '${params.product}'`
-					: `No documentation found for query '${params.query}'`;
+				return {
+					formatted: params.product
+						? `No documentation found for query '${params.query}' in product '${params.product}'`
+						: `No documentation found for query '${params.query}'`,
+					totalResults: 0,
+					resultsShared: 0
+				};
 			}
 
 			return formatSearchResults(params.query, results, params.product, this.tokenBudget);
@@ -207,7 +216,7 @@ function formatSearchResults(
 	results: DocSearchResult[],
 	productFilter?: string,
 	tokenBudget = DEFAULT_TOKEN_BUDGET
-): string {
+): ToolResult {
 	const lines: string[] = [];
 	let hasShownTruncationMessage = false;
 
@@ -311,5 +320,9 @@ function formatSearchResults(
 	lines.push('---\n');
 	lines.push(`Use the "${DOC_FETCH_CONFIG.name}" tool to fetch a document from the library.`);
 
-	return lines.join('\n');
+	return {
+		formatted: lines.join('\n'),
+		totalResults: results.length,
+		resultsShared: results.length
+	};
 }

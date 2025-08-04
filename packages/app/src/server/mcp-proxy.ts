@@ -50,7 +50,12 @@ export const createProxyServerFactory = (
 	return async (
 		headers: Record<string, string> | null,
 		userSettings?: AppSettings,
-		skipGradio?: boolean
+		skipGradio?: boolean,
+		sessionInfo?: {
+			clientSessionId?: string;
+			isAuthenticated?: boolean;
+			clientInfo?: { name: string; version: string };
+		}
 	): Promise<McpServer> => {
 		logger.debug('=== PROXY FACTORY CALLED ===', { skipGradio });
 
@@ -65,7 +70,7 @@ export const createProxyServerFactory = (
 		}
 
 		// Create the original server instance with user settings
-		const server = await originalServerFactory(headers, settings, skipGradio);
+		const server = await originalServerFactory(headers, settings, skipGradio, sessionInfo);
 
 		// Skip Gradio endpoint connection for requests that skip Gradio
 		if (skipGradio) {
