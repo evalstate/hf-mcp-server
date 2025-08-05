@@ -183,6 +183,12 @@ export class StatelessHttpTransport extends BaseTransport {
 					res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(req.body)));
 					return;
 				}
+			} else {
+				// No session ID provided for non-initialize request - return 400
+				this.trackError(400);
+				logger.debug('Missing session ID for non-initialize request in analytics mode');
+				res.status(400).json(JsonRpcErrors.invalidRequest(extractJsonRpcId(req.body), 'Session ID required'));
+				return;
 			}
 		}
 
