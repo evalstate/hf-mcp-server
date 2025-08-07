@@ -172,13 +172,37 @@ export class WebServer {
 		});
 
 		// Transport metrics endpoint
-		this.app.get('/api/transport-metrics', (_req, res) => {
+		this.app.get('/api/transport-metrics', (req, res) => {
 			if (!this.transport) {
 				res.status(503).json({ error: 'Transport not initialized' });
 				return;
 			}
 
 			try {
+				// Check for templog query parameter
+				const tempLogParam = req.query.templog;
+				let tempLogStatus: { activated: boolean; remaining: number; maxAllowed: number } | undefined = undefined;
+				
+				if (tempLogParam && this.transportInfo.transport === 'streamableHttpJson') {
+					// Only activate for stateless transport with analytics mode
+					// We need to import StatelessHttpTransport type or use method check
+					const statelessTransport = this.transport as { 
+						activateTempLogging?: (count: number) => number;
+						getTempLogStatus?: () => { enabled: boolean; remaining: number; maxAllowed: number };
+					};
+					if (statelessTransport.activateTempLogging && statelessTransport.getTempLogStatus) {
+						const requestedCount = parseInt(tempLogParam as string, 10);
+						if (!isNaN(requestedCount) && requestedCount > 0) {
+							const activated = statelessTransport.activateTempLogging(requestedCount);
+							tempLogStatus = {
+								activated: true,
+								remaining: activated,
+								maxAllowed: statelessTransport.getTempLogStatus().maxAllowed,
+							};
+						}
+					}
+				}
+				
 				// Get raw metrics from transport
 				const metrics = this.transport.getMetrics();
 
@@ -241,6 +265,23 @@ export class WebServer {
 
 				// Add Gradio metrics
 				formattedMetrics.gradioMetrics = gradioMetrics.getMetrics();
+				
+				// Add temp log status if it was activated or if we need to check current status
+				const extendedMetrics = formattedMetrics as typeof formattedMetrics & { tempLogStatus?: unknown };
+				if (tempLogStatus) {
+					extendedMetrics.tempLogStatus = tempLogStatus;
+				} else if (this.transportInfo.transport === 'streamableHttpJson') {
+					// Include current status even if not activating
+					const statelessTransport = this.transport as {
+						getTempLogStatus?: () => { enabled: boolean; remaining: number; maxAllowed: number };
+					};
+					if (statelessTransport.getTempLogStatus) {
+						const status = statelessTransport.getTempLogStatus();
+						if (status.enabled) {
+							extendedMetrics.tempLogStatus = status;
+						}
+					}
+				}
 
 				res.json(formattedMetrics);
 			} catch (error) {
