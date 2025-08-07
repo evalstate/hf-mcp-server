@@ -39,15 +39,22 @@ interface AnalyticsSession {
 export class StatelessHttpTransport extends BaseTransport {
 	private readonly analyticsMode: boolean;
 	private analyticsSessions: Map<string, AnalyticsSession> = new Map();
+	private readonly tempLogMax: number;
+	private tempLogCounter: number = 0;
+	private tempLogOriginalCount: number = 0;
 
 	constructor(serverFactory: ServerFactory, app: Express) {
 		super(serverFactory, app);
 		this.analyticsMode = process.env.ANALYTICS_MODE === 'true';
+		this.tempLogMax = parseInt(process.env.TEMPLOG_MAX || '0', 10);
 
+		// we basically just keep a map, memeory usage is small so we can get away with - no cleanup needed
 		if (this.analyticsMode) {
-			logger.info(
-				'Analytics mode enabled for stateless HTTP transport - no cleanup needed, can handle millions of sessions'
-			);
+			logger.info('Analytics mode enabled for stateless HTTP transport.');
+		}
+
+		if (this.tempLogMax > 0) {
+			logger.info(`Temporary logging available with max count: ${this.tempLogMax}`);
 		}
 	}
 	/**
@@ -179,6 +186,46 @@ export class StatelessHttpTransport extends BaseTransport {
 					// Session not found - track failed resumption and return 404
 					this.metrics.trackSessionResumeFailed();
 					this.trackError(404);
+
+					// Log details if temp logging is active
+					if (this.tempLogCounter > 0) {
+						const logNumber = this.tempLogOriginalCount - this.tempLogCounter + 1;
+						
+						// Redact HF token if present - show only last 5 chars
+						let hfTokenInfo: string | undefined;
+						const hfToken = headers['authorization'] || headers['hf-token'] || headers['x-hf-token'];
+						if (hfToken) {
+							const tokenStr = hfToken.replace(/^Bearer\s+/i, '');
+							if (tokenStr.length > 5) {
+								hfTokenInfo = `[REDACTED]...${tokenStr.slice(-5)}`;
+							} else {
+								hfTokenInfo = '[PRESENT BUT TOO SHORT]';
+							}
+						}
+						
+						console.log(`[TEMPLOG ${logNumber}/${this.tempLogOriginalCount}] Session Resume Failed:`, {
+							sessionId: sessionId,
+							timestamp: new Date().toISOString(),
+							headers: {
+								userAgent: headers['user-agent'],
+								clientSessionId: headers['mcp-session-id'],
+								xForwardedFor: headers['x-forwarded-for'],
+								origin: headers['origin'],
+								referer: headers['referer'],
+								hfToken: hfTokenInfo || '[NOT PRESENT]',
+							},
+							method: requestBody?.method,
+							clientInfo: requestBody?.params?.clientInfo,
+							sessionExisted: false,
+							activeSessionCount: this.analyticsSessions.size,
+						});
+						this.tempLogCounter--;
+
+						if (this.tempLogCounter === 0) {
+							logger.info('Temporary logging completed - auto-disabled');
+						}
+					}
+
 					logger.debug({ sessionId }, 'Analytics session not found for resumption');
 					res.status(404).json(JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(req.body)));
 					return;
@@ -475,5 +522,31 @@ export class StatelessHttpTransport extends BaseTransport {
 		if (session) {
 			session.metadata.clientInfo = clientInfo;
 		}
+	}
+
+	/**
+	 * Activate temporary logging for session resume failures
+	 * @param count Number of failures to log
+	 * @returns The actual number of logs that will be captured
+	 */
+	activateTempLogging(count: number): number {
+		if (this.tempLogMax <= 0) return 0;
+		this.tempLogCounter = Math.min(count, this.tempLogMax);
+		this.tempLogOriginalCount = this.tempLogCounter;
+		if (this.tempLogCounter > 0) {
+			logger.info(`Temporary logging activated for ${this.tempLogCounter} session resume failures`);
+		}
+		return this.tempLogCounter;
+	}
+
+	/**
+	 * Get the current temp logging status
+	 */
+	getTempLogStatus(): { enabled: boolean; remaining: number; maxAllowed: number } {
+		return {
+			enabled: this.tempLogMax > 0,
+			remaining: this.tempLogCounter,
+			maxAllowed: this.tempLogMax,
+		};
 	}
 }
