@@ -3,7 +3,7 @@
 	"private": true,
 	"version": "0.2.9",
 	"type": "module",
-	"packageManager": "pnpm@10.12.3",
+	"packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748",
 	"scripts": {
 		"dev": "concurrently \"pnpm run --filter=@llmindset/hf-mcp dev\" \"pnpm run --filter=@llmindset/hf-mcp-server dev\"",
 		"dev:sse": "concurrently \"pnpm run --filter=@llmindset/hf-mcp dev\" \"pnpm run --filter=@llmindset/hf-mcp-server dev:sse\"",
