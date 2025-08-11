@@ -5,14 +5,23 @@ import type { TransportMetrics } from '../../shared/transport-metrics.js';
 import { MetricsCounter } from '../../shared/transport-metrics.js';
 import type { AppSettings } from '../../shared/settings.js';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
-import { whoAmI, HubApiError } from '@huggingface/hub';
+import { whoAmI, HubApiError, type WhoAmI } from '@huggingface/hub';
 import { extractAuthBouquetAndMix } from '../utils/auth-utils.js';
 import { getMetricsSafeName } from '../utils/gradio-metrics.js';
 import { isGradioTool } from '../utils/gradio-utils.js';
 
 /**
+ * Result returned by ServerFactory containing the server instance and optional user details
+ */
+export interface ServerFactoryResult {
+	server: McpServer;
+	userDetails?: WhoAmI;
+}
+
+/**
  * Factory function to create server instances
  * This should be provided during transport construction to enable per-connection server instances
+ * Returns both the server instance and optional user details from authentication
  */
 export type ServerFactory = (
 	headers: Record<string, string> | null,
@@ -23,7 +32,7 @@ export type ServerFactory = (
 		isAuthenticated?: boolean;
 		clientInfo?: { name: string; version: string };
 	}
-) => Promise<McpServer>;
+) => Promise<ServerFactoryResult>;
 
 export interface TransportOptions {
 	port?: number;
@@ -242,7 +251,7 @@ export abstract class BaseTransport {
 		const methodName = body?.method || 'unknown';
 
 		// Always skip for initialize requests
-		if (methodName === 'initialize' || methodName.startsWith('prompts/')) {
+		if (methodName === 'initialize' || methodName.startsWith('resources/')) {
 			return true;
 		}
 
@@ -262,6 +271,25 @@ export abstract class BaseTransport {
 	protected trackMethodCall(methodName: string | null, startTime: number, isError: boolean = false): void {
 		const duration = Date.now() - startTime;
 		this.metrics.trackMethod(methodName, duration, isError);
+	}
+
+	/**
+	 * Extract client info from initialize request parameters
+	 * Used by stateless transports to capture client info directly from request
+	 * @param requestBody - The request body containing initialize params
+	 * @returns Client info if available in the request
+	 */
+	protected extractClientInfoFromRequest(requestBody: unknown): { name: string; version: string } | undefined {
+		const body = requestBody as { method?: string; params?: { clientInfo?: unknown } } | undefined;
+
+		if (body?.method === 'initialize' && body?.params) {
+			const clientInfo = body.params.clientInfo as { name?: string; version?: string } | undefined;
+			if (clientInfo?.name && clientInfo?.version) {
+				return { name: clientInfo.name, version: clientInfo.version };
+			}
+		}
+
+		return undefined;
 	}
 
 	/**

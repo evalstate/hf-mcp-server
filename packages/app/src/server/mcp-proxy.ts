@@ -1,5 +1,5 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { ServerFactory } from './transport/base-transport.js';
+//import { datasetInfo, listFiles, repoExists } from '@huggingface/hub';
+import type { ServerFactory, ServerFactoryResult } from './transport/base-transport.js';
 import type { McpApiClient } from './utils/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
 import type { AppSettings } from '../shared/settings.js';
@@ -7,14 +7,21 @@ import { logger } from './utils/logger.js';
 import { connectToGradioEndpoints, registerRemoteTools } from './gradio-endpoint-connector.js';
 import { extractAuthBouquetAndMix } from './utils/auth-utils.js';
 import type { SpaceTool } from '../shared/settings.js';
+import { repoExists } from '@huggingface/hub';
+import type { GradioFilesParams } from '@llmindset/hf-mcp';
+import { GRADIO_FILES_TOOL_CONFIG, GradioFilesTool } from '@llmindset/hf-mcp';
+import { logSearchQuery } from './utils/query-logger.js';
 
 /**
  * Parses gradio parameter and converts domain/space format to SpaceTool objects
  */
 function parseGradioEndpoints(gradioParam: string): SpaceTool[] {
 	const spaceTools: SpaceTool[] = [];
-	const entries = gradioParam.split(',').map(s => s.trim()).filter(s => s.length > 0);
-	
+	const entries = gradioParam
+		.split(',')
+		.map((s) => s.trim())
+		.filter((s) => s.length > 0);
+
 	for (const entry of entries) {
 		// Validate exactly one slash
 		const slashCount = (entry.match(/\//g) || []).length;
@@ -22,20 +29,20 @@ function parseGradioEndpoints(gradioParam: string): SpaceTool[] {
 			logger.warn(`Skipping invalid gradio entry "${entry}": must contain exactly one slash`);
 			continue;
 		}
-		
+
 		// Convert domain/space to subdomain format (replace / and . with -)
 		const subdomain = entry.replace(/[/.]/g, '-');
-		
+
 		spaceTools.push({
 			_id: `gradio_${subdomain}`,
 			name: entry,
 			subdomain: subdomain,
-			emoji: '🔧'
+			emoji: '🔧',
 		});
-		
+
 		logger.debug(`Added gradio endpoint: ${entry} -> ${subdomain}`);
 	}
-	
+
 	return spaceTools;
 }
 
@@ -56,7 +63,7 @@ export const createProxyServerFactory = (
 			isAuthenticated?: boolean;
 			clientInfo?: { name: string; version: string };
 		}
-	): Promise<McpServer> => {
+	): Promise<ServerFactoryResult> => {
 		logger.debug('=== PROXY FACTORY CALLED ===', { skipGradio });
 
 		// Extract auth, bouquet, and gradio using shared utility
@@ -70,18 +77,24 @@ export const createProxyServerFactory = (
 		}
 
 		// Create the original server instance with user settings
-		const server = await originalServerFactory(headers, settings, skipGradio, sessionInfo);
+		const result = await originalServerFactory(headers, settings, skipGradio, sessionInfo);
+		const { server, userDetails } = result;
 
 		// Skip Gradio endpoint connection for requests that skip Gradio
 		if (skipGradio) {
 			logger.debug('Skipping Gradio endpoints (initialize or non-Gradio tool call)');
-			return server;
+			return result;
 		}
 
-		// Skip Gradio endpoints if bouquet is "search"
-		if (bouquet === 'search') {
-			logger.debug({ bouquet }, 'Bouquet is "search", skipping all Gradio endpoints');
-			return server;
+		// Skip Gradio endpoints if bouquet is not "all"
+		if (bouquet && bouquet !== 'all') {
+			logger.debug({ bouquet }, 'Bouquet specified and not "all", skipping Gradio endpoints');
+			return result;
+		}
+
+		// Now we have access to userDetails if needed
+		if (userDetails) {
+			logger.debug(`Proxy has access to user details for: ${userDetails.name}`);
 		}
 
 		// Parse gradio parameter and merge with settings
@@ -138,20 +151,78 @@ export const createProxyServerFactory = (
 
 		if (validEndpoints.length === 0) {
 			logger.debug('No valid Gradio endpoints, using local tools only');
-			return server;
+			return result;
 		}
 
 		// Connect to all valid endpoints in parallel with timeout
 		const connections = await connectToGradioEndpoints(validEndpoints, hfToken);
 
 		// Register tools from successful connections
-		for (const result of connections) {
-			if (!result.success) continue;
+		for (const connection of connections) {
+			if (!connection.success) continue;
 
-			registerRemoteTools(server, result.connection, hfToken);
+			registerRemoteTools(server, connection.connection, hfToken);
+		}
+
+		if (sessionInfo?.isAuthenticated && userDetails?.name && hfToken) {
+			const username = userDetails.name; // Capture username for closure
+			const token = hfToken; // Capture token for closure
+			const exists = await repoExists({
+				repo: { type: 'dataset', name: `${username}/gradio-files` },
+			});
+			if (exists)
+				server.tool(
+					GRADIO_FILES_TOOL_CONFIG.name,
+					GRADIO_FILES_TOOL_CONFIG.description,
+					GRADIO_FILES_TOOL_CONFIG.schema.shape,
+					GRADIO_FILES_TOOL_CONFIG.annotations,
+					async (params: GradioFilesParams) => {
+						const tool = new GradioFilesTool(token, username);
+						const markdown = await tool.generateDetailedMarkdown(params.fileType);
+						
+						// Log the tool usage
+						logSearchQuery(
+							GRADIO_FILES_TOOL_CONFIG.name,
+							`${username}/gradio-files`,
+							{ fileType: params.fileType },
+							{
+								clientSessionId: sessionInfo?.clientSessionId,
+								isAuthenticated: sessionInfo?.isAuthenticated ?? true,
+								clientName: sessionInfo?.clientInfo?.name,
+								clientVersion: sessionInfo?.clientInfo?.version,
+								responseCharCount: markdown.length,
+							}
+						);
+						
+						return {
+							content: [{ type: 'text', text: markdown }],
+						};
+					}
+				);
+			/* TODO -- reinstate once method handling is improved; 
+			server.prompt(
+				GRADIO_FILES_PROMPT_CONFIG.name,
+				GRADIO_FILES_PROMPT_CONFIG.description,
+				GRADIO_FILES_PROMPT_CONFIG.schema.shape,
+				async () => {
+					return {
+						description: `Gradio Files summary for ${username}`,
+						messages: [
+							{
+								role: 'user' as const,
+								content: {
+									type: 'text' as const,
+									text: await new GradioFilesTool(token, username).generateDetailedMarkdown('all'),
+								},
+							},
+						],
+					};
+				}
+			);
+			*/
 		}
 
 		logger.debug('Server ready with local and remote tools');
-		return server;
+		return result;
 	};
 };

@@ -1,6 +1,7 @@
 /**
  * Utility functions for handling Gradio endpoint detection and configuration
  */
+import { GRADIO_FILES_TOOL_CONFIG } from '@llmindset/hf-mcp';
 import { GRADIO_PREFIX, GRADIO_PRIVATE_PREFIX } from '../../shared/constants.js';
 
 /**
@@ -18,7 +19,7 @@ import { GRADIO_PREFIX, GRADIO_PRIVATE_PREFIX } from '../../shared/constants.js'
  */
 export function isGradioTool(toolName: string): boolean {
 	// Gradio tools follow pattern: gr<number>_<name> or grp<number>_<name>
-	return /^grp?\d+_/.test(toolName);
+	return /^grp?\d+_/.test(toolName) || toolName === GRADIO_FILES_TOOL_CONFIG.name;
 }
 
 /**
@@ -36,7 +37,12 @@ export function isGradioTool(toolName: string): boolean {
  * createGradioToolName('EasyGhibli', 1, false) // 'gr2_easyghibli'
  * createGradioToolName('private.model', 2, true) // 'grp3_private_model'
  */
-export function createGradioToolName(toolName: string, index: number, isPrivate: boolean | undefined, toolIndex?: number): string {
+export function createGradioToolName(
+	toolName: string,
+	index: number,
+	isPrivate: boolean | undefined,
+	toolIndex?: number
+): string {
 	// Choose prefix based on privacy status
 	const prefix = isPrivate ? GRADIO_PRIVATE_PREFIX : GRADIO_PREFIX;
 	const indexStr = (index + 1).toString();
@@ -58,7 +64,7 @@ export function createGradioToolName(toolName: string, index: number, isPrivate:
 			// Insert tool index after the underscore: gr1_0_toolname
 			const toolIndexPrefix = `${toolIndex}_`;
 			const availableForName = maxNameLength - toolIndexPrefix.length;
-			
+
 			// Keep first 20 chars, add underscore, then keep as many chars from the end as possible
 			const keepFromEnd = availableForName - 20 - 1; // -1 for the underscore
 			sanitizedName = toolIndexPrefix + sanitizedName.substring(0, 20) + '_' + sanitizedName.slice(-keepFromEnd);
