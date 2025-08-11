@@ -29,7 +29,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.12.3
+          version: 10.14.0
 
       - uses: actions/setup-node@v4
         with:
@@ -90,7 +90,7 @@ jobs:
           # Publish the mcp package first (dependency)
           cd packages/mcp
           pnpm publish --access public --no-git-checks
-          
+
           # Then publish the main app package  
           cd ../app
           pnpm publish --access public --no-git-checks
