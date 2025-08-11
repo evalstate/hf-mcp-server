@@ -14,7 +14,8 @@ export class StdioTransport extends StatefulTransport<StdioSession> {
 		const transport = new StdioServerTransport();
 
 		// Create server instance using factory (null headers for STDIO)
-		const server = await this.serverFactory(null);
+		const result = await this.serverFactory(null);
+		const server = result.server;
 
 		// Create session with metadata tracking
 		const session: StdioSession = {

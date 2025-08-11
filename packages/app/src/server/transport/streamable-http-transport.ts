@@ -219,7 +219,8 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 	private async createSession(requestHeaders?: Record<string, string>): Promise<StreamableHTTPServerTransport> {
 		// Create server instance using factory with request headers
 		// Note: Auth validation is now done in handlePostRequest before calling this method
-		const server = await this.serverFactory(requestHeaders || null);
+		const result = await this.serverFactory(requestHeaders || null);
+		const server = result.server;
 
 		const transport = new StreamableHTTPServerTransport({
 			sessionIdGenerator: () => randomUUID(),

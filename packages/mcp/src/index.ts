@@ -11,6 +11,7 @@ export * from './dataset-detail.js';
 export * from './duplicate-space.js';
 export * from './space-info.js';
 export * from './space-files.js';
+export * from './gradio-files.js';
 export * from './user-summary.js';
 export * from './paper-summary.js';
 export * from './docs-search/docs-semantic-search.js';

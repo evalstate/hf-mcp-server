@@ -46,7 +46,7 @@ import {
 	type DocFetchParams,
 } from '@llmindset/hf-mcp';
 
-import type { ServerFactory } from './transport/base-transport.js';
+import type { ServerFactory, ServerFactoryResult } from './transport/base-transport.js';
 import type { McpApiClient } from './utils/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
 import { logger } from './utils/logger.js';
@@ -86,7 +86,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			isAuthenticated?: boolean;
 			clientInfo?: { name: string; version: string };
 		}
-	): Promise<McpServer> => {
+	): Promise<ServerFactoryResult> => {
 		logger.debug('=== CREATING NEW MCP SERVER INSTANCE ===', { skipGradio, sessionInfo });
 		// Extract auth using shared utility
 		const { hfToken } = extractAuthBouquetAndMix(headers);
@@ -553,6 +553,6 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				};
 			}
 		}
-		return server;
+		return { server, userDetails };
 	};
 };

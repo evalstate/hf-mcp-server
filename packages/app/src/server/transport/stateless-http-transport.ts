@@ -170,7 +170,7 @@ export class StatelessHttpTransport extends BaseTransport {
 				res.setHeader('Mcp-Session-Id', sessionId);
 
 				// Log initialize event
-				const initClientInfo = requestBody?.params?.clientInfo as { name?: string; version?: string } | undefined;
+				const initClientInfo = this.extractClientInfoFromRequest(requestBody);
 				logSystemEvent('initialize', sessionId, {
 					clientSessionId: sessionId,
 					isAuthenticated: authResult.userIdentified,
@@ -250,23 +250,20 @@ export class StatelessHttpTransport extends BaseTransport {
 
 		try {
 			// Track client info for initialize requests
-			if (requestBody?.method === 'initialize' && requestBody?.params) {
-				const clientInfo = requestBody.params.clientInfo as { name?: string; version?: string } | undefined;
+			const extractedClientInfo = this.extractClientInfoFromRequest(requestBody);
+			if (extractedClientInfo) {
+				this.associateSessionWithClient(extractedClientInfo);
+				this.updateClientActivity(extractedClientInfo);
 
-				if (clientInfo?.name && clientInfo?.version) {
-					this.associateSessionWithClient({ name: clientInfo.name, version: clientInfo.version });
-					this.updateClientActivity({ name: clientInfo.name, version: clientInfo.version });
-
-					// Update analytics session with client info
-					if (this.analyticsMode && sessionId) {
-						this.updateAnalyticsSessionClientInfo(sessionId, { name: clientInfo.name, version: clientInfo.version });
-					}
+				// Update analytics session with client info
+				if (this.analyticsMode && sessionId) {
+					this.updateAnalyticsSessionClientInfo(sessionId, extractedClientInfo);
 				}
 
 				logger.debug(
 					{
-						clientInfo: requestBody.params.clientInfo,
-						capabilities: requestBody.params.capabilities,
+						clientInfo: requestBody?.params?.clientInfo,
+						capabilities: requestBody?.params?.capabilities,
 					},
 					'Initialize request received'
 				);
@@ -282,11 +279,8 @@ export class StatelessHttpTransport extends BaseTransport {
 
 			// For initialize requests, get client info directly from the request
 			let clientInfo = analyticsSession?.metadata.clientInfo;
-			if (requestBody?.method === 'initialize' && requestBody?.params) {
-				const initClientInfo = requestBody.params.clientInfo as { name?: string; version?: string } | undefined;
-				if (initClientInfo?.name && initClientInfo?.version) {
-					clientInfo = { name: initClientInfo.name, version: initClientInfo.version };
-				}
+			if (extractedClientInfo) {
+				clientInfo = extractedClientInfo;
 			}
 
 			if (useFullServer) {
@@ -302,7 +296,8 @@ export class StatelessHttpTransport extends BaseTransport {
 					isAuthenticated: analyticsSession?.metadata.isAuthenticated ?? isAuthenticated,
 					clientInfo,
 				};
-				server = await this.serverFactory(headers, undefined, skipGradio, sessionInfoForLogging);
+				const result = await this.serverFactory(headers, undefined, skipGradio, sessionInfoForLogging);
+				server = result.server;
 
 				// For Gradio tool calls, disable direct response to enable streaming/progress notifications
 				directResponse = !this.isGradioToolCall(requestBody);
