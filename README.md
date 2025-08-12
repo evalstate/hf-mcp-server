@@ -2,7 +2,13 @@
 
 ## Getting Started
 
-This repository contains the offical Hugging Face MCP Server source. The server supports multiple deployment and configuration options, and is deployable locally as well as on your own infrastructure.
+Welcome to the official Hugging Face MCP Server. 
+
+The easiest way to get started is to go to https://huggingface.co/mcp and configure your Tools at https://huggingface.co/settings/mcp.
+
+Here's how to get started in popular clients:
+
+
 
 The easiest way to access Hugging Face MCP Services is via `https://hf.co/mcp` which offers a number of Tools, Prompts and access to Gradio Spaces which are configurable at `https://hf.co/settings/mcp`. 
 
