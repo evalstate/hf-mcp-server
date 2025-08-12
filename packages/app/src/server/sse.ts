@@ -35,12 +35,13 @@ async function start() {
 	await app.start();
 
 	// Handle server shutdown
+	let shutdownInProgress = false;
 	const shutdown = async () => {
 		logger.info('Shutting down server...');
+		shutdownInProgress = true;
 		try {
 			await app.stop();
 			logger.info('Server shutdown complete');
-			process.exit(0);
 		} catch (error) {
 			logger.error({ error }, 'Error during shutdown');
 			process.exit(1);
@@ -49,6 +50,13 @@ async function start() {
 
 	process.once('SIGINT', () => {
 		void shutdown();
+		// Set up second SIGINT handler for force exit
+		process.once('SIGINT', () => {
+			if (shutdownInProgress) {
+				logger.warn('Force exit requested, terminating immediately...');
+				process.exit(1);
+			}
+		});
 	});
 
 	process.once('SIGTERM', () => {

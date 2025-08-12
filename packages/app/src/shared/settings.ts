@@ -26,12 +26,14 @@ export const DEFAULT_SPACE_TOOLS: SpaceTool[] = [
 		subdomain: 'evalstate-flux1-schnell',
 		emoji: '🏎️💨',
 	},
+	/*
 	{
 		_id: '680be03dc38b7fa7d6855910',
 		name: 'abidlabs/EasyGhibli',
 		subdomain: 'abidlabs-easyghibli',
 		emoji: '🦀',
 	},
+	*/
 ];
 
 // Default settings
