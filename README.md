@@ -14,7 +14,7 @@ Click [here](https://claude.ai/redirect/website.v1.67274164-23df-4883-8166-3c93c
 
 Alternatively, navigate to [https://claude.ai/settings/connectors](https://claude.ai/settings/connectors), and add "Hugging Face" from the gallery.
 
-<img src='docs/claude-badge.png' />
+<img src='docs/claude-badge.png' width='50%' align='center' />
 
 </details>
 
@@ -48,7 +48,7 @@ Click <a href="vscode:mcp/install?%7B%22name%22%3A%22huggingface%22%2C%22gallery
 
 If you prefer to configure manually or use an auth token, add the snippet below to your `mcp.json` configuration:
 
-<img src='docs/vscode-badge.png' />
+<img src='docs/vscode-badge.png' width='50%' align='center' />
 
 ```JSON
 "huggingface": {
