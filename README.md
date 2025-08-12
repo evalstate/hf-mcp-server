@@ -33,7 +33,7 @@ Alternativey, navigate to [https://claude.ai/settings/connectors](https://claude
 
 Click <a href="vscode:mcp/install?%7B%22name%22%3A%22huggingface%22%2C%22gallery%22%3Atrue%2C%22url%22%3A%22https%3A%2F%2Fhuggingface.co%2Fmcp%3Flogin%22%7D">hffere</a> to add the Hugging Face connector directly to VSCode. Alternatively, install from the gallery at [https://code.visualstudio.com/mcp](https://code.visualstudio.com/mcp): 
 
-vscode:mcp/install?%7B%22name%22%3A%22huggingface%22%2C%22gallery%22%3Atrue%2C%22url%22%3A%22https%3A%2F%2Fhuggingface.co%2Fmcp%3Flogin%22%7D
+vscode:mcp/install?%7B%22name%22%3A%22huggingface%22%2C%22gallery%22%3Afalse%2C%22url%22%3A%22https%3A%2F%2Fhuggingface.co%2Fmcp%3Flogin%22%7D
 
 For <b>VSCode</b> add the Hugging Face server from the [VSCode gallery](https://code.visualstudio.com/mcp) here : [https://code.visualstudio.com/mcp](https://code.visualstudio.com/mcp)
 
