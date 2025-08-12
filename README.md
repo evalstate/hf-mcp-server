@@ -22,11 +22,13 @@ Alternatively, navigate to [https://claude.ai/settings/connectors](https://claud
 <summary>Install in <b>Claude Code</b></summary>
 <br />
 
-Enter the command below to install in <b>Claude Code></b>:
+Enter the command below to install in <b>Claude Code</b>:
 
 ```bash
 claude mcp add hf-mcp-server -t http https://huggingface.co/mcp?login
 ```
+
+Then start `claude` and follow the instructions to complete authentication.
 
 ```bash
 claude mcp add hf-mcp-server \
@@ -78,7 +80,6 @@ If you prefer to use configure manually or specify an Authorization Token, use t
 Once installed, navigate to https://huggingface.co/settings/mcp to configure your Tools and Spaces.
 
 ![hf_mcp_server_small](https://github.com/user-attachments/assets/d30f9f56-b08c-4dfc-a68f-a164a93db564)
-
 
 
 ## Quick Guide (Repository Packages)
