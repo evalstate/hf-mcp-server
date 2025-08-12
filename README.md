@@ -1,53 +1,86 @@
 # Hugging Face Official MCP Server 
 
-## Getting Started
+Welcome to the official Hugging Face MCP Server 🤗. Connect your LLM to the Hugging Face Hub and thousands of Gradio AI Applications.
 
-This repository contains the offical Hugging Face MCP Server source. The server supports multiple deployment and configuration options, and is deployable locally as well as on your own infrastructure.
+## Installing the MCP Server
 
-The easiest way to access Hugging Face MCP Services is via `https://hf.co/mcp` which offers a number of Tools, Prompts and access to Gradio Spaces which are configurable at `https://hf.co/settings/mcp`. 
+Follow the instructions below to get started:
 
 ![hf_mcp_server_small](https://github.com/user-attachments/assets/d30f9f56-b08c-4dfc-a68f-a164a93db564)
 
-Anonymous access is supported with a default set of Tools and Prompts, or use a Hugging Face READ token to customize your settings:
+<details>
+<summary>Install in <b>Claude Desktop</b> or <b>claude.ai</b></summary>
+<br />
+
+Click [here](https://claude.ai/redirect/website.v1.67274164-23df-4883-8166-3c93ced276be/directory/37ed56d5-9d61-4fd4-ad00-b9134c694296) to add the Hugging Face connector to your account. 
+
+Alternatively, navigate to [https://claude.ai/settings/connectors](https://claude.ai/settings/connectors), and add "Hugging Face" from the gallery.
+
+<img src='docs/claude-badge.png' />
+
+</details>
 
 <details>
-<summary>Install in <b>Claude Desktop</b></summary>
+<summary>Install in <b>Claude Code</b></summary>
 <br />
-For <b>Claude Desktop</b> (via MCP Remote) (in your `mcpServers` section):
 
-```JSON
-"Hugging Face": {
-    "command": "npx",
-    "args": [
-        "-y","mcp-remote",
-        "https://hf.co/mcp",
-        "--header", "Authorization:${AUTH_HEADER}"
-    ],
-    "env": {
-    "AUTH_HEADER": "Bearer <YOUR_HF_TOKEN>"
-    }
-}
+Enter the command below to install in <b>Claude Code></b>:
+
+```bash
+claude mcp add hf-mcp-server -t http https://huggingface.co/mcp?login
 ```
+
+```bash
+claude mcp add hf-mcp-server \
+  -t http https://huggingface.co/mcp \
+  -H "Authorization: Bearer <YOUR_HF_TOKEN>"
+```
+
+
 </details>
 
 <details>
 
-<summary>Install in <b>VSCode</b> or <b>Cursor</b></summary>
+<summary>Install in <b>VSCode</b></summary>
 <br />
-For <b>VSCode</b> and <b>Cursor</b> (in your `mcp/servers`or `mcpServers` section respectively):
 
-If you prefer to use OAuth, use `https://hf.co/mcp?login`
+Click <a href="vscode:mcp/install?%7B%22name%22%3A%22huggingface%22%2C%22gallery%22%3Atrue%2C%22url%22%3A%22https%3A%2F%2Fhuggingface.co%2Fmcp%3Flogin%22%7D">here</a> to add the Hugging Face connector directly to VSCode. Alternatively, install from the gallery at [https://code.visualstudio.com/mcp](https://code.visualstudio.com/mcp): 
+
+Alternatively, navigate to the VSCode [MCP Servers for agent mode](https://code.visualstudio.com/mcp) directory, and <a href="foo">click</a> "Install Hugging Face".
+
+If you prefer to use configure manually or prefer to use an auth token, use the snippet below in your mcp.json configuration:
+
+<img src='docs/vscode-badge.png' />
 
 ```JSON
-"hf-mcp-server": {
-    "url": "https://hf.co/mcp",
+"huggingface": {
+    "url": "https://huggingface.co/mcp",
+    "headers": {
+        "Authorization": "Bearer <YOUR_HF_TOKEN>"
+    }
+```
+
+</details>
+
+<details>
+<summary>Install in <b>Cursor</b></summary>
+<br />
+
+Click <a href="https://cursor.com/en/install-mcp?name=Hugging%20Face&config=eyJ1cmwiOiJodHRwczovL2h1Z2dpbmdmYWNlLmNvL21jcD9sb2dpbiJ9">here</a> to install the Hugging Face MCP Server directly in <b>Cursor</b>. 
+
+If you prefer to use configure manually or specify an Authorization Token, use the snippet below:
+
+```JSON
+"huggingface": {
+    "url": "https://huggingface.co/mcp",
     "headers": {
         "Authorization": "Bearer <YOUR_HF_TOKEN>"
     }
 ```
 </details>
 
-For **claude.ai**  enter `https://hf.co/mcp` from the "Add Integrations" dropdown menu. Claude does not currently support the MCP 2025-06-18 OAuth standard so is limited to anonymous access.
+
+https://cursor.com/en/install-mcp?name=Hugging%20Face&config=eyJ1cmwiOiJodHRwczovL2h1Z2dpbmdmYWNlLmNvL21jcD9sb2dpbiJ9
 
 ## Quick Guide (Repository Packages)
 
