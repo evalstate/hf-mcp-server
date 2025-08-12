@@ -1,20 +1,12 @@
 # Hugging Face Official MCP Server 
 
-## Getting Started
+Welcome to the official Hugging Face MCP Server 🤗.
 
-Welcome to the official Hugging Face MCP Server. 
+## Install the MCP Server
 
-The easiest way to get started is to go to https://huggingface.co/mcp and configure your Tools at https://huggingface.co/settings/mcp.
-
-Here's how to get started in popular clients:
-
-
-
-The easiest way to access Hugging Face MCP Services is via `https://hf.co/mcp` which offers a number of Tools, Prompts and access to Gradio Spaces which are configurable at `https://hf.co/settings/mcp`. 
+The Hugging Face MCP Server can be installed 
 
 ![hf_mcp_server_small](https://github.com/user-attachments/assets/d30f9f56-b08c-4dfc-a68f-a164a93db564)
-
-Anonymous access is supported with a default set of Tools and Prompts, or use a Hugging Face READ token to customize your settings:
 
 <details>
 <summary>Install in <b>Claude Desktop</b> or <b>claude.ai</b></summary>
@@ -37,7 +29,7 @@ vscode:mcp/install?%7B%22name%22%3A%22huggingface%22%2C%22gallery%22%3Afalse%2C%
 
 For <b>VSCode</b> add the Hugging Face server from the [VSCode gallery](https://code.visualstudio.com/mcp) here : [https://code.visualstudio.com/mcp](https://code.visualstudio.com/mcp)
 
-If you prefer to use OAuth, use `https://hf.co/mcp?login`
+If you prefer to use configure manually or specify an Authorization Token, use the snippet below:
 
 ```JSON
 "huggingface": {
@@ -48,7 +40,26 @@ If you prefer to use OAuth, use `https://hf.co/mcp?login`
 ```
 </details>
 
-For **claude.ai**  enter `https://hf.co/mcp` from the "Add Integrations" dropdown menu. Claude does not currently support the MCP 2025-06-18 OAuth standard so is limited to anonymous access.
+<summary>Install in <b>Cursor</b></summary>
+<br />
+
+Click <a href="https://cursor.com/en/install-mcp?name=Hugging%20Face&config=eyJ1cmwiOiJodHRwczovL2h1Z2dpbmdmYWNlLmNvL21jcD9sb2dpbiJ9">here</a> to install the Hugging Face MCP Server directly in <b>Cursor</b>. 
+
+For <b>Cursor</b> add the Hugging Face server from the [VSCode gallery](https://code.visualstudio.com/mcp) here : [https://code.visualstudio.com/mcp](https://code.visualstudio.com/mcp)
+
+If you prefer to use configure manually or specify an Authorization Token, use the snippet below:
+
+```JSON
+"huggingface": {
+    "url": "https://huggingface.co/mcp",
+    "headers": {
+        "Authorization": "Bearer <YOUR_HF_TOKEN>"
+    }
+```
+</details>
+
+
+https://cursor.com/en/install-mcp?name=Hugging%20Face&config=eyJ1cmwiOiJodHRwczovL2h1Z2dpbmdmYWNlLmNvL21jcD9sb2dpbiJ9
 
 ## Quick Guide (Repository Packages)
 
