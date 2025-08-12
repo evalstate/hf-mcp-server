@@ -17,36 +17,30 @@ The easiest way to access Hugging Face MCP Services is via `https://hf.co/mcp` w
 Anonymous access is supported with a default set of Tools and Prompts, or use a Hugging Face READ token to customize your settings:
 
 <details>
-<summary>Install in <b>Claude Desktop</b></summary>
+<summary>Install in <b>Claude Desktop</b> or <b>claude.ai</b></summary>
 <br />
-For <b>Claude Desktop</b> (via MCP Remote) (in your `mcpServers` section):
 
-```JSON
-"Hugging Face": {
-    "command": "npx",
-    "args": [
-        "-y","mcp-remote",
-        "https://hf.co/mcp",
-        "--header", "Authorization:${AUTH_HEADER}"
-    ],
-    "env": {
-    "AUTH_HEADER": "Bearer <YOUR_HF_TOKEN>"
-    }
-}
-```
+Click [here](https://claude.ai/redirect/website.v1.67274164-23df-4883-8166-3c93ced276be/directory/37ed56d5-9d61-4fd4-ad00-b9134c694296) to add the Hugging Face connector to your account. 
+
+Alternative, navigate to [https://claude.ai/settings/connectors](https://claude.ai/settings/connectors), and choose "Hugging Face" from the gallery.
+
 </details>
 
 <details>
 
-<summary>Install in <b>VSCode</b> or <b>Cursor</b></summary>
+<summary>Install in <b>VSCode</b></summary>
 <br />
-For <b>VSCode</b> and <b>Cursor</b> (in your `mcp/servers`or `mcpServers` section respectively):
+
+Click [here](vscode:mcp/install?%7B%22name%22%3A%22huggingface%22%2C%22gallery%22%3Atrue%2C%22url%22%3A%22https%3A%2F%2Fhuggingface.co%2Fmcp%3Flogin%22%7D) to add the Hugging Face connector directly to VSCode. Alternatively, install from the gallery at [https://code.visualstudio.com/mcp](https://code.visualstudio.com/mcp): 
+
+
+For <b>VSCode</b> add the Hugging Face server from the [VSCode gallery](https://code.visualstudio.com/mcp) here : [https://code.visualstudio.com/mcp](https://code.visualstudio.com/mcp)
 
 If you prefer to use OAuth, use `https://hf.co/mcp?login`
 
 ```JSON
-"hf-mcp-server": {
-    "url": "https://hf.co/mcp",
+"huggingface": {
+    "url": "https://huggingface.co/mcp",
     "headers": {
         "Authorization": "Bearer <YOUR_HF_TOKEN>"
     }
