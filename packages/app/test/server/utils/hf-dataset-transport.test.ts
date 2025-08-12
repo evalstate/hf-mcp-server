@@ -88,10 +88,10 @@ describe('HfDatasetLogger', () => {
 		});
 
 		it('should drop oldest logs when buffer exceeds maximum size', async () => {
-			logger = createTestLogger({ batchSize: 2000, flushInterval: 60000 }); // Prevent auto-flush
+			logger = createTestLogger({ batchSize: 20000, flushInterval: 60000 }); // Prevent auto-flush
 
-			// Add logs to exceed buffer capacity (maxBufferSize = 1000)
-			for (let i = 0; i < 1002; i++) {
+			// Add logs to exceed buffer capacity (maxBufferSize = 10000)
+			for (let i = 0; i < 10002; i++) {
 				logger.processLog({
 					level: 30,
 					time: Date.now(),
@@ -102,8 +102,8 @@ describe('HfDatasetLogger', () => {
 			// Wait a bit to ensure all logs are processed
 			await new Promise((resolve) => setTimeout(resolve, 10));
 
-			// Buffer should be at max size (1000), not 1002
-			expect(logger.getStatus().bufferSize).toBe(1000);
+			// Buffer should be at max size (10000), not 10002
+			expect(logger.getStatus().bufferSize).toBe(10000);
 		});
 	});
 
@@ -254,7 +254,7 @@ describe('HfDatasetLogger', () => {
 
 			const status = logger.getStatus();
 			expect(status).toBeDefined();
-			expect(status.bufferSize).toBeLessThanOrEqual(1000); // Should respect max buffer size
+			expect(status.bufferSize).toBeLessThanOrEqual(10000); // Should respect max buffer size
 		});
 	});
 
@@ -322,7 +322,7 @@ describe('HfDatasetLogger', () => {
 
 			const status = logger.getStatus();
 			// Should not accumulate unlimited logs
-			expect(status.bufferSize).toBeLessThanOrEqual(1000);
+			expect(status.bufferSize).toBeLessThanOrEqual(10000);
 		});
 
 		it('should handle large log messages efficiently', () => {
