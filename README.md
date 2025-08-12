@@ -46,9 +46,10 @@ claude mcp add hf-mcp-server \
 
 Click <a href="vscode:mcp/install?%7B%22name%22%3A%22huggingface%22%2C%22gallery%22%3Atrue%2C%22url%22%3A%22https%3A%2F%2Fhuggingface.co%2Fmcp%3Flogin%22%7D">here</a> to add the Hugging Face connector directly to VSCode. Alternatively, install from the gallery at [https://code.visualstudio.com/mcp](https://code.visualstudio.com/mcp): 
 
+<img src='docs/vscode-badge.png' width='50%' align='center' />
+
 If you prefer to configure manually or use an auth token, add the snippet below to your `mcp.json` configuration:
 
-<img src='docs/vscode-badge.png' width='50%' align='center' />
 
 ```JSON
 "huggingface": {
