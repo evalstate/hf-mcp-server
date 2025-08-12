@@ -1,10 +1,10 @@
 # Hugging Face Official MCP Server 
 
-Welcome to the official Hugging Face MCP Server 🤗.
+Welcome to the official Hugging Face MCP Server 🤗. Connect your LLM to the Hugging Face Hub and thousands of Gradio AI Applications.
 
-## Install the MCP Server
+## Installing the MCP Server
 
-The Hugging Face MCP Server can be installed 
+Follow the instructions below to get started:
 
 ![hf_mcp_server_small](https://github.com/user-attachments/assets/d30f9f56-b08c-4dfc-a68f-a164a93db564)
 
@@ -14,7 +14,9 @@ The Hugging Face MCP Server can be installed
 
 Click [here](https://claude.ai/redirect/website.v1.67274164-23df-4883-8166-3c93ced276be/directory/37ed56d5-9d61-4fd4-ad00-b9134c694296) to add the Hugging Face connector to your account. 
 
-Alternativey, navigate to [https://claude.ai/settings/connectors](https://claude.ai/settings/connectors), and choose "Hugging Face" from the gallery.
+Alternatively, navigate to [https://claude.ai/settings/connectors](https://claude.ai/settings/connectors), and add "Hugging Face" from the gallery.
+
+<img src='docs/claude-badge.png' />
 
 </details>
 
@@ -23,7 +25,9 @@ Alternativey, navigate to [https://claude.ai/settings/connectors](https://claude
 <summary>Install in <b>VSCode</b></summary>
 <br />
 
-Click <a href="vscode:mcp/install?%7B%22name%22%3A%22huggingface%22%2C%22gallery%22%3Atrue%2C%22url%22%3A%22https%3A%2F%2Fhuggingface.co%2Fmcp%3Flogin%22%7D">hffere</a> to add the Hugging Face connector directly to VSCode. Alternatively, install from the gallery at [https://code.visualstudio.com/mcp](https://code.visualstudio.com/mcp): 
+Click <a href="vscode:mcp/install?%7B%22name%22%3A%22huggingface%22%2C%22gallery%22%3Atrue%2C%22url%22%3A%22https%3A%2F%2Fhuggingface.co%2Fmcp%3Flogin%22%7D">here</a> to add the Hugging Face connector directly to VSCode. Alternatively, install from the gallery at [https://code.visualstudio.com/mcp](https://code.visualstudio.com/mcp): 
+
+
 
 vscode:mcp/install?%7B%22name%22%3A%22huggingface%22%2C%22gallery%22%3Afalse%2C%22url%22%3A%22https%3A%2F%2Fhuggingface.co%2Fmcp%3Flogin%22%7D
 
