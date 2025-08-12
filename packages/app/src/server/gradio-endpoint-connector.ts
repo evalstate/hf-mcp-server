@@ -187,15 +187,6 @@ async function fetchEndpointSchema(
 	clearTimeout(timeoutId);
 
 	if (!response.ok) {
-		logger.error(
-			{
-				endpointId,
-				subdomain: endpoint.subdomain,
-				status: response.status,
-				statusText: response.statusText,
-			},
-			'Failed to fetch schema from endpoint'
-		);
 		throw new Error(`Failed to fetch schema: ${response.status} ${response.statusText}`);
 	}
 

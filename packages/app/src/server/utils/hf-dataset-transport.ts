@@ -38,7 +38,7 @@ export class HfDatasetLogger {
 	private uploadInProgress = false;
 	private sessionId: string;
 	private uploadFunction: typeof UploadFileFunction;
-	private readonly maxBufferSize: number = 1000;
+	private readonly maxBufferSize: number = 10000;
 	private logType: string;
 
 	constructor(options: HfDatasetTransportOptions) {
