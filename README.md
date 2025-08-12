@@ -21,8 +21,6 @@ Alternatively, navigate to [https://claude.ai/settings/connectors](https://claud
 </details>
 
 <details>
-
-<details>
 <summary>Install in <b>Claude Code</b></summary>
 <br />
 
@@ -52,7 +50,7 @@ Alternatively, navigate to the VSCode [MCP Servers for agent mode](https://code.
 
 If you prefer to use configure manually or prefer to use an auth token, use the snippet below in your mcp.json configuration:
 
-<img src='docs/vscode-badge.png.png' />
+<img src='docs/vscode-badge.png' />
 
 ```JSON
 "huggingface": {
