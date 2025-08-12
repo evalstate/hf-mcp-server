@@ -465,11 +465,9 @@ export class StatelessHttpTransport extends BaseTransport {
 	 * Get all active sessions - returns empty array for stateless transport
 	 */
 	override getSessions(): SessionMetadata[] {
-		// In analytics mode, return tracked sessions
-		if (this.analyticsMode) {
-			return Array.from(this.analyticsSessions.values()).map((session) => session.metadata);
-		}
-		// Stateless transport doesn't maintain sessions
+		// Stateless transport doesn't maintain sessions for metrics display
+		// Even in analytics mode, we track sessions internally but don't expose them
+		// to avoid returning massive amounts of session data
 		return [];
 	}
 
