@@ -6,8 +6,6 @@ Welcome to the official Hugging Face MCP Server 🤗. Connect your LLM to the Hu
 
 Follow the instructions below to get started:
 
-![hf_mcp_server_small](https://github.com/user-attachments/assets/d30f9f56-b08c-4dfc-a68f-a164a93db564)
-
 <details>
 <summary>Install in <b>Claude Desktop</b> or <b>claude.ai</b></summary>
 <br />
@@ -46,9 +44,7 @@ claude mcp add hf-mcp-server \
 
 Click <a href="vscode:mcp/install?%7B%22name%22%3A%22huggingface%22%2C%22gallery%22%3Atrue%2C%22url%22%3A%22https%3A%2F%2Fhuggingface.co%2Fmcp%3Flogin%22%7D">here</a> to add the Hugging Face connector directly to VSCode. Alternatively, install from the gallery at [https://code.visualstudio.com/mcp](https://code.visualstudio.com/mcp): 
 
-Alternatively, navigate to the VSCode [MCP Servers for agent mode](https://code.visualstudio.com/mcp) directory, and <a href="foo">click</a> "Install Hugging Face".
-
-If you prefer to use configure manually or prefer to use an auth token, use the snippet below in your mcp.json configuration:
+If you prefer to configure manually or use an auth token, add the snippet below to your `mcp.json` configuration:
 
 <img src='docs/vscode-badge.png' />
 
@@ -79,8 +75,11 @@ If you prefer to use configure manually or specify an Authorization Token, use t
 ```
 </details>
 
+Once installed, navigate to https://huggingface.co/settings/mcp to configure your Tools and Spaces.
 
-https://cursor.com/en/install-mcp?name=Hugging%20Face&config=eyJ1cmwiOiJodHRwczovL2h1Z2dpbmdmYWNlLmNvL21jcD9sb2dpbiJ9
+![hf_mcp_server_small](https://github.com/user-attachments/assets/d30f9f56-b08c-4dfc-a68f-a164a93db564)
+
+
 
 ## Quick Guide (Repository Packages)
 
