@@ -21,6 +21,19 @@ export const MODEL_DETAIL_TOOL_CONFIG = {
 	},
 } as const;
 
+export const MODEL_DETAIL_PROMPT_CONFIG = {
+	name: 'Model Details',
+	title: 'Model Details',
+	description: 'Get detailed information about a model from the Hugging Face Hub',
+	schema: z.object({
+		model_id: z
+			.string()
+			.min(5, 'Model ID is required')
+			.max(50)
+			.describe("The Model ID in repo/model format (e.g. 'openai/gpt-oss-120b')"),
+	}),
+};
+
 export type ModelDetailParams = z.infer<typeof MODEL_DETAIL_TOOL_CONFIG.schema>;
 
 // Clean interface design with explicit data availability
@@ -407,7 +420,7 @@ function formatModelDetails(model: ModelInformation): ToolResult {
 
 	return {
 		formatted: r.join('\n'),
-		totalResults: 1,  // Model was found
-		resultsShared: 1  // All details shared
+		totalResults: 1, // Model was found
+		resultsShared: 1, // All details shared
 	};
 }
