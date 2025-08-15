@@ -13,6 +13,7 @@ import {
 	type ModelSearchParams,
 	ModelDetailTool,
 	MODEL_DETAIL_TOOL_CONFIG,
+	MODEL_DETAIL_PROMPT_CONFIG,
 	type ModelDetailParams,
 	PaperSearchTool,
 	PAPER_SEARCH_TOOL_CONFIG,
@@ -235,6 +236,40 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 							content: {
 								type: 'text' as const,
 								text: summaryText,
+							},
+						},
+					],
+				};
+			}
+		);
+
+		server.prompt(
+			MODEL_DETAIL_PROMPT_CONFIG.name,
+			MODEL_DETAIL_PROMPT_CONFIG.description,
+			MODEL_DETAIL_PROMPT_CONFIG.schema.shape,
+			async (params: ModelDetailParams) => {
+				const modelDetail = new ModelDetailTool(hfToken, undefined);
+				const result = await modelDetail.getDetails(params.model_id);
+				logPromptQuery(
+					MODEL_DETAIL_PROMPT_CONFIG.name,
+					params.model_id,
+					{ model_id: params.model_id },
+					{
+						...getLoggingOptions(),
+						totalResults: result.totalResults,
+						resultsShared: result.resultsShared,
+						responseCharCount: result.formatted.length,
+					}
+				);
+
+				return {
+					description: `Model details for ${params.model_id}`,
+					messages: [
+						{
+							role: 'user' as const,
+							content: {
+								type: 'text' as const,
+								text: result.formatted,
 							},
 						},
 					],

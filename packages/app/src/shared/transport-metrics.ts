@@ -28,6 +28,9 @@ export interface TransportMetrics {
 	requests: {
 		total: number;
 		averagePerMinute: number;
+		lastMinute: number;
+		lastHour: number;
+		last3Hours: number;
 	};
 
 	// Ping metrics (for stateful transports)
@@ -155,6 +158,9 @@ export interface TransportMetricsResponse {
 	requests: {
 		total: number;
 		averagePerMinute: number;
+		lastMinute: number;
+		lastHour: number;
+		last3Hours: number;
 	};
 
 	// Static page hits (stateless transport only)
@@ -289,6 +295,9 @@ export function createEmptyMetrics(): TransportMetrics {
 		requests: {
 			total: 0,
 			averagePerMinute: 0,
+			lastMinute: 0,
+			lastHour: 0,
+			last3Hours: 0,
 		},
 		errors: {
 			expected: 0,
@@ -309,19 +318,83 @@ export function getClientKey(name: string, version: string): string {
 }
 
 /**
+ * Rolling window counter for tracking metrics over time periods
+ */
+class RollingWindowCounter {
+	private readonly buckets: number[];
+	private currentBucket: number = 0;
+	private lastRotation: number = Date.now();
+	
+	constructor(windowMinutes: number) {
+		this.buckets = new Array(windowMinutes).fill(0);
+	}
+	
+	increment(): void {
+		this.rotateBucketsIfNeeded();
+		const current = this.buckets[this.currentBucket] ?? 0;
+		this.buckets[this.currentBucket] = current + 1;
+	}
+	
+	getCount(): number {
+		this.rotateBucketsIfNeeded();
+		return this.buckets.reduce((sum, count) => sum + count, 0);
+	}
+	
+	private rotateBucketsIfNeeded(): void {
+		const now = Date.now();
+		const minutesPassed = Math.floor((now - this.lastRotation) / 60000);
+		
+		// Rotate and clear buckets for each minute that has passed
+		for (let i = 0; i < minutesPassed && i < this.buckets.length; i++) {
+			this.currentBucket = (this.currentBucket + 1) % this.buckets.length;
+			this.buckets[this.currentBucket] = 0;
+		}
+		
+		// If all buckets need to be cleared (time gap > window size)
+		if (minutesPassed >= this.buckets.length) {
+			this.buckets.fill(0);
+			this.currentBucket = 0;
+		}
+		
+		if (minutesPassed > 0) {
+			// Update to the last minute boundary that was processed
+			this.lastRotation = this.lastRotation + (minutesPassed * 60000);
+		}
+	}
+}
+
+/**
  * Centralized metrics counter for transport operations
  */
 export class MetricsCounter {
 	private metrics: TransportMetrics;
+	private rollingMinute: RollingWindowCounter;
+	private rollingHour: RollingWindowCounter;
+	private rolling3Hours: RollingWindowCounter;
 
 	constructor() {
 		this.metrics = createEmptyMetrics();
+		this.rollingMinute = new RollingWindowCounter(1);
+		this.rollingHour = new RollingWindowCounter(60);
+		this.rolling3Hours = new RollingWindowCounter(180);
 	}
 
 	/**
 	 * Get the underlying metrics data
 	 */
 	getMetrics(): TransportMetrics {
+		// Calculate rates (requests per minute) for each window
+		// Note: All values represent "requests per minute" calculated over their respective windows
+		this.metrics.requests.lastMinute = this.rollingMinute.getCount(); // Requests in last 1 minute (already per minute)
+		
+		// For longer windows, divide total count by window size to get per-minute rate
+		const hourCount = this.rollingHour.getCount();
+		const threeHourCount = this.rolling3Hours.getCount();
+		
+		// Calculate per-minute rates for the longer windows
+		this.metrics.requests.lastHour = Math.round((hourCount / 60) * 100) / 100; // Requests per minute over last hour
+		this.metrics.requests.last3Hours = Math.round((threeHourCount / 180) * 100) / 100; // Requests per minute over last 3 hours
+			
 		return this.metrics;
 	}
 
@@ -331,6 +404,23 @@ export class MetricsCounter {
 	trackRequest(): void {
 		this.metrics.requests.total++;
 		this.updateRequestsPerMinute();
+		
+		// Update rolling window counters
+		this.rollingMinute.increment();
+		this.rollingHour.increment();
+		this.rolling3Hours.increment();
+		
+		// Calculate rates (requests per minute) for each window
+		// Note: All values represent "requests per minute" calculated over their respective windows
+		this.metrics.requests.lastMinute = this.rollingMinute.getCount(); // Requests in last 1 minute (already per minute)
+		
+		// For longer windows, divide total count by window size to get per-minute rate
+		const hourCount = this.rollingHour.getCount();
+		const threeHourCount = this.rolling3Hours.getCount();
+		
+		// Calculate per-minute rates for the longer windows
+		this.metrics.requests.lastHour = Math.round((hourCount / 60) * 100) / 100; // Requests per minute over last hour
+		this.metrics.requests.last3Hours = Math.round((threeHourCount / 180) * 100) / 100; // Requests per minute over last 3 hours
 	}
 
 	/**
