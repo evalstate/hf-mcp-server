@@ -252,7 +252,7 @@ export async function connectToGradioEndpoints(
 			.catch((error: unknown): EndpointConnectionResult => {
 				const isFirstError = gradioMetrics.schemaFetchError(endpoint.name);
 				const logLevel = isFirstError ? 'warn' : 'trace';
-				
+
 				logger[logLevel](
 					{
 						endpointId,
@@ -261,7 +261,7 @@ export async function connectToGradioEndpoints(
 					},
 					'Failed to fetch schema from endpoint'
 				);
-				
+
 				return {
 					success: false,
 					endpointId,
@@ -438,7 +438,12 @@ function createToolHandler(
 export function registerRemoteTools(server: McpServer, connection: EndpointConnection, hfToken?: string): void {
 	connection.tools.forEach((tool, toolIndex) => {
 		// Generate tool name
-		const outwardFacingName = createGradioToolName(tool.name, connection.originalIndex, connection.isPrivate, toolIndex);
+		const outwardFacingName = createGradioToolName(
+			tool.name,
+			connection.originalIndex,
+			connection.isPrivate,
+			toolIndex
+		);
 
 		// Create display info
 		const { title, description } = createToolDisplayInfo(connection, tool);
