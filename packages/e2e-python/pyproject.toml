@@ -6,7 +6,7 @@ requires-python = ">=3.13"
 dependencies = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
-    "fast-agent-mcp>=0.2.56",
+    "fast-agent-mcp>=0.2.57",
     "huggingface_hub>=0.34.0"
 ]
 

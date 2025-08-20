@@ -250,7 +250,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			MODEL_DETAIL_PROMPT_CONFIG.schema.shape,
 			async (params: ModelDetailParams) => {
 				const modelDetail = new ModelDetailTool(hfToken, undefined);
-				const result = await modelDetail.getDetails(params.model_id);
+				const result = await modelDetail.getDetails(params.model_id, true);
 				logPromptQuery(
 					MODEL_DETAIL_PROMPT_CONFIG.name,
 					params.model_id,
@@ -284,7 +284,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			DATASET_DETAIL_PROMPT_CONFIG.schema.shape,
 			async (params: DatasetDetailParams) => {
 				const datasetDetail = new DatasetDetailTool(hfToken, undefined);
-				const result = await datasetDetail.getDetails(params.dataset_id);
+				const result = await datasetDetail.getDetails(params.dataset_id, true);
 				logPromptQuery(
 					DATASET_DETAIL_PROMPT_CONFIG.name,
 					params.dataset_id,
