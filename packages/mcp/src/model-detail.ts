@@ -28,7 +28,8 @@ export const MODEL_DETAIL_TOOL_CONFIG = {
 export const MODEL_DETAIL_PROMPT_CONFIG = {
 	name: 'Model Details',
 	title: 'Model Details',
-	description: 'Get detailed information about a model from the Hugging Face Hub',
+	description:
+		'Get detailed information about a model from the Hugging Face Hub. Includes README from the repository - review before use.',
 	schema: z.object({
 		model_id: z
 			.string()
