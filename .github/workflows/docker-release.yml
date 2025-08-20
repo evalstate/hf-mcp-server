@@ -4,6 +4,10 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
 
 jobs:
   docker:
@@ -11,6 +15,7 @@ jobs:
     permissions:
       packages: write
       contents: read
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     steps:
       - uses: actions/checkout@v4
 
