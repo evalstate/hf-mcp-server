@@ -21,6 +21,19 @@ export const DATASET_DETAIL_TOOL_CONFIG = {
 	},
 } as const;
 
+export const DATASET_DETAIL_PROMPT_CONFIG = {
+	name: 'Dataset Details',
+	title: 'Dataset Details',
+	description: 'Get detailed information about a dataset from the Hugging Face Hub',
+	schema: z.object({
+		dataset_id: z
+			.string()
+			.min(3, 'Dataset ID is required')
+			.max(100)
+			.describe("The Dataset ID in repo/dataset format (e.g. 'squad', 'imdb', 'Anthropic/hh-rlhf')"),
+	}),
+};
+
 export type DatasetDetailParams = z.infer<typeof DATASET_DETAIL_TOOL_CONFIG.schema>;
 
 // Clean interface design with explicit data availability
