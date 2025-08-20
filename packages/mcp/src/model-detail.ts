@@ -2,6 +2,7 @@ import { modelInfo } from '@huggingface/hub';
 import { z } from 'zod';
 import { formatDate, formatNumber } from './utilities.js';
 import type { ToolResult } from './types/tool-result.js';
+import { fetchReadmeContent } from './readme-utils.js';
 
 const SPACES_TO_INCLUDE = 12;
 // Model Detail Tool Configuration
@@ -11,7 +12,10 @@ export const MODEL_DETAIL_TOOL_CONFIG = {
 		'Get detailed information about a model from the Hugging Face Hub. Include relevant links ' +
 		'in result summaries.',
 	schema: z.object({
-		model_id: z.string().min(1, 'Model ID is required').describe('Model ID (e.g., microsoft/DialoGPT-large)'),
+		model_id: z
+			.string()
+			.min(1, 'Model ID is required')
+			.describe('The Model ID in author/model format (e.g., microsoft/DialoGPT-large)'),
 	}),
 	annotations: {
 		title: 'Model Details',
@@ -24,13 +28,14 @@ export const MODEL_DETAIL_TOOL_CONFIG = {
 export const MODEL_DETAIL_PROMPT_CONFIG = {
 	name: 'Model Details',
 	title: 'Model Details',
-	description: 'Get detailed information about a model from the Hugging Face Hub',
+	description:
+		'Get detailed information about a model from the Hugging Face Hub. Includes README from the repository - review before use.',
 	schema: z.object({
 		model_id: z
 			.string()
 			.min(5, 'Model ID is required')
 			.max(50)
-			.describe("The Model ID in repo/model format (e.g. 'openai/gpt-oss-120b')"),
+			.describe("The Model ID in author/model format (e.g. 'openai/gpt-oss-120b')"),
 	}),
 };
 
@@ -116,9 +121,10 @@ export class ModelDetailTool {
 	 * Get detailed information about a specific model
 	 *
 	 * @param modelId The model ID to get details for (e.g., microsoft/DialoGPT-large)
+	 * @param includeReadme Whether to include README content (default: false)
 	 * @returns ToolResult with formatted model details
 	 */
-	async getDetails(modelId: string): Promise<ToolResult> {
+	async getDetails(modelId: string, includeReadme: boolean = false): Promise<ToolResult> {
 		try {
 			// Define additional fields we want to retrieve (only those available in the hub library)
 			const additionalFields = [
@@ -252,6 +258,16 @@ export class ModelDetailTool {
 					// eslint-disable-next-line @typescript-eslint/no-unused-vars
 				} catch (ignoreUnformattedSpaces) {
 					console.error(`Error processing spaces for model ${modelId}:`);
+				}
+			}
+
+			// Fetch and append README content if requested
+			if (includeReadme) {
+				const readmeContent = await fetchReadmeContent(modelDetails.name, 'models', false);
+				if (readmeContent) {
+					const result = formatModelDetails(modelDetails);
+					result.formatted += '\n\n## README\n<modelcard-readme>\n\n' + readmeContent.trim() + '\n</modelcard-readme>';
+					return result;
 				}
 			}
 

@@ -22,6 +22,7 @@ import {
 	type DatasetSearchParams,
 	DatasetDetailTool,
 	DATASET_DETAIL_TOOL_CONFIG,
+	DATASET_DETAIL_PROMPT_CONFIG,
 	type DatasetDetailParams,
 	DuplicateSpaceTool,
 	formatDuplicateResult,
@@ -249,7 +250,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			MODEL_DETAIL_PROMPT_CONFIG.schema.shape,
 			async (params: ModelDetailParams) => {
 				const modelDetail = new ModelDetailTool(hfToken, undefined);
-				const result = await modelDetail.getDetails(params.model_id);
+				const result = await modelDetail.getDetails(params.model_id, true);
 				logPromptQuery(
 					MODEL_DETAIL_PROMPT_CONFIG.name,
 					params.model_id,
@@ -264,6 +265,40 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 
 				return {
 					description: `Model details for ${params.model_id}`,
+					messages: [
+						{
+							role: 'user' as const,
+							content: {
+								type: 'text' as const,
+								text: result.formatted,
+							},
+						},
+					],
+				};
+			}
+		);
+
+		server.prompt(
+			DATASET_DETAIL_PROMPT_CONFIG.name,
+			DATASET_DETAIL_PROMPT_CONFIG.description,
+			DATASET_DETAIL_PROMPT_CONFIG.schema.shape,
+			async (params: DatasetDetailParams) => {
+				const datasetDetail = new DatasetDetailTool(hfToken, undefined);
+				const result = await datasetDetail.getDetails(params.dataset_id, true);
+				logPromptQuery(
+					DATASET_DETAIL_PROMPT_CONFIG.name,
+					params.dataset_id,
+					{ dataset_id: params.dataset_id },
+					{
+						...getLoggingOptions(),
+						totalResults: result.totalResults,
+						resultsShared: result.resultsShared,
+						responseCharCount: result.formatted.length,
+					}
+				);
+
+				return {
+					description: `Dataset details for ${params.dataset_id}`,
 					messages: [
 						{
 							role: 'user' as const,

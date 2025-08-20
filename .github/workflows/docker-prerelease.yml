@@ -11,12 +11,6 @@ on:
         description: 'Push to registry (true/false)'
         required: false
         default: 'true'
-  push:
-    branches:
-      - 'feat/*'
-      - 'feature/*'
-      - 'dev'
-      - 'develop'
 
 jobs:
   docker-prerelease:

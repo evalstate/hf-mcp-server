@@ -16,6 +16,7 @@ export * from './user-summary.js';
 export * from './paper-summary.js';
 export * from './docs-search/docs-semantic-search.js';
 export * from './docs-search/doc-fetch.js';
+export * from './readme-utils.js';
 
 // Export shared types
 export * from './types/tool-result.js';
