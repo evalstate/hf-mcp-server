@@ -11,7 +11,7 @@ export const DATASET_DETAIL_TOOL_CONFIG = {
 		dataset_id: z
 			.string()
 			.min(5, 'Dataset ID is required')
-			.describe('Dataset ID (e.g. institutional/institutional-books-1.0, Anthropic/hh-rlhf etc.)'),
+			.describe('The Dataset ID (e.g. Anthropic/hh-rlhf, squad)'),
 	}),
 	annotations: {
 		title: 'Dataset Details',
@@ -30,7 +30,7 @@ export const DATASET_DETAIL_PROMPT_CONFIG = {
 			.string()
 			.min(3, 'Dataset ID is required')
 			.max(100)
-			.describe("The Dataset ID in repo/dataset format (e.g. 'squad', 'imdb', 'Anthropic/hh-rlhf')"),
+			.describe("The Dataset ID (e.g. 'Anthropic/hh-rlhf', 'squad')"),
 	}),
 };
 

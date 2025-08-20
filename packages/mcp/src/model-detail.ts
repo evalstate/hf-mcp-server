@@ -11,7 +11,7 @@ export const MODEL_DETAIL_TOOL_CONFIG = {
 		'Get detailed information about a model from the Hugging Face Hub. Include relevant links ' +
 		'in result summaries.',
 	schema: z.object({
-		model_id: z.string().min(1, 'Model ID is required').describe('Model ID (e.g., microsoft/DialoGPT-large)'),
+		model_id: z.string().min(1, 'Model ID is required').describe('The Model ID in author/model format (e.g., microsoft/DialoGPT-large)'),
 	}),
 	annotations: {
 		title: 'Model Details',
@@ -30,7 +30,7 @@ export const MODEL_DETAIL_PROMPT_CONFIG = {
 			.string()
 			.min(5, 'Model ID is required')
 			.max(50)
-			.describe("The Model ID in repo/model format (e.g. 'openai/gpt-oss-120b')"),
+			.describe("The Model ID in author/model format (e.g. 'openai/gpt-oss-120b')"),
 	}),
 };
 
