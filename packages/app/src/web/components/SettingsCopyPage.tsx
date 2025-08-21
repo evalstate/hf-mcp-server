@@ -9,9 +9,7 @@ import {
 	Rocket,
 	ChevronDown,
 	ChevronRight,
-	Terminal,
 	Bot,
-	MessageSquare,
 	ExternalLink,
 	Download,
 	AlertTriangle,
@@ -29,7 +27,7 @@ interface ActionButton {
 
 interface InstructionStep {
 	type: 'text' | 'code' | 'button' | 'warning' | 'info';
-	content: string;
+	content: string | React.ReactNode;
 	button?: ActionButton;
 	copyable?: boolean;
 }
@@ -38,7 +36,7 @@ interface ClientConfig {
 	id: string;
 	name: string;
 	icon: React.ReactNode;
-	description: string;
+	description?: string;
 	configExample?: string;
 	instructions: (string | InstructionStep)[];
 	actionButtons?: ActionButton[];
@@ -52,8 +50,28 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 	{
 		id: 'claude',
 		name: 'Claude Desktop and Claude.ai',
-		icon: <MessageSquare className="h-5 w-5" />,
-		description: "Use with Anthropic's Claude Desktop app",
+		icon: (
+			<svg
+				className="h-5 w-5"
+				width="1em"
+				height="1em"
+				viewBox="0 0 12 12"
+				fill="none"
+				xmlns="http://www.w3.org/2000/svg"
+			>
+				<g clip-path="url(#a)">
+					<path
+						d="m2.96 7.65 1.97-1.1.03-.1-.03-.05h-.1l-.33-.02-1.12-.03-.97-.04-.95-.06-.24-.05L1 5.91l.02-.15.2-.13.29.02.63.05.95.06.69.04 1.02.11h.16L5 5.84l-.06-.04-.04-.04-.99-.66-1.06-.7-.56-.41-.3-.2-.15-.2-.07-.42.28-.3.36.03.1.02.37.29.8.61 1.03.77.16.12.06-.04v-.03l-.06-.11-.57-1.02-.6-1.04-.27-.43-.07-.26c-.03-.1-.04-.2-.04-.3l.3-.42L3.8 1l.42.06.17.15.26.59.42.93.64 1.26.2.37.1.35.03.1h.07v-.06l.05-.7.1-.88.1-1.12.03-.32.16-.38.3-.2.25.11.2.29-.03.18-.12.77-.23 1.21-.15.81h.09l.1-.1.41-.54.69-.86.3-.34.36-.38.22-.18h.43l.32.47-.14.49-.44.56-.37.47-.53.71-.33.57.03.04h.08l1.2-.26.63-.11.77-.13.35.16.04.16-.14.34-.82.2-.96.2-1.44.33-.01.01.02.03.64.06.28.02h.68l1.25.09.33.22.2.26-.03.2-.5.26-.7-.16-1.59-.38-.54-.13h-.08v.04l.46.45.83.75 1.05.97.05.24-.13.2-.15-.03-.92-.69-.35-.31-.8-.68h-.06v.08l.19.27.98 1.46.05.45-.07.15-.26.09-.28-.05-.57-.8-.59-.9-.47-.82-.06.04-.28 3.02-.13.15-.3.12-.26-.2-.14-.3.14-.62.16-.8.13-.64.12-.79.07-.26v-.02H5.9l-.6.83-.9 1.22-.73.77-.17.07-.3-.15.03-.28.17-.24 1-1.27.6-.78.38-.46v-.06h-.03L2.72 8.73l-.47.06-.2-.19.02-.3.1-.1.8-.55Z"
+						fill="#D97757"
+					></path>
+				</g>
+				<defs>
+					<clipPath id="a">
+						<path fill="#fff" transform="translate(1 1)" d="M0 0h10v10H0z"></path>
+					</clipPath>
+				</defs>
+			</svg>
+		),
 		configExample: `{
   "mcpServers": {
     "huggingface": {
@@ -83,30 +101,382 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 		],
 	},
 	{
-		id: 'claude-code',
-		name: 'Claude Code',
-		icon: <Terminal className="h-5 w-5" />,
-		description: 'Use with Claude Code in your terminal',
+		id: 'vscode',
+		name: 'Visual Studio Code',
+		icon: (
+			<svg
+				className="h-5 w-5"
+				width="1em"
+				height="1em"
+				viewBox="0 0 12 12"
+				fill="none"
+				xmlns="http://www.w3.org/2000/svg"
+			>
+				<g clipPath="url(#a)">
+					<mask id="b" style={{ maskType: 'alpha' }} maskUnits="userSpaceOnUse" x="1" y="1" width="10" height="10">
+						<path
+							fillRule="evenodd"
+							clipRule="evenodd"
+							d="M8.1 10.93c.15.06.33.06.49-.02l2.06-.99c.21-.1.35-.32.35-.56V2.64a.63.63 0 0
+  0-.35-.56l-2.06-1a.62.62 0 0 0-.71.13L3.94 4.8 2.22 3.5a.42.42 0 0 0-.53.02l-.55.5a.42.42 0 0 0 0 .62L2.62 6 1.14 7.36a.42.42 0 0 0 0
+  .61l.55.5c.15.14.37.15.53.03l1.72-1.3 3.94 3.59c.06.06.13.1.21.14Zm.4-7.2L5.51 6l3 2.27V3.73Z"
+							fill="#fff"
+						></path>
+					</mask>
+					<g mask="url(#b)">
+						<path
+							d="m10.64 2.08-2.06-1a.62.62 0 0 0-.7.13L1.12 7.36a.42.42 0 0 0 0 .61l.55.5c.15.14.37.15.53.03l8.12-6.17c.28-.2.67 0
+  .67.33v-.02a.63.63 0 0 0-.36-.56Z"
+							fill="#0065A9"
+						></path>
+						<g filter="url(#c)">
+							<path
+								d="m10.64 9.92-2.06.99a.62.62 0 0 1-.7-.12L1.12 4.64a.42.42 0 0 1 0-.62l.55-.5a.42.42 0 0 1 .53-.02l8.12
+  6.16c.28.2.67.01.67-.33v.03c0 .24-.14.45-.36.56Z"
+								fill="#007ACC"
+							></path>
+						</g>
+						<g filter="url(#d)">
+							<path
+								d="M8.59 10.91a.62.62 0 0 1-.71-.12c.23.23.62.07.62-.26V1.46c0-.32-.4-.48-.63-.25a.62.62 0 0 1
+  .72-.12l2.06.99c.21.1.35.32.35.56v6.72c0 .24-.14.46-.35.56l-2.06.99Z"
+								fill="#1F9CF0"
+							></path>
+						</g>
+						<path
+							fillRule="evenodd"
+							clipRule="evenodd"
+							d="M8.08 10.93c.16.06.34.06.5-.02l2.06-.99c.21-.1.35-.32.35-.56V2.64a.63.63 0 0
+  0-.35-.56l-2.06-1a.62.62 0 0 0-.71.13L3.93 4.8 2.2 3.5a.42.42 0 0 0-.53.02l-.55.5a.42.42 0 0 0 0 .62L2.62 6l-1.5 1.36a.42.42 0 0 0 0
+  .61l.56.5c.15.14.37.15.53.03l1.72-1.3 3.94 3.59c.06.06.13.1.21.14Zm.41-7.2L5.5 6l3 2.27V3.73Z"
+							fill="url(#e)"
+							style={{ mixBlendMode: 'overlay' }}
+							opacity=".25"
+						></path>
+					</g>
+				</g>
+				<defs>
+					<filter
+						id="c"
+						x="-8.27"
+						y="-5.85"
+						width="28.53"
+						height="26.07"
+						filterUnits="userSpaceOnUse"
+						colorInterpolationFilters="sRGB"
+					>
+						<feFlood floodOpacity="0" result="BackgroundImageFix"></feFlood>
+						<feColorMatrix
+							in="SourceAlpha"
+							values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+							result="hardAlpha"
+						></feColorMatrix>
+						<feOffset></feOffset>
+						<feGaussianBlur stdDeviation="4.63"></feGaussianBlur>
+						<feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"></feColorMatrix>
+						<feBlend mode="overlay" in2="BackgroundImageFix" result="effect1_dropShadow_640_684"></feBlend>
+						<feBlend in="SourceGraphic" in2="effect1_dropShadow_640_684" result="shape"></feBlend>
+					</filter>
+					<filter
+						id="d"
+						x="-1.38"
+						y="-8.24"
+						width="21.64"
+						height="28.46"
+						filterUnits="userSpaceOnUse"
+						colorInterpolationFilters="sRGB"
+					>
+						<feFlood floodOpacity="0" result="BackgroundImageFix"></feFlood>
+						<feColorMatrix
+							in="SourceAlpha"
+							values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+							result="hardAlpha"
+						></feColorMatrix>
+						<feOffset></feOffset>
+						<feGaussianBlur stdDeviation="4.63"></feGaussianBlur>
+						<feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"></feColorMatrix>
+						<feBlend mode="overlay" in2="BackgroundImageFix" result="effect1_dropShadow_640_684"></feBlend>
+						<feBlend in="SourceGraphic" in2="effect1_dropShadow_640_684" result="shape"></feBlend>
+					</filter>
+					<linearGradient id="e" x1="5.99" y1="1.02" x2="5.99" y2="10.97" gradientUnits="userSpaceOnUse">
+						<stop stopColor="#fff"></stop>
+						<stop offset="1" stopColor="#fff" stopOpacity="0"></stop>
+					</linearGradient>
+					<clipPath id="a">
+						<path fill="#fff" transform="translate(1 1)" d="M0 0h10v10H0z"></path>
+					</clipPath>
+				</defs>
+			</svg>
+		),
+		//	description: 'Use with VS Code MCP extension',
 		instructions: [
 			{
 				type: 'info',
-				content: 'Claude Code automatically detects MCP servers. Simply add this server to your configuration.',
+				content: 'Install the MCP extension for VS Code to enable AI assistants with Hugging Face access.',
+			},
+			'Install the MCP extension from VS Code marketplace',
+			'Open VS Code settings (Cmd/Ctrl + ,)',
+			'Search for "MCP" in settings',
+			'Add the Hugging Face MCP server configuration',
+			'Reload VS Code to activate the server',
+		],
+		actionButtons: [
+			{
+				type: 'external',
+				label: 'Install MCP Extension',
+				url: 'vscode:extension/modelcontextprotocol.mcp',
+				variant: 'default',
 			},
 			{
-				type: 'button',
-				content: 'Add to Claude Code configuration',
-				button: {
-					type: 'copy',
-					label: 'Copy Config',
-					content: 'npx @llmindset/hf-mcp-server',
-					variant: 'default',
+				type: 'external',
+				label: 'VS Code MCP Docs',
+				url: 'https://marketplace.visualstudio.com/items?itemName=modelcontextprotocol.mcp',
+				variant: 'outline',
+			},
+		],
+		configExample: `// Add to VS Code settings.json
+{
+  "mcp.servers": {
+    "huggingface": {
+      "command": "npx",
+      "args": ["@llmindset/hf-mcp-server"],
+      "env": {
+        "HF_TOKEN": "your_hf_token_here"
+      }
+    }
+  }
+}`,
+	},
+	{
+		id: 'cursor',
+		name: 'Cursor',
+		icon: (
+			<svg
+				className="h-5 w-5"
+				width="1em"
+				height="1em"
+				viewBox="0 0 12 12"
+				fill="none"
+				xmlns="http://www.w3.org/2000/svg"
+			>
+				<defs>
+					<linearGradient
+						id="paint0_linear_640_687"
+						x1="5.99601"
+						y1="5.99219"
+						x2="5.99601"
+						y2="11.3473"
+						gradientUnits="userSpaceOnUse"
+					>
+						<stop className="stop-color-black dark:stop-color-white" offset="0.16" stopOpacity="0.39"></stop>
+						<stop className="stop-color-black dark:stop-color-white" offset="0.658" stopOpacity="0.8"></stop>
+					</linearGradient>
+					<linearGradient
+						id="paint1_linear_640_687"
+						x1="10.6523"
+						y1="3.3347"
+						x2="6"
+						y2="6.06268"
+						gradientUnits="userSpaceOnUse"
+					>
+						<stop className="stop-color-black dark:stop-color-white" offset="0.182" stopOpacity="0.31"></stop>
+						<stop className="stop-color-black dark:stop-color-white" offset="0.715" stopOpacity="0"></stop>
+					</linearGradient>
+					<linearGradient
+						id="paint2_linear_640_687"
+						x1="5.99601"
+						y1="0.640625"
+						x2="1.34375"
+						y2="8.6733"
+						gradientUnits="userSpaceOnUse"
+					>
+						<stop className="stop-color-black dark:stop-color-white" stopOpacity="0.6"></stop>
+						<stop className="stop-color-black dark:stop-color-white" offset="0.667" stopOpacity="0.22"></stop>
+					</linearGradient>
+				</defs>
+				<path
+					d="M5.99601 11.3473L10.6483 8.66975L5.99601 5.99219L1.34375 8.66975L5.99601 11.3473Z"
+					fill="url(#paint0_linear_640_687)"
+				></path>
+				<path d="M10.6523 8.6733V3.31818L6 0.640625V5.99574L10.6523 8.6733Z" fill="url(#paint1_linear_640_687)"></path>
+				<path
+					d="M5.99601 0.640625L1.34375 3.31818V8.6733L5.99601 5.99574V0.640625Z"
+					fill="url(#paint2_linear_640_687)"
+				></path>
+				<path
+					className="fill-gray-500 dark:fill-gray-400"
+					d="M10.6523 3.32031L6 11.353V5.99787L10.6523 3.32031Z"
+				></path>
+				<path
+					className="fill-black dark:fill-white"
+					d="M10.6483 3.32031L5.99601 5.99787L1.34375 3.32031H10.6483Z"
+				></path>
+			</svg>
+		),
+		//		description: 'Use with Cursor AI editor',
+		instructions: [
+			{
+				type: 'text',
+				content: (
+					<a
+						href="https://cursor.com/en/install-mcp?name=huggingface&config=eyJ1cmwiOiJodHRwczovL2h1Z2dpbmdmYWNlLmNvL21jcD9sb2dpbiJ9"
+						target="_blank"
+						rel="noopener noreferrer"
+						className="inline-block border border-border rounded-lg p-2 hover:bg-accent/10 transition-colors duration-200"
+					>
+						<img
+							src="https://cursor.com/deeplink/mcp-install-light.svg"
+							alt="Add huggingface MCP server to Cursor"
+							height="32"
+							className="hover:scale-105 transition-transform duration-200"
+						/>
+					</a>
+				),
+			},
+			{
+				type: 'text',
+				content: 'After clicking, complete authentication in your browser.',
+			},
+		],
+		manualConfig: {
+			title: 'Manual Configuration with an HF_TOKEN',
+			steps: [
+				{
+					type: 'text',
+					content: 'Edit your Cursor configuration file to add the Hugging Face MCP server:',
 				},
+				{
+					type: 'info',
+					content:
+						'Location: ~/.cursor/mcp_settings.json (Mac/Linux) or %APPDATA%\\Cursor\\mcp_settings.json (Windows)',
+				},
+				{
+					type: 'code',
+					content: `{
+  "mcpServers": {
+    "huggingface": {
+      "command": "npx",
+      "args": ["@llmindset/hf-mcp-server"],
+      "env": {
+        "HF_TOKEN": "your_hf_token_here"
+      }
+    }
+  }
+}`,
+					copyable: true,
+				},
+				{
+					type: 'text',
+					content: 'Replace "your_hf_token_here" with your actual Hugging Face API token.',
+				},
+			],
+		},
+	},
+	{
+		id: 'lm-studio',
+		name: 'LM Studio',
+		icon: (
+			<svg
+				className="h-5 w-5"
+				xmlns="http://www.w3.org/2000/svg"
+				xmlnsXlink="http://www.w3.org/1999/xlink"
+				aria-hidden="true"
+				focusable="false"
+				role="img"
+				width="1em"
+				height="1em"
+				preserveAspectRatio="xMidYMid meet"
+				viewBox="0 0 24 24"
+			>
+				<path
+					fill="url(#icon-lm-studio-a)"
+					d="M19.337 0H4.663A4.663 4.663 0 0 0 0 4.663v14.674A4.663 4.663 0 0 0 4.663 24h14.674A4.663 4.663 0 0 0 24 19.337V4.663A4.663 4.663 0 0 0 19.337 0"
+				></path>
+				<g fill="#fff" opacity=".266">
+					<path d="M15.803 4.35H7.418a1 1 0 0 0 0 2h8.385a1 1 0 0 0 0-2M19.928 7.063h-8.385a1 1 0 0 0 0 2h8.385a1 1 0 0 0 0-2M17.51 9.776H9.125a1 1 0 0 0 0 2h8.385a1 1 0 0 0 0-2M14.523 12.632H6.138a1 1 0 0 0 0 2h8.385a1 1 0 0 0 0-2M17.51 15.345H9.125a1 1 0 1 0 0 2h8.385a1 1 0 1 0 0-2M20.497 18.059h-4.829a1 1 0 1 0 0 1.999h4.829a1 1 0 1 0 0-2"></path>
+				</g>
+				<g fill="#fff" opacity=".845">
+					<path d="M12.65 4.345H4.265a1 1 0 0 0 0 2h8.385a1 1 0 0 0 0-2M16.775 7.058H8.39a1 1 0 0 0 0 2h8.385a1 1 0 0 0 0-2M14.357 9.771H5.972a1 1 0 0 0 0 2h8.385a1 1 0 0 0 0-2M11.37 12.627H2.985a1 1 0 1 0 0 2h8.385a1 1 0 0 0 0-2M14.357 15.34H5.972a1 1 0 1 0 0 2h8.385a1 1 0 0 0 0-2M17.344 18.054h-4.828a1 1 0 1 0 0 1.999h4.828a1 1 0 1 0 0-2"></path>
+				</g>
+				<defs>
+					<linearGradient
+						id="icon-lm-studio-a"
+						x1="78.731"
+						x2="2229.6"
+						y1="0"
+						y2="2218.01"
+						gradientUnits="userSpaceOnUse"
+					>
+						<stop stopColor="#6E7EF3"></stop>
+						<stop offset="1" stopColor="#4F13BE"></stop>
+					</linearGradient>
+				</defs>
+			</svg>
+		),
+		//		description: 'Use with LM Studio for local models',
+		instructions: [
+			{
+				type: 'text',
+				content: (
+					<a
+						href="https://lmstudio.ai/install-mcp?name=huggingface&config=eyJ1cmwiOiJodHRwczovL2h1Z2dpbmdmYWNlLmNvL21jcCIsImhlYWRlcnMiOnsiQXV0aG9yaXphdGlvbiI6IkJlYXJlciA8WU9VUl9IRl9UT0tFTj4ifX0%3D"
+						target="_blank"
+						rel="noopener noreferrer"
+						className="inline-block border border-border rounded-lg p-2 hover:bg-accent/10 transition-colors duration-200"
+					>
+						<img
+							src="https://files.lmstudio.ai/deeplink/mcp-install-dark.svg"
+							alt="Add MCP Server huggingface to LM Studio"
+							className="hover:scale-105 transition-transform duration-200"
+						/>
+					</a>
+				),
+			},
+			{
+				type: 'text',
+				content: 'After clicking, change your <HF_TOKEN> with your READ Hugging Face API token.',
+			},
+		],
+	},
+	{
+		id: 'claude-code',
+		name: 'Claude Code',
+		icon: (
+			<svg
+				className="h-5 w-5"
+				width="1em"
+				height="1em"
+				viewBox="0 0 12 12"
+				fill="none"
+				xmlns="http://www.w3.org/2000/svg"
+			>
+				<g clip-path="url(#a)">
+					<path
+						d="m2.96 7.65 1.97-1.1.03-.1-.03-.05h-.1l-.33-.02-1.12-.03-.97-.04-.95-.06-.24-.05L1 5.91l.02-.15.2-.13.29.02.63.05.95.06.69.04 1.02.11h.16L5 5.84l-.06-.04-.04-.04-.99-.66-1.06-.7-.56-.41-.3-.2-.15-.2-.07-.42.28-.3.36.03.1.02.37.29.8.61 1.03.77.16.12.06-.04v-.03l-.06-.11-.57-1.02-.6-1.04-.27-.43-.07-.26c-.03-.1-.04-.2-.04-.3l.3-.42L3.8 1l.42.06.17.15.26.59.42.93.64 1.26.2.37.1.35.03.1h.07v-.06l.05-.7.1-.88.1-1.12.03-.32.16-.38.3-.2.25.11.2.29-.03.18-.12.77-.23 1.21-.15.81h.09l.1-.1.41-.54.69-.86.3-.34.36-.38.22-.18h.43l.32.47-.14.49-.44.56-.37.47-.53.71-.33.57.03.04h.08l1.2-.26.63-.11.77-.13.35.16.04.16-.14.34-.82.2-.96.2-1.44.33-.01.01.02.03.64.06.28.02h.68l1.25.09.33.22.2.26-.03.2-.5.26-.7-.16-1.59-.38-.54-.13h-.08v.04l.46.45.83.75 1.05.97.05.24-.13.2-.15-.03-.92-.69-.35-.31-.8-.68h-.06v.08l.19.27.98 1.46.05.45-.07.15-.26.09-.28-.05-.57-.8-.59-.9-.47-.82-.06.04-.28 3.02-.13.15-.3.12-.26-.2-.14-.3.14-.62.16-.8.13-.64.12-.79.07-.26v-.02H5.9l-.6.83-.9 1.22-.73.77-.17.07-.3-.15.03-.28.17-.24 1-1.27.6-.78.38-.46v-.06h-.03L2.72 8.73l-.47.06-.2-.19.02-.3.1-.1.8-.55Z"
+						fill="#D97757"
+					></path>
+				</g>
+				<defs>
+					<clipPath id="a">
+						<path fill="#fff" transform="translate(1 1)" d="M0 0h10v10H0z"></path>
+					</clipPath>
+				</defs>
+			</svg>
+		),
+		//		description: 'Use with Claude Code in your terminal',
+		instructions: [
+			{
+				type: 'text',
+				content: 'Enter the command below to install in Claude Code:',
 			},
 			{
 				type: 'code',
-				content: `# Add to your Claude Code config
-echo 'npx @llmindset/hf-mcp-server' >> ~/.config/claude-code/servers`,
+				content: 'claude mcp add hf-mcp-server -t http https://huggingface.co/mcp?login',
 				copyable: true,
+			},
+			{
+				type: 'text',
+				content: 'Then start Claude and follow the instructions to complete authentication.',
 			},
 		],
 		actionButtons: [
@@ -118,29 +488,31 @@ echo 'npx @llmindset/hf-mcp-server' >> ~/.config/claude-code/servers`,
 			},
 		],
 		manualConfig: {
-			title: 'Manual Configuration',
+			title: 'Using a READ HF_TOKEN instead of OAuth:',
 			steps: [
 				{
 					type: 'text',
-					content: 'Set your Hugging Face token as an environment variable:',
+					content: 'To use an HF_TOKEN rather than OAuth, use the following command:',
 				},
 				{
 					type: 'code',
-					content: 'export HF_TOKEN=your_hf_token_here',
+					content: `claude mcp add hf-mcp-server \\
+  -t http https://huggingface.co/mcp \\
+  -H "Authorization: Bearer <HF_TOKEN>"`,
 					copyable: true,
 				},
 				{
-					type: 'warning',
-					content: 'Make sure to restart Claude Code after adding the server configuration.',
+					type: 'text',
+					content: 'Replace <HF_TOKEN> with your Hugging Face API token.',
 				},
 			],
 		},
 	},
 	{
-		id: 'custom-client',
-		name: 'Custom MCP Client',
+		id: 'other-clients',
+		name: 'Other Clients',
 		icon: <Bot className="h-5 w-5" />,
-		description: 'Integrate with your own MCP client',
+		description: 'Integrate with any MCP-compatible client',
 		configExample: `import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -294,7 +666,7 @@ export function SettingsCopyPage() {
 				);
 			case 'code':
 				return (
-					<div key={index} className="relative">
+					<div key={index} className="relative group">
 						<pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto">
 							<code className="text-foreground font-mono">{step.content}</code>
 						</pre>
@@ -303,7 +675,7 @@ export function SettingsCopyPage() {
 								variant="ghost"
 								size="sm"
 								onClick={() => copyConfigExample(step.content)}
-								className="absolute top-2 right-2 h-6 px-2 text-xs"
+								className="absolute top-2 right-2 h-6 px-2 text-xs transition-all duration-200 hover:bg-secondary hover:scale-110"
 							>
 								<Copy className="h-3 w-3" />
 							</Button>
@@ -357,6 +729,9 @@ export function SettingsCopyPage() {
 					<Card>
 						<CardHeader className="pb-0">
 							<CardTitle className="text-xl font-semibold">Get Started</CardTitle>
+							<CardDescription>
+								Create a <a href="https://huggingface.co/join">Hugging Face account</a>{' '}
+							</CardDescription>
 						</CardHeader>
 						<CardContent className="space-y-6 pt-0">
 							{/* Side-by-side layout on larger screens */}
@@ -396,13 +771,13 @@ export function SettingsCopyPage() {
 										<span className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-lg font-bold">
 											2
 										</span>
-										<span className="text-lg font-medium text-foreground">Choose Apps and Tools</span>
+										<span className="text-lg font-medium text-foreground">Choose your Apps and Tools</span>
 									</div>
 
 									<div className="relative">
 										<input
 											type="text"
-											value="Go to Hugging Face MCP Settings"
+											value="Go to MCP Settings"
 											readOnly
 											className="w-full pl-12 pr-12 py-3 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 h-12 cursor-pointer hover:bg-muted/80 transition-colors"
 											onClick={handleGoToSettings}
@@ -475,7 +850,9 @@ export function SettingsCopyPage() {
 
 												{/* Instructions */}
 												<div>
-													<h5 className="font-semibold text-sm text-foreground mb-2">Instructions:</h5>
+													<h5 className="font-semibold text-sm text-foreground mb-2">
+														{(client.id === 'lm-studio' || client.id === 'cursor') ? 'One Click Install:' : 'Instructions:'}
+													</h5>
 													<div className="space-y-2">
 														{client.instructions.map((instruction, index) => {
 															if (typeof instruction === 'string') {
@@ -496,22 +873,22 @@ export function SettingsCopyPage() {
 
 												{/* Configuration Example */}
 												{client.configExample && (
-													<div>
+													<div className="relative group">
 														<div className="flex items-center justify-between mb-2">
 															<h5 className="font-semibold text-sm text-foreground">Configuration:</h5>
-															<Button
-																variant="ghost"
-																size="sm"
-																onClick={() => copyConfigExample(client.configExample!)}
-																className="h-8 px-2 text-xs"
-															>
-																<Copy className="h-3 w-3 mr-1" />
-																Copy
-															</Button>
 														</div>
 														<pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto">
 															<code className="text-foreground font-mono">{client.configExample}</code>
 														</pre>
+														<Button
+															variant="ghost"
+															size="sm"
+															onClick={() => copyConfigExample(client.configExample!)}
+															className="absolute top-2 right-2 h-6 px-2 text-xs transition-all duration-200 hover:bg-secondary hover:scale-110"
+														>
+															<Copy className="h-3 w-3 mr-1" />
+															Copy
+														</Button>
 													</div>
 												)}
 
