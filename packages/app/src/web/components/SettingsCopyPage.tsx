@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
+import hfLogoWithTitle from '../hf-logo-with-title.svg';
 import {
 	Copy,
 	Settings,
@@ -818,7 +819,7 @@ export function SettingsCopyPage() {
 			{/* Hero Section with HF Logo */}
 			<div className="bg-gradient-to-b from-primary/5 to-background px-8 pt-12 pb-8">
 				<div className="max-w-4xl mx-auto text-center">
-					<img src="/hf-logo-with-title.svg" alt="Hugging Face" className="h-16 mx-auto mb-8" />
+					<img src={hfLogoWithTitle} alt="Hugging Face" className="h-16 mx-auto mb-8" />
 					<h1 className="text-3xl font-bold text-foreground mb-4">Welcome to the Hugging Face MCP Server</h1>
 					<p className="text-lg text-muted-foreground max-w-2xl mx-auto">
 						Connect assistants to the Hub and thousands of AI Apps
