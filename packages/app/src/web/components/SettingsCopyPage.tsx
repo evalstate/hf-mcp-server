@@ -339,26 +339,20 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 			},
 		],
 		manualConfig: {
-			title: 'Manual Configuration with an HF_TOKEN',
+			title: 'Manual Configuration / Using a READ HF_TOKEN instead of OAuth:',
 			steps: [
 				{
 					type: 'text',
-					content: 'Edit your Cursor configuration file to add the Hugging Face MCP server:',
-				},
-				{
-					type: 'info',
-					content:
-						'Location: ~/.cursor/mcp_settings.json (Mac/Linux) or %APPDATA%\\Cursor\\mcp_settings.json (Windows)',
+					content: 'Edit your Cursor `mcp.json` configuration file to add the Hugging Face MCP server:',
 				},
 				{
 					type: 'code',
 					content: `{
   "mcpServers": {
     "huggingface": {
-      "command": "npx",
-      "args": ["@llmindset/hf-mcp-server"],
-      "env": {
-        "HF_TOKEN": "your_hf_token_here"
+      "url": "https://huggingface.co/mcp",
+      "headers": {
+        "Authorization": "Bearer <HF_TOKEN>"
       }
     }
   }
@@ -367,7 +361,7 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 				},
 				{
 					type: 'text',
-					content: 'Replace "your_hf_token_here" with your actual Hugging Face API token.',
+					content: 'Replace <HF_TOKEN> with your Hugging Face API Token.',
 				},
 			],
 		},
@@ -434,7 +428,7 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 			},
 			{
 				type: 'text',
-				content: 'After clicking, change your <HF_TOKEN> with your READ Hugging Face API token.',
+				content: 'After clicking, replace <HF_TOKEN> with your READ Hugging Face API token.',
 			},
 		],
 	},
@@ -492,7 +486,7 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 			steps: [
 				{
 					type: 'text',
-					content: 'To use an HF_TOKEN rather than OAuth, use the following command:',
+					content: 'To use a READ HF_TOKEN instead of OAuth, use the following command:',
 				},
 				{
 					type: 'code',
@@ -851,7 +845,9 @@ export function SettingsCopyPage() {
 												{/* Instructions */}
 												<div>
 													<h5 className="font-semibold text-sm text-foreground mb-2">
-														{(client.id === 'lm-studio' || client.id === 'cursor') ? 'One Click Install:' : 'Instructions:'}
+														{client.id === 'lm-studio' || client.id === 'cursor'
+															? 'One Click Install:'
+															: 'Instructions:'}
 													</h5>
 													<div className="space-y-2">
 														{client.instructions.map((instruction, index) => {
