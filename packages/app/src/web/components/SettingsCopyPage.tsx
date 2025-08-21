@@ -1,15 +1,14 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
+import hfLogoWithTitle from '../hf-logo-with-title.svg';
 import {
 	Copy,
 	Settings,
 	CheckCircle,
 	Search,
-	Database,
 	Rocket,
 	ChevronDown,
 	ChevronRight,
-	Bot,
 	ExternalLink,
 	Download,
 	AlertTriangle,
@@ -72,31 +71,51 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 				</defs>
 			</svg>
 		),
-		configExample: `{
-  "mcpServers": {
-    "huggingface": {
-      "command": "npx",
-      "args": [
-        "@llmindset/hf-mcp-server"
-      ],
-      "env": {
-        "HF_TOKEN": "your_hf_token_here"
-      }
-    }
-  }
-}`,
 		instructions: [
-			'Copy the MCP server URL from the button above',
-			'Open Claude Desktop settings',
-			'Add the Hugging Face MCP server configuration',
-			'Restart Claude Desktop to load the server',
-		],
-		actionButtons: [
 			{
-				type: 'external',
-				label: 'Download Claude Desktop',
-				url: 'https://claude.ai/download',
-				variant: 'outline',
+				type: 'text',
+				content: '1. Click below to open Claude Connectors',
+			},
+			{
+				type: 'text',
+				content: (
+					<a
+						href="https://claude.ai/settings/connectors"
+						target="_blank"
+						rel="noopener noreferrer"
+						className="inline-flex items-center space-x-2 border border-border rounded-lg p-2 hover:bg-accent/10 transition-colors duration-200"
+					>
+						<svg
+							className="h-8 w-8 hover:scale-105 transition-transform duration-200"
+							width="1em"
+							height="1em"
+							viewBox="0 0 12 12"
+							fill="none"
+							xmlns="http://www.w3.org/2000/svg"
+						>
+							<g clipPath="url(#a)">
+								<path
+									d="m2.96 7.65 1.97-1.1.03-.1-.03-.05h-.1l-.33-.02-1.12-.03-.97-.04-.95-.06-.24-.05L1 5.91l.02-.15.2-.13.29.02.63.05.95.06.69.04 1.02.11h.16L5 5.84l-.06-.04-.04-.04-.99-.66-1.06-.7-.56-.41-.3-.2-.15-.2-.07-.42.28-.3.36.03.1.02.37.29.8.61 1.03.77.16.12.06-.04v-.03l-.06-.11-.57-1.02-.6-1.04-.27-.43-.07-.26c-.03-.1-.04-.2-.04-.3l.3-.42L3.8 1l.42.06.17.15.26.59.42.93.64 1.26.2.37.1.35.03.1h.07v-.06l.05-.7.1-.88.1-1.12.03-.32.16-.38.3-.2.25.11.2.29-.03.18-.12.77-.23 1.21-.15.81h.09l.1-.1.41-.54.69-.86.3-.34.36-.38.22-.18h.43l.32.47-.14.49-.44.56-.37.47-.53.71-.33.57.03.04h.08l1.2-.26.63-.11.77-.13.35.16.04.16-.14.34-.82.2-.96.2-1.44.33-.01.01.02.03.64.06.28.02h.68l1.25.09.33.22.2.26-.03.2-.5.26-.7-.16-1.59-.38-.54-.13h-.08v.04l.46.45.83.75 1.05.97.05.24-.13.2-.15-.03-.92-.69-.35-.31-.8-.68h-.06v.08l.19.27.98 1.46.05.45-.07.15-.26.09-.28-.05-.57-.8-.59-.9-.47-.82-.06.04-.28 3.02-.13.15-.3.12-.26-.2-.14-.3.14-.62.16-.8.13-.64.12-.79.07-.26v-.02H5.9l-.6.83-.9 1.22-.73.77-.17.07-.3-.15.03-.28.17-.24 1-1.27.6-.78.38-.46v-.06h-.03L2.72 8.73l-.47.06-.2-.19.02-.3.1-.1.8-.55Z"
+									fill="#D97757"
+								></path>
+							</g>
+							<defs>
+								<clipPath id="a">
+									<path fill="#fff" transform="translate(1 1)" d="M0 0h10v10H0z"></path>
+								</clipPath>
+							</defs>
+						</svg>
+						<span className="text-sm font-medium">Go to Claude Connectors</span>
+					</a>
+				),
+			},
+			{
+				type: 'text',
+				content: '2. Click "Browse Connectors"',
+			},
+			{
+				type: 'text',
+				content: '3. Select "Hugging Face" and click "Add"',
 			},
 		],
 	},
@@ -211,41 +230,169 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 		//	description: 'Use with VS Code MCP extension',
 		instructions: [
 			{
-				type: 'info',
-				content: 'Install the MCP extension for VS Code to enable AI assistants with Hugging Face access.',
+				type: 'text',
+				content: (
+					<a
+						href="vscode:mcp/install?%7B%22name%22%3A%22huggingface%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fhuggingface.co%2Fmcp%3Flogin%22%7D"
+						className="inline-flex items-center space-x-2 border border-border rounded-lg p-2 hover:bg-accent/10 transition-colors duration-200"
+					>
+						<svg
+							className="h-8 w-8 hover:scale-105 transition-transform duration-200"
+							width="1em"
+							height="1em"
+							viewBox="0 0 12 12"
+							fill="none"
+							xmlns="http://www.w3.org/2000/svg"
+						>
+							<g clipPath="url(#a)">
+								<mask
+									id="b"
+									style={{ maskType: 'alpha' }}
+									maskUnits="userSpaceOnUse"
+									x="1"
+									y="1"
+									width="10"
+									height="10"
+								>
+									<path
+										fillRule="evenodd"
+										clipRule="evenodd"
+										d="M8.1 10.93c.15.06.33.06.49-.02l2.06-.99c.21-.1.35-.32.35-.56V2.64a.63.63 0 0
+  0-.35-.56l-2.06-1a.62.62 0 0 0-.71.13L3.94 4.8 2.22 3.5a.42.42 0 0 0-.53.02l-.55.5a.42.42 0 0 0 0 .62L2.62 6 1.14 7.36a.42.42 0 0 0 0
+  .61l.55.5c.15.14.37.15.53.03l1.72-1.3 3.94 3.59c.06.06.13.1.21.14Zm.4-7.2L5.51 6l3 2.27V3.73Z"
+										fill="#fff"
+									></path>
+								</mask>
+								<g mask="url(#b)">
+									<path
+										d="m10.64 2.08-2.06-1a.62.62 0 0 0-.7.13L1.12 7.36a.42.42 0 0 0 0 .61l.55.5c.15.14.37.15.53.03l8.12-6.17c.28-.2.67 0
+  .67.33v-.02a.63.63 0 0 0-.36-.56Z"
+										fill="#0065A9"
+									></path>
+									<g filter="url(#c)">
+										<path
+											d="m10.64 9.92-2.06.99a.62.62 0 0 1-.7-.12L1.12 4.64a.42.42 0 0 1 0-.62l.55-.5a.42.42 0 0 1 .53-.02l8.12
+  6.16c.28.2.67.01.67-.33v.03c0 .24-.14.45-.36.56Z"
+											fill="#007ACC"
+										></path>
+									</g>
+									<g filter="url(#d)">
+										<path
+											d="M8.59 10.91a.62.62 0 0 1-.71-.12c.23.23.62.07.62-.26V1.46c0-.32-.4-.48-.63-.25a.62.62 0 0 1
+  .72-.12l2.06.99c.21.1.35.32.35.56v6.72c0 .24-.14.46-.35.56l-2.06.99Z"
+											fill="#1F9CF0"
+										></path>
+									</g>
+									<path
+										fillRule="evenodd"
+										clipRule="evenodd"
+										d="M8.08 10.93c.16.06.34.06.5-.02l2.06-.99c.21-.1.35-.32.35-.56V2.64a.63.63 0 0
+  0-.35-.56l-2.06-1a.62.62 0 0 0-.71.13L3.93 4.8 2.2 3.5a.42.42 0 0 0-.53.02l-.55.5a.42.42 0 0 0 0 .62L2.62 6l-1.5 1.36a.42.42 0 0 0 0
+  .61l.56.5c.15.14.37.15.53.03l1.72-1.3 3.94 3.59c.06.06.13.1.21.14Zm.41-7.2L5.5 6l3 2.27V3.73Z"
+										fill="url(#e)"
+										style={{ mixBlendMode: 'overlay' }}
+										opacity=".25"
+									></path>
+								</g>
+							</g>
+							<defs>
+								<filter
+									id="c"
+									x="-8.27"
+									y="-5.85"
+									width="28.53"
+									height="26.07"
+									filterUnits="userSpaceOnUse"
+									colorInterpolationFilters="sRGB"
+								>
+									<feFlood floodOpacity="0" result="BackgroundImageFix"></feFlood>
+									<feColorMatrix
+										in="SourceAlpha"
+										values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+										result="hardAlpha"
+									></feColorMatrix>
+									<feOffset></feOffset>
+									<feGaussianBlur stdDeviation="4.63"></feGaussianBlur>
+									<feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"></feColorMatrix>
+									<feBlend mode="overlay" in2="BackgroundImageFix" result="effect1_dropShadow_640_684"></feBlend>
+									<feBlend in="SourceGraphic" in2="effect1_dropShadow_640_684" result="shape"></feBlend>
+								</filter>
+								<filter
+									id="d"
+									x="-1.38"
+									y="-8.24"
+									width="21.64"
+									height="28.46"
+									filterUnits="userSpaceOnUse"
+									colorInterpolationFilters="sRGB"
+								>
+									<feFlood floodOpacity="0" result="BackgroundImageFix"></feFlood>
+									<feColorMatrix
+										in="SourceAlpha"
+										values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+										result="hardAlpha"
+									></feColorMatrix>
+									<feOffset></feOffset>
+									<feGaussianBlur stdDeviation="4.63"></feGaussianBlur>
+									<feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"></feColorMatrix>
+									<feBlend mode="overlay" in2="BackgroundImageFix" result="effect1_dropShadow_640_684"></feBlend>
+									<feBlend in="SourceGraphic" in2="effect1_dropShadow_640_684" result="shape"></feBlend>
+								</filter>
+								<linearGradient id="e" x1="5.99" y1="1.02" x2="5.99" y2="10.97" gradientUnits="userSpaceOnUse">
+									<stop stopColor="#fff"></stop>
+									<stop offset="1" stopColor="#fff" stopOpacity="0"></stop>
+								</linearGradient>
+								<clipPath id="a">
+									<path fill="#fff" transform="translate(1 1)" d="M0 0h10v10H0z"></path>
+								</clipPath>
+							</defs>
+						</svg>
+						<span className="text-sm font-medium">Add to VS Code</span>
+					</a>
+				),
 			},
-			'Install the MCP extension from VS Code marketplace',
-			'Open VS Code settings (Cmd/Ctrl + ,)',
-			'Search for "MCP" in settings',
-			'Add the Hugging Face MCP server configuration',
-			'Reload VS Code to activate the server',
-		],
-		actionButtons: [
 			{
-				type: 'external',
-				label: 'Install MCP Extension',
-				url: 'vscode:extension/modelcontextprotocol.mcp',
-				variant: 'default',
-			},
-			{
-				type: 'external',
-				label: 'VS Code MCP Docs',
-				url: 'https://marketplace.visualstudio.com/items?itemName=modelcontextprotocol.mcp',
-				variant: 'outline',
+				type: 'text',
+				content: 'Click to install the MCP Server within VS Code.',
 			},
 		],
-		configExample: `// Add to VS Code settings.json
-{
-  "mcp.servers": {
+		manualConfig: {
+			title: 'Manual Configuration / Using a READ HF_TOKEN instead of OAuth:',
+			steps: [
+				{
+					type: 'text',
+					content: (
+						<span>
+							Add to your VS Code <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">settings.json</code>{' '}
+							file:
+						</span>
+					),
+				},
+				{
+					type: 'code',
+					content: `{
+  "servers": {
     "huggingface": {
-      "command": "npx",
-      "args": ["@llmindset/hf-mcp-server"],
-      "env": {
-        "HF_TOKEN": "your_hf_token_here"
+      "url": "https://huggingface.co/mcp",
+      "headers": {
+        "Authorization": "Bearer <HF_TOKEN>"
       }
     }
   }
 }`,
+					copyable: true,
+				},
+				{
+					type: 'text',
+					content: (
+						<span>
+							Replace <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">&lt;HF_TOKEN&gt;</code> with your
+							Hugging Face API token.
+						</span>
+					),
+				},
+			],
+		},
 	},
 	{
 		id: 'cursor',
@@ -335,7 +482,7 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 			},
 			{
 				type: 'text',
-				content: 'After clicking, complete authentication in your browser.',
+				content: 'Click to install the MCP Server within Cursor.',
 			},
 		],
 		manualConfig: {
@@ -343,7 +490,12 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 			steps: [
 				{
 					type: 'text',
-					content: 'Edit your Cursor `mcp.json` configuration file to add the Hugging Face MCP server:',
+					content: (
+						<span>
+							Edit your Cursor <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">mcp.json</code>{' '}
+							configuration file to add the Hugging Face MCP server:
+						</span>
+					),
 				},
 				{
 					type: 'code',
@@ -361,7 +513,12 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 				},
 				{
 					type: 'text',
-					content: 'Replace <HF_TOKEN> with your Hugging Face API Token.',
+					content: (
+						<span>
+							Replace <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">&lt;HF_TOKEN&gt;</code> with your
+							Hugging Face API Token.
+						</span>
+					),
 				},
 			],
 		},
@@ -428,7 +585,13 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 			},
 			{
 				type: 'text',
-				content: 'After clicking, replace <HF_TOKEN> with your READ Hugging Face API token.',
+				content: (
+					<span>
+						After clicking, replace{' '}
+						<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">&lt;HF_TOKEN&gt;</code> with your READ
+						Hugging Face API token.
+					</span>
+				),
 			},
 		],
 	},
@@ -497,70 +660,15 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 				},
 				{
 					type: 'text',
-					content: 'Replace <HF_TOKEN> with your Hugging Face API token.',
+					content: (
+						<span>
+							Replace <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">&lt;HF_TOKEN&gt;</code> with your
+							Hugging Face API token.
+						</span>
+					),
 				},
 			],
 		},
-	},
-	{
-		id: 'other-clients',
-		name: 'Other Clients',
-		icon: <Bot className="h-5 w-5" />,
-		description: 'Integrate with any MCP-compatible client',
-		configExample: `import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-
-const transport = new StdioClientTransport({
-  command: 'npx',
-  args: ['@llmindset/hf-mcp-server'],
-  env: {
-    HF_TOKEN: process.env.HF_TOKEN
-  }
-});
-
-const client = new Client({
-  name: "my-client",
-  version: "1.0.0"
-}, {
-  capabilities: {}
-});
-
-await client.connect(transport);`,
-		instructions: [
-			'Install the MCP SDK in your project',
-			{
-				type: 'code',
-				content: 'npm install @modelcontextprotocol/sdk',
-				copyable: true,
-			},
-			{
-				type: 'text',
-				content: 'Create a transport to connect to the HF MCP server',
-			},
-			{
-				type: 'text',
-				content: 'Initialize your MCP client with proper capabilities',
-			},
-			{
-				type: 'info',
-				content:
-					'Use the client to call available tools and resources. See the MCP documentation for available methods.',
-			},
-		],
-		actionButtons: [
-			{
-				type: 'external',
-				label: 'MCP Documentation',
-				url: 'https://modelcontextprotocol.io/docs',
-				variant: 'outline',
-			},
-			{
-				type: 'external',
-				label: 'SDK Reference',
-				url: 'https://github.com/modelcontextprotocol/typescript-sdk',
-				variant: 'secondary',
-			},
-		],
 	},
 ];
 
@@ -709,7 +817,7 @@ export function SettingsCopyPage() {
 			{/* Hero Section with HF Logo */}
 			<div className="bg-gradient-to-b from-primary/5 to-background px-8 pt-12 pb-8">
 				<div className="max-w-4xl mx-auto text-center">
-					<img src="/hf-logo-with-title.svg" alt="Hugging Face" className="h-16 mx-auto mb-8" />
+					<img src={hfLogoWithTitle} alt="Hugging Face" className="h-16 mx-auto mb-8" />
 					<h1 className="text-3xl font-bold text-foreground mb-4">Welcome to the Hugging Face MCP Server</h1>
 					<p className="text-lg text-muted-foreground max-w-2xl mx-auto">
 						Connect assistants to the Hub and thousands of AI Apps
@@ -723,9 +831,6 @@ export function SettingsCopyPage() {
 					<Card>
 						<CardHeader className="pb-0">
 							<CardTitle className="text-xl font-semibold">Get Started</CardTitle>
-							<CardDescription>
-								Create a <a href="https://huggingface.co/join">Hugging Face account</a>{' '}
-							</CardDescription>
 						</CardHeader>
 						<CardContent className="space-y-6 pt-0">
 							{/* Side-by-side layout on larger screens */}
@@ -845,7 +950,7 @@ export function SettingsCopyPage() {
 												{/* Instructions */}
 												<div>
 													<h5 className="font-semibold text-sm text-foreground mb-2">
-														{client.id === 'lm-studio' || client.id === 'cursor'
+														{client.id === 'lm-studio' || client.id === 'cursor' || client.id === 'vscode'
 															? 'One Click Install:'
 															: 'Instructions:'}
 													</h5>
@@ -913,8 +1018,12 @@ export function SettingsCopyPage() {
 						<CardContent className="space-y-4">
 							<p className="text-base text-muted-foreground leading-relaxed">
 								The Model Context Protocol (MCP) is an open standard that enables AI assistants to securely connect to
-								external data sources and tools. This HF MCP Server provides seamless access to Hugging Face's vast
-								ecosystem.
+								external data sources and tools.
+							</p>
+							<p className="text-base text-muted-foreground leading-relaxed">
+								The Hugging Face MCP Server provides seamless access to Hugging Face's vast ecosystem of Models,
+								Datasets, Research Papers and state-of-the-art AI tools. This server is Open Source, click the link
+								below for details of alternative deployment options, to raise issues or suggest a contribution.
 							</p>
 
 							{/* Features Grid */}
@@ -922,22 +1031,44 @@ export function SettingsCopyPage() {
 								<div className="flex items-start space-x-3">
 									<Search className="h-5 w-5 text-primary mt-0.5" />
 									<div>
-										<h4 className="font-semibold text-sm text-foreground">Search Models</h4>
+										<h4 className="font-semibold text-sm text-foreground">Search Models and Datasets</h4>
 										<p className="text-sm text-muted-foreground">Browse and discover ML models</p>
-									</div>
-								</div>
-								<div className="flex items-start space-x-3">
-									<Database className="h-5 w-5 text-primary mt-0.5" />
-									<div>
-										<h4 className="font-semibold text-sm text-foreground">Access Datasets</h4>
-										<p className="text-sm text-muted-foreground">Explore training datasets</p>
 									</div>
 								</div>
 								<div className="flex items-start space-x-3">
 									<Rocket className="h-5 w-5 text-primary mt-0.5" />
 									<div>
 										<h4 className="font-semibold text-sm text-foreground">Run Spaces</h4>
-										<p className="text-sm text-muted-foreground">Interact with ML applications</p>
+										<p className="text-sm text-muted-foreground">Interact with AI applications</p>
+									</div>
+								</div>
+								<div className="flex items-start space-x-3">
+									<svg
+										className="h-5 w-5 mt-0.5"
+										viewBox="0 0 98 96"
+										xmlns="http://www.w3.org/2000/svg"
+										fill="currentColor"
+									>
+										<path
+											fillRule="evenodd"
+											clipRule="evenodd"
+											d="M48.854 0C21.839 0 0 22 0 49.217c0 21.756 13.993 40.172 33.405 46.69 2.427.49 3.316-1.059 3.316-2.362 0-1.141-.08-5.052-.08-9.127-13.59 2.934-16.42-5.867-16.42-5.867-2.184-5.704-5.42-7.17-5.42-7.17-4.448-3.015.324-3.015.324-3.015 4.934.326 7.523 5.052 7.523 5.052 4.367 7.496 11.404 5.378 14.235 4.074.404-3.178 1.699-5.378 3.074-6.6-10.839-1.141-22.243-5.378-22.243-24.283 0-5.378 1.94-9.778 5.014-13.2-.485-1.222-2.184-6.275.486-13.038 0 0 4.125-1.304 13.426 5.052a46.97 46.97 0 0 1 12.214-1.63c4.125 0 8.33.571 12.213 1.63 9.302-6.356 13.427-5.052 13.427-5.052 2.67 6.763.97 11.816.485 13.038 3.155 3.422 5.015 7.822 5.015 13.2 0 18.905-11.404 23.06-22.324 24.283 1.78 1.548 3.316 4.481 3.316 9.126 0 6.6-.08 11.897-.08 13.526 0 1.304.89 2.853 3.316 2.364 19.412-6.52 33.405-24.935 33.405-46.691C97.707 22 75.788 0 48.854 0z"
+											fill="#6b7280"
+										/>
+									</svg>
+									<div>
+										<h4 className="font-semibold text-sm text-foreground">
+											<a
+												href="https://github.com/evalstate/hf-mcp-server"
+												target="_blank"
+												rel="noopener noreferrer"
+												className="hover:text-primary hover:underline transition-colors duration-200 inline-flex items-center space-x-1"
+											>
+												<span>Open Source</span>
+												<ExternalLink className="h-3 w-3" />
+											</a>
+										</h4>
+										<p className="text-sm text-muted-foreground">Contribute on GitHub</p>
 									</div>
 								</div>
 							</div>
