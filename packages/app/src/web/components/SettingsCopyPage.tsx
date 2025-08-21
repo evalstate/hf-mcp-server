@@ -12,22 +12,46 @@ import {
 	Terminal,
 	Bot,
 	MessageSquare,
+	ExternalLink,
+	Download,
+	AlertTriangle,
+	Info,
 } from 'lucide-react';
 import { useState } from 'react';
+
+interface ActionButton {
+	type: 'link' | 'download' | 'copy' | 'external';
+	label: string;
+	url?: string;
+	content?: string;
+	variant?: 'default' | 'secondary' | 'outline';
+}
+
+interface InstructionStep {
+	type: 'text' | 'code' | 'button' | 'warning' | 'info';
+	content: string;
+	button?: ActionButton;
+	copyable?: boolean;
+}
 
 interface ClientConfig {
 	id: string;
 	name: string;
 	icon: React.ReactNode;
 	description: string;
-	configExample: string;
-	instructions: string[];
+	configExample?: string;
+	instructions: (string | InstructionStep)[];
+	actionButtons?: ActionButton[];
+	manualConfig?: {
+		title: string;
+		steps: InstructionStep[];
+	};
 }
 
 const CLIENT_CONFIGS: ClientConfig[] = [
 	{
-		id: 'claude-desktop',
-		name: 'Claude Desktop',
+		id: 'claude',
+		name: 'Claude Desktop and Claude.ai',
 		icon: <MessageSquare className="h-5 w-5" />,
 		description: "Use with Anthropic's Claude Desktop app",
 		configExample: `{
@@ -49,26 +73,68 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 			'Add the Hugging Face MCP server configuration',
 			'Restart Claude Desktop to load the server',
 		],
+		actionButtons: [
+			{
+				type: 'external',
+				label: 'Download Claude Desktop',
+				url: 'https://claude.ai/download',
+				variant: 'outline',
+			},
+		],
 	},
 	{
-		id: 'terminal',
-		name: 'Terminal/CLI',
+		id: 'claude-code',
+		name: 'Claude Code',
 		icon: <Terminal className="h-5 w-5" />,
-		description: 'Run directly from your terminal',
-		configExample: `# Install the MCP server
-npm install -g @llmindset/hf-mcp-server
-
-# Set your Hugging Face token
-export HF_TOKEN=your_hf_token_here
-
-# Run the server
-hf-mcp-server`,
+		description: 'Use with Claude Code in your terminal',
 		instructions: [
-			'Install the MCP server package globally',
-			'Set your HF_TOKEN environment variable',
-			'Run the server using the command line',
-			'Connect your MCP-compatible client to the server',
+			{
+				type: 'info',
+				content: 'Claude Code automatically detects MCP servers. Simply add this server to your configuration.',
+			},
+			{
+				type: 'button',
+				content: 'Add to Claude Code configuration',
+				button: {
+					type: 'copy',
+					label: 'Copy Config',
+					content: 'npx @llmindset/hf-mcp-server',
+					variant: 'default',
+				},
+			},
+			{
+				type: 'code',
+				content: `# Add to your Claude Code config
+echo 'npx @llmindset/hf-mcp-server' >> ~/.config/claude-code/servers`,
+				copyable: true,
+			},
 		],
+		actionButtons: [
+			{
+				type: 'external',
+				label: 'Claude Code Docs',
+				url: 'https://docs.anthropic.com/en/docs/claude-code',
+				variant: 'outline',
+			},
+		],
+		manualConfig: {
+			title: 'Manual Configuration',
+			steps: [
+				{
+					type: 'text',
+					content: 'Set your Hugging Face token as an environment variable:',
+				},
+				{
+					type: 'code',
+					content: 'export HF_TOKEN=your_hf_token_here',
+					copyable: true,
+				},
+				{
+					type: 'warning',
+					content: 'Make sure to restart Claude Code after adding the server configuration.',
+				},
+			],
+		},
 	},
 	{
 		id: 'custom-client',
@@ -96,9 +162,38 @@ const client = new Client({
 await client.connect(transport);`,
 		instructions: [
 			'Install the MCP SDK in your project',
-			'Create a transport to connect to the HF MCP server',
-			'Initialize your MCP client with proper capabilities',
-			'Use the client to call available tools and resources',
+			{
+				type: 'code',
+				content: 'npm install @modelcontextprotocol/sdk',
+				copyable: true,
+			},
+			{
+				type: 'text',
+				content: 'Create a transport to connect to the HF MCP server',
+			},
+			{
+				type: 'text',
+				content: 'Initialize your MCP client with proper capabilities',
+			},
+			{
+				type: 'info',
+				content:
+					'Use the client to call available tools and resources. See the MCP documentation for available methods.',
+			},
+		],
+		actionButtons: [
+			{
+				type: 'external',
+				label: 'MCP Documentation',
+				url: 'https://modelcontextprotocol.io/docs',
+				variant: 'outline',
+			},
+			{
+				type: 'external',
+				label: 'SDK Reference',
+				url: 'https://github.com/modelcontextprotocol/typescript-sdk',
+				variant: 'secondary',
+			},
 		],
 	},
 ];
@@ -147,6 +242,102 @@ export function SettingsCopyPage() {
 		}
 	};
 
+	// Handler for action buttons
+	const handleActionButton = async (button: ActionButton) => {
+		switch (button.type) {
+			case 'copy':
+				if (button.content) {
+					try {
+						await navigator.clipboard.writeText(button.content);
+					} catch (err) {
+						console.error('Failed to copy content:', err);
+					}
+				}
+				break;
+			case 'link':
+			case 'external':
+				if (button.url) {
+					window.open(button.url, '_blank');
+				}
+				break;
+			case 'download':
+				if (button.url) {
+					const link = document.createElement('a');
+					link.href = button.url;
+					link.download = button.label;
+					document.body.appendChild(link);
+					link.click();
+					document.body.removeChild(link);
+				}
+				break;
+		}
+	};
+
+	// Component for rendering instruction steps
+	const renderInstructionStep = (step: InstructionStep, index: number) => {
+		const baseClasses = 'text-sm';
+
+		switch (step.type) {
+			case 'warning':
+				return (
+					<div key={index} className="flex items-start space-x-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+						<AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+						<div className="text-sm text-yellow-800">{step.content}</div>
+					</div>
+				);
+			case 'info':
+				return (
+					<div key={index} className="flex items-start space-x-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+						<Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+						<div className="text-sm text-blue-800">{step.content}</div>
+					</div>
+				);
+			case 'code':
+				return (
+					<div key={index} className="relative">
+						<pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto">
+							<code className="text-foreground font-mono">{step.content}</code>
+						</pre>
+						{step.copyable && (
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={() => copyConfigExample(step.content)}
+								className="absolute top-2 right-2 h-6 px-2 text-xs"
+							>
+								<Copy className="h-3 w-3" />
+							</Button>
+						)}
+					</div>
+				);
+			case 'button':
+				return (
+					<div key={index} className="flex items-center space-x-3">
+						<span className={baseClasses + ' text-muted-foreground flex-grow'}>{step.content}</span>
+						{step.button && (
+							<Button
+								variant={step.button.variant || 'default'}
+								size="sm"
+								onClick={() => handleActionButton(step.button!)}
+								className="ml-auto"
+							>
+								{step.button.type === 'external' && <ExternalLink className="h-4 w-4 mr-2" />}
+								{step.button.type === 'download' && <Download className="h-4 w-4 mr-2" />}
+								{step.button.type === 'copy' && <Copy className="h-4 w-4 mr-2" />}
+								{step.button.label}
+							</Button>
+						)}
+					</div>
+				);
+			default:
+				return (
+					<div key={index} className={baseClasses + ' text-muted-foreground'}>
+						{step.content}
+					</div>
+				);
+		}
+	};
+
 	return (
 		<div className="min-h-screen bg-background">
 			{/* Hero Section with HF Logo */}
@@ -164,60 +355,80 @@ export function SettingsCopyPage() {
 				<div className="max-w-3xl mx-auto">
 					{/* Action Buttons Card */}
 					<Card>
-						<CardHeader className="pb-4">
+						<CardHeader className="pb-0">
 							<CardTitle className="text-xl font-semibold">Get Started</CardTitle>
-							<CardDescription>Connect your AI assistant to Hugging Face in two simple steps</CardDescription>
 						</CardHeader>
-						<CardContent className="space-y-4">
-							<div className="space-y-3">
-								<div className="flex items-center space-x-2 text-sm text-muted-foreground">
-									<span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold">
-										1
-									</span>
-									<span>Copy the MCP server URL</span>
-								</div>
-								<Button
-									size="lg"
-									onClick={handleCopyMcpUrl}
-									className="w-full font-semibold transition-all duration-200"
-									variant={copied ? 'default' : 'default'}
-								>
-									{copied ? (
-										<>
-											<CheckCircle className="mr-2 h-5 w-5" />
-											Copied to Clipboard!
-										</>
-									) : (
-										<>
-											<Copy className="mr-2 h-5 w-5" />
-											Copy MCP URL
-										</>
-									)}
-								</Button>
-							</div>
+						<CardContent className="space-y-6 pt-0">
+							{/* Side-by-side layout on larger screens */}
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+								{/* Step 1 */}
+								<div className="space-y-4">
+									<div className="flex items-center space-x-3 mb-4">
+										<span className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-lg font-bold">
+											1
+										</span>
+										<span className="text-lg font-medium text-foreground">Setup your Client with this URL:</span>
+									</div>
 
-							<div className="space-y-3">
-								<div className="flex items-center space-x-2 text-sm text-muted-foreground">
-									<span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold">
-										2
-									</span>
-									<span>Configure your tools in settings</span>
+									{/* URL input with embedded copy button */}
+									<div className="relative">
+										<input
+											type="text"
+											value="https://huggingface.co/mcp?login"
+											readOnly
+											className="w-full px-4 py-3 pr-12 text-sm font-mono bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 h-12 cursor-pointer hover:bg-muted/80 transition-colors"
+											onClick={handleCopyMcpUrl}
+										/>
+										<Button
+											size="sm"
+											onClick={handleCopyMcpUrl}
+											className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 px-2 hover:bg-secondary/80 transition-colors"
+											variant={copied ? 'default' : 'secondary'}
+										>
+											{copied ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+										</Button>
+									</div>
 								</div>
-								<Button size="lg" variant="outline" onClick={handleGoToSettings} className="w-full font-semibold">
-									<Settings className="mr-2 h-5 w-5" />
-									Go to Settings
-								</Button>
+
+								{/* Step 2 */}
+								<div className="space-y-4">
+									<div className="flex items-center space-x-3 mb-4">
+										<span className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-lg font-bold">
+											2
+										</span>
+										<span className="text-lg font-medium text-foreground">Choose Apps and Tools</span>
+									</div>
+
+									<div className="relative">
+										<input
+											type="text"
+											value="Go to Hugging Face MCP Settings"
+											readOnly
+											className="w-full pl-12 pr-12 py-3 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 h-12 cursor-pointer hover:bg-muted/80 transition-colors"
+											onClick={handleGoToSettings}
+										/>
+										<Button
+											size="sm"
+											onClick={handleGoToSettings}
+											className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 px-2 hover:bg-secondary/80 transition-colors"
+											variant="secondary"
+										>
+											<ExternalLink className="h-4 w-4" />
+										</Button>
+										<Settings className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+									</div>
+								</div>
 							</div>
 						</CardContent>
 					</Card>
 
 					{/* Client Configuration Section */}
 					<Card className="mt-8">
-						<CardHeader className="pb-4">
-							<CardTitle className="text-xl font-semibold">Client Setup</CardTitle>
+						<CardHeader className="pb-0">
+							<CardTitle className="text-xl font-semibold">Detailed Client Setup</CardTitle>
 							<CardDescription>Choose your preferred AI client and follow the setup instructions</CardDescription>
 						</CardHeader>
-						<CardContent className="space-y-4">
+						<CardContent className="space-y-4 pt-0">
 							{CLIENT_CONFIGS.map((client) => {
 								const isExpanded = expandedClients.has(client.id);
 								return (
@@ -242,36 +453,77 @@ export function SettingsCopyPage() {
 										{/* Expanded Content */}
 										{isExpanded && (
 											<div className="px-4 pb-4 space-y-4 border-t border-border mt-3 pt-4">
+												{/* Action Buttons */}
+												{client.actionButtons && client.actionButtons.length > 0 && (
+													<div className="flex flex-wrap gap-2">
+														{client.actionButtons.map((button, index) => (
+															<Button
+																key={index}
+																variant={button.variant || 'default'}
+																size="sm"
+																onClick={() => handleActionButton(button)}
+																className="h-8"
+															>
+																{button.type === 'external' && <ExternalLink className="h-4 w-4 mr-2" />}
+																{button.type === 'download' && <Download className="h-4 w-4 mr-2" />}
+																{button.type === 'copy' && <Copy className="h-4 w-4 mr-2" />}
+																{button.label}
+															</Button>
+														))}
+													</div>
+												)}
+
 												{/* Instructions */}
 												<div>
 													<h5 className="font-semibold text-sm text-foreground mb-2">Instructions:</h5>
-													<ol className="list-decimal list-inside space-y-1">
-														{client.instructions.map((instruction, index) => (
-															<li key={index} className="text-sm text-muted-foreground">
-																{instruction}
-															</li>
-														))}
-													</ol>
+													<div className="space-y-2">
+														{client.instructions.map((instruction, index) => {
+															if (typeof instruction === 'string') {
+																return (
+																	<div key={index} className="flex items-start space-x-2">
+																		<span className="text-sm text-muted-foreground flex-shrink-0 mt-0.5">
+																			{index + 1}.
+																		</span>
+																		<span className="text-sm text-muted-foreground">{instruction}</span>
+																	</div>
+																);
+															} else {
+																return renderInstructionStep(instruction, index);
+															}
+														})}
+													</div>
 												</div>
 
 												{/* Configuration Example */}
-												<div>
-													<div className="flex items-center justify-between mb-2">
-														<h5 className="font-semibold text-sm text-foreground">Configuration:</h5>
-														<Button
-															variant="ghost"
-															size="sm"
-															onClick={() => copyConfigExample(client.configExample)}
-															className="h-8 px-2 text-xs"
-														>
-															<Copy className="h-3 w-3 mr-1" />
-															Copy
-														</Button>
+												{client.configExample && (
+													<div>
+														<div className="flex items-center justify-between mb-2">
+															<h5 className="font-semibold text-sm text-foreground">Configuration:</h5>
+															<Button
+																variant="ghost"
+																size="sm"
+																onClick={() => copyConfigExample(client.configExample!)}
+																className="h-8 px-2 text-xs"
+															>
+																<Copy className="h-3 w-3 mr-1" />
+																Copy
+															</Button>
+														</div>
+														<pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto">
+															<code className="text-foreground font-mono">{client.configExample}</code>
+														</pre>
 													</div>
-													<pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto">
-														<code className="text-foreground font-mono">{client.configExample}</code>
-													</pre>
-												</div>
+												)}
+
+												{/* Manual Configuration */}
+												{client.manualConfig && (
+													<div>
+														<h5 className="font-semibold text-sm text-foreground mb-2">{client.manualConfig.title}</h5>
+														<div className="space-y-2">
+															{client.manualConfig.steps.map((step, index) => renderInstructionStep(step, index))}
+														</div>
+													</div>
+												)}
 											</div>
 										)}
 									</div>
@@ -282,7 +534,7 @@ export function SettingsCopyPage() {
 
 					{/* What is MCP Card - moved to bottom */}
 					<Card className="mt-8">
-						<CardHeader className="pb-4">
+						<CardHeader className="pb-3">
 							<CardTitle className="text-xl font-semibold">What is MCP?</CardTitle>
 						</CardHeader>
 						<CardContent className="space-y-4">
