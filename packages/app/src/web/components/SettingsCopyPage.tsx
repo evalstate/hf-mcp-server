@@ -343,7 +343,11 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 			steps: [
 				{
 					type: 'text',
-					content: 'Edit your Cursor `mcp.json` configuration file to add the Hugging Face MCP server:',
+					content: (
+						<span>
+							Edit your Cursor <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">mcp.json</code> configuration file to add the Hugging Face MCP server:
+						</span>
+					),
 				},
 				{
 					type: 'code',
@@ -361,7 +365,12 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 				},
 				{
 					type: 'text',
-					content: 'Replace <HF_TOKEN> with your Hugging Face API Token.',
+					content: (
+						<span>
+							Replace <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">&lt;HF_TOKEN&gt;</code> with your
+							Hugging Face API Token.
+						</span>
+					),
 				},
 			],
 		},
@@ -428,7 +437,13 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 			},
 			{
 				type: 'text',
-				content: 'After clicking, replace <HF_TOKEN> with your READ Hugging Face API token.',
+				content: (
+					<span>
+						After clicking, replace{' '}
+						<code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">&lt;HF_TOKEN&gt;</code> with your READ
+						Hugging Face API token.
+					</span>
+				),
 			},
 		],
 	},
@@ -497,7 +512,12 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 				},
 				{
 					type: 'text',
-					content: 'Replace <HF_TOKEN> with your Hugging Face API token.',
+					content: (
+						<span>
+							Replace <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">&lt;HF_TOKEN&gt;</code> with your
+							Hugging Face API token.
+						</span>
+					),
 				},
 			],
 		},
@@ -723,9 +743,6 @@ export function SettingsCopyPage() {
 					<Card>
 						<CardHeader className="pb-0">
 							<CardTitle className="text-xl font-semibold">Get Started</CardTitle>
-							<CardDescription>
-								Create a <a href="https://huggingface.co/join">Hugging Face account</a>{' '}
-							</CardDescription>
 						</CardHeader>
 						<CardContent className="space-y-6 pt-0">
 							{/* Side-by-side layout on larger screens */}
