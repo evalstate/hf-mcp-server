@@ -85,7 +85,7 @@ function parseGradioEndpoints(gradioParam: string): SpaceTool[] {
 	for (const entry of entries) {
 		// Validate exactly one slash
 		const slashCount = (entry.match(/\//g) || []).length;
-		if (slashCount !== 1) {
+		if (slashCount !== 1 && 'none' != entry) {
 			logger.warn(`Skipping invalid gradio entry "${entry}": must contain exactly one slash`);
 			continue;
 		}
@@ -149,6 +149,12 @@ export const createProxyServerFactory = (
 		// Skip Gradio endpoints if bouquet is not "all"
 		if (bouquet && bouquet !== 'all') {
 			logger.debug({ bouquet }, 'Bouquet specified and not "all", skipping Gradio endpoints');
+			return result;
+		}
+
+		// Skip Gradio endpoints if explicitly disabled
+		if (gradio === 'none') {
+			logger.debug('Gradio endpoints explicitly disabled via gradio="none"');
 			return result;
 		}
 
