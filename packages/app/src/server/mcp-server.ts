@@ -24,6 +24,9 @@ import {
 	DATASET_DETAIL_TOOL_CONFIG,
 	DATASET_DETAIL_PROMPT_CONFIG,
 	type DatasetDetailParams,
+	HUB_INSPECT_TOOL_CONFIG,
+	HubInspectTool,
+	type HubInspectParams,
 	DuplicateSpaceTool,
 	formatDuplicateResult,
 	type DuplicateSpaceParams,
@@ -150,6 +153,14 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			enable(): void;
 			disable(): void;
 		}
+
+		// Get tool selection first (needed for runtime configuration like INCLUDE_README)
+		const toolSelectionContext: ToolSelectionContext = {
+			headers,
+			userSettings,
+			hfToken,
+		};
+		const toolSelection = await toolSelectionStrategy.selectTools(toolSelectionContext);
 
 		// Always register all tools and store instances for dynamic control
 		const toolInstances: { [name: string]: Tool } = {};
@@ -466,6 +477,34 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			}
 		);
 
+
+		toolInstances[HUB_INSPECT_TOOL_CONFIG.name] = server.tool(
+			HUB_INSPECT_TOOL_CONFIG.name,
+			HUB_INSPECT_TOOL_CONFIG.description,
+			HUB_INSPECT_TOOL_CONFIG.schema.shape,
+			HUB_INSPECT_TOOL_CONFIG.annotations,
+			async (params: HubInspectParams) => {
+				// Check if INCLUDE_README flag is present in enabled tools
+				const includeReadme = toolSelection.enabledToolIds.includes('INCLUDE_README');
+				const tool = new HubInspectTool(hfToken, undefined);
+				const result = await tool.inspect(params, includeReadme);
+				logPromptQuery(
+					HUB_INSPECT_TOOL_CONFIG.name,
+					params.repo_ids[0] || '',
+					{ count: params.repo_ids.length, repo_type: params.repo_type },
+					{
+						...getLoggingOptions(),
+						totalResults: result.totalResults,
+						resultsShared: result.resultsShared,
+						responseCharCount: result.formatted.length,
+					}
+				);
+				return {
+					content: [{ type: 'text', text: result.formatted }],
+				};
+			}
+		);
+
 		toolInstances[DOCS_SEMANTIC_SEARCH_CONFIG.name] = server.tool(
 			DOCS_SEMANTIC_SEARCH_CONFIG.name,
 			DOCS_SEMANTIC_SEARCH_CONFIG.description,
@@ -557,13 +596,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		// NB: That may not always be the case, consider carefully whether you want a tool
 		// included in the skipGradio check.
 		const applyToolStates = async () => {
-			const context: ToolSelectionContext = {
-				headers,
-				userSettings,
-				hfToken,
-			};
-
-			const toolSelection = await toolSelectionStrategy.selectTools(context);
+			// Use the already computed toolSelection
 
 			logger.info(
 				{
