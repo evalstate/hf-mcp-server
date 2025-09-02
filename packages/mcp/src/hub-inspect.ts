@@ -8,18 +8,16 @@ import { formatDate } from './utilities.js';
 export const HUB_INSPECT_TOOL_CONFIG = {
 	name: 'hub_inspect',
 	description:
-		'Inspect one or more Hugging Face repos (model, dataset, or space). ' +
-		'Auto-detects type unless constrained. Returns a concise summary per repo.',
+		'Get details for one or more Hugging Face repos (model, dataset, or space). ' +
+		'Auto-detects type unless specified.',
 	schema: z.object({
 		repo_ids: z
 			.array(z.string().min(1))
-			.min(1, 'Provide at least one repo id')
+			.min(1, 'Provide at least one id')
 			.max(10, 'Provide at most 10 repo ids')
 			.describe('Repo IDs for (models|dataset/space) - usually in author/name format (e.g. openai/gpt-oss-120b)'),
-		repo_type: z
-			.enum(['model', 'dataset', 'space'])
-			.optional()
-			.describe('Limit lookup to a specific type; otherwise auto-detects'),
+		repo_type: z.enum(['model', 'dataset', 'space']).optional().describe('Specify lookup type; otherwise auto-detects'),
+		include_readme: z.boolean().default(true).describe('Include README from the repo'),
 	}),
 	annotations: {
 		title: 'Hub Inspect',

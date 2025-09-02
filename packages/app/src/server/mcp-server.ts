@@ -477,21 +477,43 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			}
 		);
 
+		// Compute README availability; adjust description and schema accordingly
+		const hubInspectReadmeAllowed = toolSelection.enabledToolIds.includes('INCLUDE_README');
+		const hubInspectDescription = hubInspectReadmeAllowed
+			? `${HUB_INSPECT_TOOL_CONFIG.description} README file is included from the external repository.`
+			: HUB_INSPECT_TOOL_CONFIG.description;
+		const hubInspectBaseShape = HUB_INSPECT_TOOL_CONFIG.schema.shape as z.ZodRawShape;
+		const hubInspectSchemaShape: z.ZodRawShape = hubInspectReadmeAllowed
+			? hubInspectBaseShape
+			: (() => {
+					const { include_readme: _omit, ...rest } = hubInspectBaseShape as unknown as Record<string, unknown>;
+					return rest as unknown as z.ZodRawShape;
+				})();
 
 		toolInstances[HUB_INSPECT_TOOL_CONFIG.name] = server.tool(
 			HUB_INSPECT_TOOL_CONFIG.name,
-			HUB_INSPECT_TOOL_CONFIG.description,
-			HUB_INSPECT_TOOL_CONFIG.schema.shape,
+			hubInspectDescription,
+			hubInspectSchemaShape,
 			HUB_INSPECT_TOOL_CONFIG.annotations,
-			async (params: HubInspectParams) => {
-				// Check if INCLUDE_README flag is present in enabled tools
-				const includeReadme = toolSelection.enabledToolIds.includes('INCLUDE_README');
+			async (params: Record<string, unknown>) => {
+				// Allow README only if enabled by configuration; default to on when allowed
+				const allowReadme = hubInspectReadmeAllowed;
+				const wantReadme = (params as { include_readme?: boolean }).include_readme !== false; // default ON if param present
+				const includeReadme = allowReadme && wantReadme;
+
 				const tool = new HubInspectTool(hfToken, undefined);
-				const result = await tool.inspect(params, includeReadme);
+				const result = await tool.inspect(params as unknown as HubInspectParams, includeReadme);
+				// Prepare safe logging parameters without relying on strong typing
+				const repoIdsParam = (params as { repo_ids?: unknown }).repo_ids;
+				const repoIds = Array.isArray(repoIdsParam) ? repoIdsParam : [];
+				const firstRepoId = typeof repoIds[0] === 'string' ? (repoIds[0] as string) : '';
+				const repoType = (params as { repo_type?: unknown }).repo_type as unknown;
+				const repoTypeSafe = repoType === 'model' || repoType === 'dataset' || repoType === 'space' ? repoType : undefined;
+
 				logPromptQuery(
 					HUB_INSPECT_TOOL_CONFIG.name,
-					params.repo_ids[0] || '',
-					{ count: params.repo_ids.length, repo_type: params.repo_type },
+					firstRepoId,
+					{ count: repoIds.length, repo_type: repoTypeSafe, include_readme: includeReadme },
 					{
 						...getLoggingOptions(),
 						totalResults: result.totalResults,
