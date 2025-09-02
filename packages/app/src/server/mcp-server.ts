@@ -24,6 +24,9 @@ import {
 	DATASET_DETAIL_TOOL_CONFIG,
 	DATASET_DETAIL_PROMPT_CONFIG,
 	type DatasetDetailParams,
+	HUB_INSPECT_TOOL_CONFIG,
+	HubInspectTool,
+	type HubInspectParams,
 	DuplicateSpaceTool,
 	formatDuplicateResult,
 	type DuplicateSpaceParams,
@@ -150,6 +153,14 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			enable(): void;
 			disable(): void;
 		}
+
+		// Get tool selection first (needed for runtime configuration like INCLUDE_README)
+		const toolSelectionContext: ToolSelectionContext = {
+			headers,
+			userSettings,
+			hfToken,
+		};
+		const toolSelection = await toolSelectionStrategy.selectTools(toolSelectionContext);
 
 		// Always register all tools and store instances for dynamic control
 		const toolInstances: { [name: string]: Tool } = {};
@@ -466,6 +477,56 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			}
 		);
 
+		// Compute README availability; adjust description and schema accordingly
+		const hubInspectReadmeAllowed = toolSelection.enabledToolIds.includes('INCLUDE_README');
+		const hubInspectDescription = hubInspectReadmeAllowed
+			? `${HUB_INSPECT_TOOL_CONFIG.description} README file is included from the external repository.`
+			: HUB_INSPECT_TOOL_CONFIG.description;
+		const hubInspectBaseShape = HUB_INSPECT_TOOL_CONFIG.schema.shape as z.ZodRawShape;
+		const hubInspectSchemaShape: z.ZodRawShape = hubInspectReadmeAllowed
+			? hubInspectBaseShape
+			: (() => {
+					const { include_readme: _omit, ...rest } = hubInspectBaseShape as unknown as Record<string, unknown>;
+					return rest as unknown as z.ZodRawShape;
+				})();
+
+		toolInstances[HUB_INSPECT_TOOL_CONFIG.name] = server.tool(
+			HUB_INSPECT_TOOL_CONFIG.name,
+			hubInspectDescription,
+			hubInspectSchemaShape,
+			HUB_INSPECT_TOOL_CONFIG.annotations,
+			async (params: Record<string, unknown>) => {
+				// Allow README only if enabled by configuration; default to on when allowed
+				const allowReadme = hubInspectReadmeAllowed;
+				const wantReadme = (params as { include_readme?: boolean }).include_readme !== false; // default ON if param present
+				const includeReadme = allowReadme && wantReadme;
+
+				const tool = new HubInspectTool(hfToken, undefined);
+				const result = await tool.inspect(params as unknown as HubInspectParams, includeReadme);
+				// Prepare safe logging parameters without relying on strong typing
+				const repoIdsParam = (params as { repo_ids?: unknown }).repo_ids;
+				const repoIds = Array.isArray(repoIdsParam) ? repoIdsParam : [];
+				const firstRepoId = typeof repoIds[0] === 'string' ? (repoIds[0] as string) : '';
+				const repoType = (params as { repo_type?: unknown }).repo_type as unknown;
+				const repoTypeSafe = repoType === 'model' || repoType === 'dataset' || repoType === 'space' ? repoType : undefined;
+
+				logPromptQuery(
+					HUB_INSPECT_TOOL_CONFIG.name,
+					firstRepoId,
+					{ count: repoIds.length, repo_type: repoTypeSafe, include_readme: includeReadme },
+					{
+						...getLoggingOptions(),
+						totalResults: result.totalResults,
+						resultsShared: result.resultsShared,
+						responseCharCount: result.formatted.length,
+					}
+				);
+				return {
+					content: [{ type: 'text', text: result.formatted }],
+				};
+			}
+		);
+
 		toolInstances[DOCS_SEMANTIC_SEARCH_CONFIG.name] = server.tool(
 			DOCS_SEMANTIC_SEARCH_CONFIG.name,
 			DOCS_SEMANTIC_SEARCH_CONFIG.description,
@@ -557,13 +618,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		// NB: That may not always be the case, consider carefully whether you want a tool
 		// included in the skipGradio check.
 		const applyToolStates = async () => {
-			const context: ToolSelectionContext = {
-				headers,
-				userSettings,
-				hfToken,
-			};
-
-			const toolSelection = await toolSelectionStrategy.selectTools(context);
+			// Use the already computed toolSelection
 
 			logger.info(
 				{

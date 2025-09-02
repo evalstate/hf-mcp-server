@@ -1,6 +1,6 @@
 import { logger } from './logger.js';
 import type { AppSettings, SpaceTool } from '../../shared/settings.js';
-import { ALL_BUILTIN_TOOL_IDS, TOOL_ID_GROUPS } from '@llmindset/hf-mcp';
+import { ALL_BUILTIN_TOOL_IDS, HUB_INSPECT_TOOL_ID, TOOL_ID_GROUPS } from '@llmindset/hf-mcp';
 import type { McpApiClient } from './mcp-api-client.js';
 import { extractAuthBouquetAndMix } from '../utils/auth-utils.js';
 
@@ -46,6 +46,15 @@ export const BOUQUETS: Record<string, AppSettings> = {
 	},
 	all: {
 		builtInTools: [...ALL_BUILTIN_TOOL_IDS],
+		spaceTools: [],
+	},
+	// Test bouquets for README inclusion behavior
+	inspect_readme: {
+		builtInTools: [HUB_INSPECT_TOOL_ID, 'INCLUDE_README'],
+		spaceTools: [],
+	},
+	inspect: {
+		builtInTools: [HUB_INSPECT_TOOL_ID],
 		spaceTools: [],
 	},
 };

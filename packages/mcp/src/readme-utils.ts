@@ -2,6 +2,9 @@
  * Utility functions for fetching and processing README files from Hugging Face repositories
  */
 
+// Maximum number of characters to include from a README
+const DEFAULT_MAX_README_CHARS = 10_000;
+
 /**
  * Fetches README content from a Hugging Face repository
  * 
@@ -38,6 +41,12 @@ export async function fetchReadmeContent(
 		// If includeYaml is false, strip YAML frontmatter
 		if (!includeYaml) {
 			content = stripYamlFrontmatter(content);
+		}
+
+		// Truncate overly long READMEs to a sensible default size
+		if (content.length > DEFAULT_MAX_README_CHARS) {
+			const truncated = content.slice(0, DEFAULT_MAX_README_CHARS);
+			content = `${truncated}\n\n[... truncated to ~${DEFAULT_MAX_README_CHARS.toString()} characters — full README: ${baseUrl}]`;
 		}
 
 		// Return null if content is empty after processing
