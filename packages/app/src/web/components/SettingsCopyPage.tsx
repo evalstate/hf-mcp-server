@@ -1,10 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
+import { CopyButton } from './ui/copy-button';
 import hfLogoWithTitle from '../hf-logo-with-title.svg';
 import {
 	Copy,
 	Settings,
-	CheckCircle,
 	Search,
 	Rocket,
 	ChevronDown,
@@ -670,20 +670,77 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 			],
 		},
 	},
+	{
+		id: 'codex-cli',
+		name: 'Codex CLI',
+		icon: (
+			<svg
+				className="h-5 w-5"
+				xmlns="http://www.w3.org/2000/svg"
+				width="1em"
+				height="1em"
+				fill="none"
+				viewBox="0 0 32 32"
+			>
+				<path
+					stroke="#000"
+					strokeLinecap="round"
+					strokeWidth="2.484"
+					d="M22.356 19.797H17.17M9.662 12.29l1.979 3.576a.511.511 0 0 1-.005.504l-1.974 3.409M30.758 16c0 8.15-6.607 14.758-14.758 14.758-8.15 0-14.758-6.607-14.758-14.758C1.242 7.85 7.85 1.242 16 1.242c8.15 0 14.758 6.608 14.758 14.758Z"
+				></path>
+			</svg>
+		),
+		instructions: [
+			{
+				type: 'text',
+				content: (
+					<a
+						href="https://github.com/openai/codex"
+						target="_blank"
+						rel="noopener noreferrer"
+						className="inline-flex items-center space-x-2 text-primary hover:underline cursor-pointer"
+					>
+						<span>Codex CLI Instructions are at: https://github.com/openai/codex</span>
+						<ExternalLink className="h-3 w-3" />
+					</a>
+				),
+			},
+			{
+				type: 'text',
+				content: (
+					<span>
+						Edit your <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">~/.codex/config.toml</code> and
+						include the below:
+					</span>
+				),
+			},
+			{
+				type: 'code',
+				content: `[mcp_servers.huggingface]
+command = "npx"
+args = ["-y", "mcp-remote@latest", "https://huggingface.co/mcp?login"]`,
+				copyable: true,
+			},
+		],
+		actionButtons: [
+			{
+				type: 'external',
+				label: 'Codex CLI Instructions',
+				url: 'https://github.com/openai/codex',
+				variant: 'outline',
+			},
+		],
+	},
 ];
 
 export function SettingsCopyPage() {
-	const [copied, setCopied] = useState(false);
 	const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
 
 	// Handler for copying MCP URL
 	const handleCopyMcpUrl = async () => {
 		const mcpUrl = `https://huggingface.co/mcp?login`;
-
 		try {
 			await navigator.clipboard.writeText(mcpUrl);
-			setCopied(true);
-			setTimeout(() => setCopied(false), 2000);
 		} catch (err) {
 			console.error('Failed to copy URL:', err);
 		}
@@ -705,15 +762,6 @@ export function SettingsCopyPage() {
 			}
 			return newSet;
 		});
-	};
-
-	// Handler for copying config examples
-	const copyConfigExample = async (config: string) => {
-		try {
-			await navigator.clipboard.writeText(config);
-		} catch (err) {
-			console.error('Failed to copy config:', err);
-		}
 	};
 
 	// Handler for action buttons
@@ -773,14 +821,13 @@ export function SettingsCopyPage() {
 							<code className="text-foreground font-mono">{step.content}</code>
 						</pre>
 						{step.copyable && (
-							<Button
+							<CopyButton
+								content={step.content as string}
 								variant="ghost"
 								size="sm"
-								onClick={() => copyConfigExample(step.content)}
-								className="absolute top-2 right-2 h-6 px-2 text-xs transition-all duration-200 hover:bg-secondary hover:scale-110"
-							>
-								<Copy className="h-3 w-3" />
-							</Button>
+								iconOnly
+								className="absolute top-2 right-2 h-6 px-2 text-xs"
+							/>
 						)}
 					</div>
 				);
@@ -793,7 +840,7 @@ export function SettingsCopyPage() {
 								variant={step.button.variant || 'default'}
 								size="sm"
 								onClick={() => handleActionButton(step.button!)}
-								className="ml-auto"
+								className="ml-auto cursor-pointer"
 							>
 								{step.button.type === 'external' && <ExternalLink className="h-4 w-4 mr-2" />}
 								{step.button.type === 'download' && <Download className="h-4 w-4 mr-2" />}
@@ -818,7 +865,7 @@ export function SettingsCopyPage() {
 			<div className="bg-gradient-to-b from-primary/5 to-background px-8 pt-12 pb-8">
 				<div className="max-w-4xl mx-auto text-center">
 					<img src={hfLogoWithTitle} alt="Hugging Face" className="h-16 mx-auto mb-8" />
-					<h1 className="text-3xl font-bold text-foreground mb-4">Welcome to the Hugging Face MCP Server</h1>
+					<h2 className="text-3xl font-bold text-foreground mb-4">Welcome to the Hugging Face MCP Server</h2>
 					<p className="text-lg text-muted-foreground max-w-2xl mx-auto">
 						Connect assistants to the Hub and thousands of AI Apps
 					</p>
@@ -853,14 +900,13 @@ export function SettingsCopyPage() {
 											className="w-full px-4 py-3 pr-12 text-sm font-mono bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 h-12 cursor-pointer hover:bg-muted/80 transition-colors"
 											onClick={handleCopyMcpUrl}
 										/>
-										<Button
+										<CopyButton
+											content="https://huggingface.co/mcp?login"
+											variant="secondary"
 											size="sm"
-											onClick={handleCopyMcpUrl}
-											className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 px-2 hover:bg-secondary/80 transition-colors"
-											variant={copied ? 'default' : 'secondary'}
-										>
-											{copied ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-										</Button>
+											iconOnly
+											className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 px-2"
+										/>
 									</div>
 								</div>
 
@@ -884,7 +930,7 @@ export function SettingsCopyPage() {
 										<Button
 											size="sm"
 											onClick={handleGoToSettings}
-											className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 px-2 hover:bg-secondary/80 transition-colors"
+											className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 px-2 hover:bg-secondary/80 transition-colors cursor-pointer"
 											variant="secondary"
 										>
 											<ExternalLink className="h-4 w-4" />
@@ -936,7 +982,7 @@ export function SettingsCopyPage() {
 																variant={button.variant || 'default'}
 																size="sm"
 																onClick={() => handleActionButton(button)}
-																className="h-8"
+																className="h-8 cursor-pointer"
 															>
 																{button.type === 'external' && <ExternalLink className="h-4 w-4 mr-2" />}
 																{button.type === 'download' && <Download className="h-4 w-4 mr-2" />}
@@ -981,15 +1027,12 @@ export function SettingsCopyPage() {
 														<pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto">
 															<code className="text-foreground font-mono">{client.configExample}</code>
 														</pre>
-														<Button
+														<CopyButton
+															content={client.configExample!}
 															variant="ghost"
 															size="sm"
-															onClick={() => copyConfigExample(client.configExample!)}
-															className="absolute top-2 right-2 h-6 px-2 text-xs transition-all duration-200 hover:bg-secondary hover:scale-110"
-														>
-															<Copy className="h-3 w-3 mr-1" />
-															Copy
-														</Button>
+															className="absolute top-2 right-2 h-6 px-2 text-xs"
+														/>
 													</div>
 												)}
 
@@ -1032,14 +1075,14 @@ export function SettingsCopyPage() {
 									<Search className="h-5 w-5 text-primary mt-0.5" />
 									<div>
 										<h4 className="font-semibold text-sm text-foreground">Search Models and Datasets</h4>
-										<p className="text-sm text-muted-foreground">Browse and discover ML models</p>
+										<p className="text-sm text-muted-foreground">Discover Models and Trends</p>
 									</div>
 								</div>
 								<div className="flex items-start space-x-3">
 									<Rocket className="h-5 w-5 text-primary mt-0.5" />
 									<div>
-										<h4 className="font-semibold text-sm text-foreground">Run Spaces</h4>
-										<p className="text-sm text-muted-foreground">Interact with AI applications</p>
+										<h4 className="font-semibold text-sm text-foreground">Discover Spaces</h4>
+										<p className="text-sm text-muted-foreground">Add the latest AI Applications</p>
 									</div>
 								</div>
 								<div className="flex items-start space-x-3">
