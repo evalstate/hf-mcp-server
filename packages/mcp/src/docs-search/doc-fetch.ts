@@ -133,9 +133,10 @@ export class DocFetchTool {
 	 */
 	async fetch(params: DocFetchParams): Promise<string> {
 		try {
-			this.validateUrl(params.doc_url);
+			const normalizedUrl = normalizeDocUrl(params.doc_url);
+			this.validateUrl(normalizedUrl);
 
-			const response = await fetch(params.doc_url);
+			const response = await fetch(normalizedUrl);
 
 			if (!response.ok) {
 				throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
@@ -163,6 +164,8 @@ export class DocFetchTool {
 			throw new Error(`Failed to fetch document: ${error instanceof Error ? error.message : 'Unknown error'}`);
 		}
 	}
+
+
 
 	/**
 	 * Apply chunking logic to markdown content
@@ -203,4 +206,22 @@ export class DocFetchTool {
 
 		return result;
 	}
+}
+
+/**
+ * Normalize incoming documentation URLs for known domains
+ * - Convert gradio.app → www.gradio.app so pages resolve correctly
+ */
+export function normalizeDocUrl(input: string): string {
+    try {
+        const url = new URL(input);
+        const host = url.hostname.toLowerCase();
+        if (host === 'gradio.app') {
+            url.hostname = 'www.gradio.app';
+            return url.toString();
+        }
+        return input;
+    } catch {
+        return input;
+    }
 }

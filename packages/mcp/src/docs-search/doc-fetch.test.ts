@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { DocFetchTool } from './doc-fetch.js';
+import { DocFetchTool, normalizeDocUrl } from './doc-fetch.js';
 
 describe('DocFetchTool', () => {
-	const tool = new DocFetchTool();
+    const tool = new DocFetchTool();
 
 	describe('URL validation', () => {
 		it('should accept valid HF and Gradio docs URLs', () => {
@@ -67,6 +67,18 @@ describe('DocFetchTool', () => {
 			expect(result).toContain('# Long Document');
 			expect(result).toContain('DOCUMENT TRUNCATED');
 			expect(result).toContain('CALL hf_doc_fetch WITH AN OFFSET OF');
+		});
+
+		it('normalizes gradio.app to www.gradio.app (pure function)', () => {
+			const cases: Array<{ in: string; out: string }> = [
+				{ in: 'https://gradio.app/guides/x', out: 'https://www.gradio.app/guides/x' },
+				{ in: 'https://www.gradio.app/guides/x', out: 'https://www.gradio.app/guides/x' },
+				{ in: 'https://huggingface.co/docs/transformers', out: 'https://huggingface.co/docs/transformers' },
+				{ in: 'not a url', out: 'not a url' },
+			];
+			for (const c of cases) {
+				expect(normalizeDocUrl(c.in)).toBe(c.out);
+			}
 		});
 
 		it('should return subsequent chunks with offset', async () => {
