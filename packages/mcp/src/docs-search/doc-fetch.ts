@@ -5,13 +5,9 @@ import { estimateTokens } from '../utilities.js';
 export const DOC_FETCH_CONFIG = {
 	name: 'hf_doc_fetch',
 	description:
-		'Fetch a document from the Hugging Face documentation library. For large documents, use offset to get subsequent chunks.',
+		'Fetch a document from the Hugging Face or Gradio documentation library. For large documents, use offset to get subsequent chunks.',
 	schema: z.object({
-		doc_url: z
-			.string()
-			.min(28, 'Url should start with https://huggingface.co/docs/')
-			.max(200, 'Query too long')
-			.describe('Hugging Face documentation URL'),
+		doc_url: z.string().max(200, 'Query too long').describe('Documentation URL (Hugging Face or Gradio)'),
 		offset: z
 			.number()
 			.min(0)
@@ -19,7 +15,7 @@ export const DOC_FETCH_CONFIG = {
 			.describe('Token offset for large documents (use the offset from truncation message)'),
 	}),
 	annotations: {
-		title: 'Fetch a document from the Hugging Face library',
+		title: 'Fetch a document from the Hugging Face documentation library',
 		destructiveHint: false,
 		readOnlyHint: true,
 		openWorldHint: true,
@@ -50,8 +46,22 @@ export class DocFetchTool {
 	 * Validate HF docs URL
 	 */
 	validateUrl(hfUrl: string): void {
-		if (!hfUrl.startsWith('https://huggingface.co/docs/')) {
-			throw new Error('That was not a valid Hugging Face document URL');
+		try {
+			const url = new URL(hfUrl);
+			if (url.protocol !== 'https:') {
+				throw new Error('That was not a valid documentation URL');
+			}
+
+			const hostname = url.hostname.toLowerCase();
+			const isHfDocs =
+				(hostname === 'huggingface.co' || hostname === 'www.huggingface.co') && url.pathname.startsWith('/docs/');
+			const isGradio = hostname === 'gradio.app' || hostname === 'www.gradio.app';
+
+			if (!isHfDocs && !isGradio) {
+				throw new Error('That was not a valid documentation URL');
+			}
+		} catch {
+			throw new Error('That was not a valid documentation URL');
 		}
 	}
 
