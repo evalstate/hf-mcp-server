@@ -49,11 +49,11 @@ export const BOUQUETS: Record<string, AppSettings> = {
 		spaceTools: [],
 	},
 	// Test bouquets for README inclusion behavior
-	inspect_readme: {
+	hub_repo_details_readme: {
 		builtInTools: [HUB_INSPECT_TOOL_ID, 'INCLUDE_README'],
 		spaceTools: [],
 	},
-	inspect: {
+	hub_repo_details: {
 		builtInTools: [HUB_INSPECT_TOOL_ID],
 		spaceTools: [],
 	},

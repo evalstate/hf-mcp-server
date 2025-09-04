@@ -34,11 +34,74 @@ export class DocFetchTool {
 		});
 		this.turndownService.remove('head');
 		this.turndownService.remove('script');
+
+		// Drop common non-content containers to reduce noise
 		this.turndownService.remove((node) => {
+			try {
+				const tag = ((node as unknown as { nodeName?: string }).nodeName || '').toLowerCase();
+				if (['header', 'nav', 'footer', 'aside', 'form', 'button', 'style', 'noscript', 'iframe'].includes(tag)) {
+					return true;
+				}
+			} catch {
+				/* ignore */
+			}
+			return false;
+		});
+		this.turndownService.remove((node) => {
+			// Strip inline SVGs as they are noisy and rarely useful in text docs
+			try {
+				if (typeof (node as unknown as { nodeName?: string }).nodeName === 'string') {
+					const tag = ((node as unknown as { nodeName: string }).nodeName || '').toLowerCase();
+					if (tag === 'svg') {
+						return true;
+					}
+				}
+			} catch {
+				/* ignore */
+			}
+
 			if (node.nodeName === 'a' && node.innerHTML.includes('<!-- HTML_TAG_START -->')) {
 				return true;
 			}
+			// Remove <img ... src="...svg"> or data-uri SVGs to avoid markdown noise
+			const nodeName = ((node as unknown as { nodeName?: string }).nodeName || '').toLowerCase();
+			if (nodeName === 'img') {
+				try {
+					const src = (node as unknown as { getAttribute?: (name: string) => string | null }).getAttribute?.('src') ??
+						((node as unknown as { src?: string }).src || '');
+					if (
+						/\.svg(\?|$)/i.test(src) ||
+						/^data:image\/svg\+xml[,;]/i.test(src) ||
+						src.toLowerCase().includes('image/svg+xml')
+					) {
+						return true;
+					}
+				} catch {
+					/* ignore */
+				}
+			}
 			return false;
+		});
+
+		// Drop anchor-only heading icons or anchors containing encoded SVG payloads
+		this.turndownService.addRule('dropHeadingAnchors', {
+			filter: (node) => {
+				try {
+					const n = node as unknown as { nodeName?: string; getAttribute?: (k: string) => string | null; textContent?: string; childNodes?: Array<{ nodeName?: string }> };
+					if ((n.nodeName || '').toLowerCase() !== 'a') return false;
+					const href = n.getAttribute?.('href') || '';
+					if (!href || !href.startsWith('#')) return false;
+					const text = (n.textContent || '').trim();
+					const children = (n as unknown as { childNodes?: Array<{ nodeName?: string }> }).childNodes || [];
+					const onlyIcons = children.length > 0 && children.every((c) => ((c.nodeName || '').toLowerCase() === 'img' || (c.nodeName || '').toLowerCase() === 'svg'));
+					const looksLikeEncodedSvg = /data:image\/svg\+xml|%3csvg|svg%2bxml/i.test(text);
+					const noAlnumText = text.length <= 3 && !/[a-z0-9]/i.test(text);
+					return onlyIcons || looksLikeEncodedSvg || noAlnumText;
+				} catch {
+					return false;
+				}
+			},
+			replacement: () => ''
 		});
 	}
 
@@ -81,7 +144,18 @@ export class DocFetchTool {
 			const htmlContent = await response.text();
 
 			// Convert HTML to Markdown
-			const fullMarkdownContent = this.turndownService.turndown(htmlContent);
+			let fullMarkdownContent = this.turndownService.turndown(htmlContent);
+
+			// Post-process: strip any leftover SVG images that slipped past DOM filters
+			//  - Markdown images pointing to data:image/svg+xml or *.svg
+			//  - Empty links left behind after image removal: [](...)
+			fullMarkdownContent = fullMarkdownContent
+				.replace(/!\[[^\]]*\]\(\s*(?:data:image\/svg\+xml[^)]*|[^)]*\.svg(?:\?[^)]*)?)\s*\)/gi, '')
+				.replace(/\[\s*\]\(\s*[^)]*\s*\)/g, '');
+
+			// Remove anchors whose link text still contains encoded SVG payloads (edge cases)
+			fullMarkdownContent = fullMarkdownContent
+				.replace(/\[[^\]]*(?:data:image\/svg\+xml|%3csvg|svg%2bxml)[^\]]*\]\([^)]*\)/gi, '');
 
 			// Apply chunking logic
 			return this.applyChunking(fullMarkdownContent, params.offset || 0);

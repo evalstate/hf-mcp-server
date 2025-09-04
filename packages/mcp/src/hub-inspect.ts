@@ -6,7 +6,7 @@ import { spaceInfo } from '@huggingface/hub';
 import { formatDate } from './utilities.js';
 
 export const HUB_INSPECT_TOOL_CONFIG = {
-	name: 'hub_inspect',
+	name: 'hub_repo_details',
 	description:
 		'Get details for one or more Hugging Face repos (model, dataset, or space). ' +
 		'Auto-detects type unless specified.',
@@ -20,7 +20,7 @@ export const HUB_INSPECT_TOOL_CONFIG = {
 		include_readme: z.boolean().default(true).describe('Include README from the repo'),
 	}),
 	annotations: {
-		title: 'Hub Inspect',
+		title: 'Hub Repo Details',
 		destructiveHint: false,
 		readOnlyHint: true,
 		openWorldHint: false,

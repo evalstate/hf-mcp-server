@@ -272,11 +272,18 @@ function App() {
 			description: DATASET_DETAIL_TOOL_CONFIG.description,
 			settings: { enabled: settings?.builtInTools?.includes(DATASET_DETAIL_TOOL_ID) ?? true },
 		},
-		hub_inspect: {
+		hub_repo_details: {
 			id: HUB_INSPECT_TOOL_ID,
 			label: HUB_INSPECT_TOOL_CONFIG.annotations.title,
 			description: HUB_INSPECT_TOOL_CONFIG.description,
 			settings: { enabled: settings?.builtInTools?.includes(HUB_INSPECT_TOOL_ID) ?? true },
+		},
+		include_readme: {
+			id: 'INCLUDE_README',
+			label: 'Include README (flag)',
+			description:
+				'Adds README content to hub_repo_details output when enabled. This is a behavior flag, not a tool. Requires reconnect to take effect',
+			settings: { enabled: settings?.builtInTools?.includes('INCLUDE_README') ?? false },
 		},
 		doc_semantic_search: {
 			id: DOCS_SEMANTIC_SEARCH_TOOL_ID,
@@ -289,7 +296,7 @@ function App() {
 			label: DOC_FETCH_CONFIG.annotations.title,
 			description: DOC_FETCH_CONFIG.description,
 			settings: { enabled: settings?.builtInTools?.includes(DOC_FETCH_TOOL_ID) ?? true },
-		}
+		},
 	};
 
 	const spaceTools = {
@@ -308,7 +315,8 @@ function App() {
 		space_files: {
 			id: SPACE_FILES_TOOL_ID,
 			label: SPACE_FILES_TOOL_CONFIG.annotations.title,
-			description: SPACE_FILES_TOOL_CONFIG.description || 'List all files in a static Hugging Face Space with download URLs.',
+			description:
+				SPACE_FILES_TOOL_CONFIG.description || 'List all files in a static Hugging Face Space with download URLs.',
 			settings: { enabled: settings?.builtInTools?.includes(SPACE_FILES_TOOL_ID) ?? true },
 		},
 	};
