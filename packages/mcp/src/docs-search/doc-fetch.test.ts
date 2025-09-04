@@ -5,7 +5,7 @@ describe('DocFetchTool', () => {
 	const tool = new DocFetchTool();
 
 	describe('URL validation', () => {
-		it('should accept valid HF docs URLs', () => {
+		it('should accept valid HF and Gradio docs URLs', () => {
 			const validUrls = [
 				'https://huggingface.co/docs/dataset-viewer/index',
 				'https://huggingface.co/docs/huggingface_hub/guides/upload#faster-uploads',
@@ -13,6 +13,8 @@ describe('DocFetchTool', () => {
 				'https://huggingface.co/docs/diffusers/api/pipelines/stable_diffusion',
 				'https://huggingface.co/docs/timm/models',
 				'https://huggingface.co/docs/transformers',
+				'https://gradio.app',
+				'https://www.gradio.app/guides',
 			];
 
 			for (const url of validUrls) {
@@ -30,7 +32,7 @@ describe('DocFetchTool', () => {
 			];
 
 			for (const url of invalidUrls) {
-				expect(() => tool.validateUrl(url)).toThrow('That was not a valid Hugging Face document URL');
+				expect(() => tool.validateUrl(url)).toThrow('That was not a valid documentation URL');
 			}
 		});
 	});

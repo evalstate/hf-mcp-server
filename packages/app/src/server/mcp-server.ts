@@ -496,8 +496,9 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			hubInspectSchemaShape,
 			HUB_INSPECT_TOOL_CONFIG.annotations,
 			async (params: Record<string, unknown>) => {
-				// Allow README only if enabled by configuration; default to on when allowed
-				const allowReadme = hubInspectReadmeAllowed;
+				// Re-evaluate flag dynamically to reflect UI changes without restarting server
+				const currentSelection = await toolSelectionStrategy.selectTools(toolSelectionContext);
+				const allowReadme = currentSelection.enabledToolIds.includes('INCLUDE_README');
 				const wantReadme = (params as { include_readme?: boolean }).include_readme !== false; // default ON if param present
 				const includeReadme = allowReadme && wantReadme;
 

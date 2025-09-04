@@ -149,12 +149,20 @@ export class McpApiClient extends EventEmitter {
 			logger.trace({ gradioEndpoints: this.gradioEndpoints }, 'Updated gradio endpoints from external API');
 		}
 
-		// Create tool states: enabled tools = true, rest = false
-		const toolStates: Record<string, boolean> = {};
-		for (const toolId of ALL_BUILTIN_TOOL_IDS) {
-			toolStates[toolId] = settings.builtInTools.includes(toolId);
-		}
-		return toolStates;
+    // Create tool states: enabled tools = true, rest = false
+    const toolStates: Record<string, boolean> = {};
+    for (const toolId of ALL_BUILTIN_TOOL_IDS) {
+        toolStates[toolId] = settings.builtInTools.includes(toolId);
+    }
+
+    // Include virtual/behavior flags that aren't real tools (e.g., INCLUDE_README)
+    // Anything present in builtInTools but not in ALL_BUILTIN_TOOL_IDS is treated as an enabled flag.
+    for (const id of settings.builtInTools) {
+        if (!(id in toolStates)) {
+            toolStates[id] = true;
+        }
+    }
+    return toolStates;
 	}
 
 	getGradioEndpoints(): GradioEndpoint[] {
