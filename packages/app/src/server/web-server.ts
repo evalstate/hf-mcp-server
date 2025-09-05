@@ -1,4 +1,6 @@
 import express, { type Express } from 'express';
+import cors from 'cors';
+import type { CorsOptions, CorsRequest, CorsOptionsDelegate } from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Server } from 'node:http';
@@ -9,6 +11,7 @@ import type { BaseTransport } from './transport/base-transport.js';
 import type { McpApiClient } from './utils/mcp-api-client.js';
 import { formatMetricsForAPI } from '../shared/transport-metrics.js';
 import { ALL_BUILTIN_TOOL_IDS } from '@llmindset/hf-mcp';
+import { CORS_ALLOWED_ORIGINS, CORS_EXPOSED_HEADERS } from '../shared/constants.js';
 import { apiMetrics } from './utils/api-metrics.js';
 import { gradioMetrics } from './utils/gradio-metrics.js';
 const __filename = fileURLToPath(import.meta.url);
@@ -33,7 +36,81 @@ export class WebServer {
 	}
 
 	private setupMiddleware(): void {
-		this.app.use(express.json());
+		this.app.disable('x-powered-by');
+		this.app.set('trust proxy', true);
+		// Inbound body size limit to prevent abuse
+		this.app.use(express.json({ limit: '1mb' }));
+
+		// Basic security headers (complementary to CORS)
+		this.app.use((_, res, next) => {
+			res.setHeader('X-Content-Type-Options', 'nosniff');
+			res.setHeader('Referrer-Policy', 'no-referrer');
+			if (process.env.HSTS === 'true') {
+				res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+			}
+			next();
+		});
+
+
+
+		// Global CORS for all routes (API + MCP endpoints)
+		// Simple exact-match allowlist with optional env override
+		const envOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+			.split(',')
+			.map((s) => s.trim())
+			.filter(Boolean);
+		const normalize = (s: string) => s.replace(/\/+$/, '');
+		const envOriginsNorm = envOrigins.map(normalize);
+		const allowedOrigins = (envOriginsNorm.length > 0 ? envOriginsNorm : CORS_ALLOWED_ORIGINS).map(normalize);
+
+		// Support wildcard "*" to allow all origins explicitly
+		let originSetting: CorsOptions['origin'];
+		if (allowedOrigins.length === 1 && allowedOrigins[0] === '*') {
+			originSetting = '*';
+		} else if (allowedOrigins.some((o) => o.includes('*'))) {
+			// Support basic subdomain wildcards like "https://*.use-mcp.dev" or "*.use-mcp.dev"
+			const exact = new Set(allowedOrigins.filter((o) => !o.includes('*')));
+			const patterns = allowedOrigins.filter((o) => o.includes('*'));
+
+			originSetting = (requestOrigin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
+				if (!requestOrigin) return cb(null, true);
+				const reqOrigin = normalize(requestOrigin);
+				if (exact.has(reqOrigin)) return cb(null, true);
+				try {
+					const u = new URL(requestOrigin);
+					for (const p of patterns) {
+						let scheme: string | undefined;
+						let hostPattern = p;
+						if (p.startsWith('http://') || p.startsWith('https://')) {
+							scheme = p.split('://', 1)[0];
+							hostPattern = p.slice((scheme + '://').length);
+						}
+						// Only support leading wildcard: *.domain.tld
+						if (!hostPattern.startsWith('*.')) continue;
+						const suffix = hostPattern.slice(2); // domain.tld
+						const host = u.hostname;
+						if (scheme && u.protocol !== scheme + ':') continue;
+						if (host.endsWith('.' + suffix) && host !== suffix) {
+							return cb(null, true);
+						}
+					}
+					return cb(null, false);
+				} catch {
+					return cb(null, false);
+				}
+			};
+		} else {
+			originSetting = allowedOrigins;
+		}
+
+		const corsOptions: CorsOptions | CorsOptionsDelegate<CorsRequest> = {
+			origin: originSetting,
+			exposedHeaders: CORS_EXPOSED_HEADERS,
+		};
+
+		this.app.use(cors(corsOptions));
+		// Ensure preflight requests succeed for any path
+		this.app.options('*', cors(corsOptions));
 	}
 
 	public getApp(): Express {
@@ -143,6 +220,7 @@ export class WebServer {
 	}
 
 	public setupApiRoutes(): void {
+
 		// Transport info endpoint
 		this.app.get('/api/transport', (_req, res) => {
 			res.json(this.transportInfo);
@@ -182,11 +260,11 @@ export class WebServer {
 				// Check for templog query parameter
 				const tempLogParam = req.query.templog;
 				let tempLogStatus: { activated: boolean; remaining: number; maxAllowed: number } | undefined = undefined;
-				
+
 				if (tempLogParam && this.transportInfo.transport === 'streamableHttpJson') {
 					// Only activate for stateless transport with analytics mode
 					// We need to import StatelessHttpTransport type or use method check
-					const statelessTransport = this.transport as { 
+					const statelessTransport = this.transport as {
 						activateTempLogging?: (count: number) => number;
 						getTempLogStatus?: () => { enabled: boolean; remaining: number; maxAllowed: number };
 					};
@@ -202,7 +280,7 @@ export class WebServer {
 						}
 					}
 				}
-				
+
 				// Get raw metrics from transport
 				const metrics = this.transport.getMetrics();
 
@@ -265,7 +343,7 @@ export class WebServer {
 
 				// Add Gradio metrics
 				formattedMetrics.gradioMetrics = gradioMetrics.getMetrics();
-				
+
 				// Add temp log status if it was activated or if we need to check current status
 				const extendedMetrics = formattedMetrics as typeof formattedMetrics & { tempLogStatus?: unknown };
 				if (tempLogStatus) {
