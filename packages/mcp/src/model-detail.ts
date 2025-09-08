@@ -148,18 +148,14 @@ export class ModelDetailTool {
 			});
 
 			// Extract inference providers from modelData if available
-			const inferenceProviders = Object.entries(modelData.inferenceProviderMapping)
-				.map(([provider, providerData]) => {
-					if (!providerData) {
-						return;
-					}
-					return {
-						provider,
-						status: providerData.status,
-						providerId: providerData.providerId,
-						task: providerData.task,
-					};
-				})
+			// huggingface.js now normalizes inferenceProviderMapping to an array when requested
+			const inferenceProviders = (modelData.inferenceProviderMapping ?? [])
+				.map((entry) => ({
+					provider: entry.provider,
+					status: entry.status,
+					providerId: entry.providerId,
+					task: entry.task,
+				}))
 				.filter((el) => !!el);
 			// Build the structured model information
 			const modelDetails: ModelInformation = {

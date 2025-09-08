@@ -124,7 +124,7 @@ export const createProxyServerFactory = (
 			clientInfo?: { name: string; version: string };
 		}
 	): Promise<ServerFactoryResult> => {
-		logger.debug('=== PROXY FACTORY CALLED ===', { skipGradio });
+		logger.debug({ skipGradio }, '=== PROXY FACTORY CALLED ===');
 
 		// Extract auth, bouquet, and gradio using shared utility
 		const { hfToken, bouquet, gradio } = extractAuthBouquetAndMix(headers);

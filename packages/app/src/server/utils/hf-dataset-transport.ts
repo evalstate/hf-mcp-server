@@ -120,7 +120,7 @@ export class HfDatasetLogger {
 		const filename = `logs-${timestamp}-${this.sessionId}.jsonl`;
 
 		const dateFolder = new Date().toISOString().split('T')[0];
-		const folder = this.logType === 'Query' ? 'queries' : 'logs';
+		const folder = this.logType === 'Query' ? 'queries' : this.logType === 'System' ? 'sessions' : 'logs';
 		const pathInRepo = `${folder}/${dateFolder}/${filename}`;
 
 		console.log(`[HF Dataset ${this.logType}] Uploading to path: ${pathInRepo}`);
@@ -272,8 +272,8 @@ export default async function (opts: HfTransportOptions = {}): Promise<Transform
 		return createNoOpTransport('disabled during tests', logType);
 	}
 
-	// Use different dataset ID based on log type
-	const datasetId = logType === 'Query' ? process.env.QUERY_DATASET_ID : process.env.LOGGING_DATASET_ID;
+	// All logs go to a single dataset; use LOGGING_DATASET_ID
+	const datasetId = process.env.LOGGING_DATASET_ID;
 	if (!datasetId) {
 		return createNoOpTransport('no dataset ID configured', logType);
 	}

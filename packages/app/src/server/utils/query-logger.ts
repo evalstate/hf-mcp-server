@@ -1,10 +1,11 @@
-import { pino, type Logger } from 'pino';
-import type { LoggerOptions } from 'pino';
+import pino, { type Logger, type LoggerOptions } from 'pino';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-// Query logging should always log when enabled, regardless of main app log level
-const queryLoggingEnabled = !!process.env.QUERY_DATASET_ID;
+// Feature flags: enable/disable per-log-type; defaults to true
+const QUERY_LOGS_ENABLED = (process.env.LOG_QUERY_EVENTS ?? 'true').toLowerCase() === 'true';
+const SYSTEM_LOGS_ENABLED = (process.env.LOG_SYSTEM_EVENTS ?? 'true').toLowerCase() === 'true';
+const DATASET_CONFIGURED = !!process.env.LOGGING_DATASET_ID;
 
 // Get the current file's directory in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -36,11 +37,11 @@ function createQueryLogger(): Logger | null {
 		return null;
 	}
 
-	if (!queryLoggingEnabled) {
+	if (!QUERY_LOGS_ENABLED || !DATASET_CONFIGURED) {
 		return null;
 	}
 
-	const datasetId = process.env.QUERY_DATASET_ID;
+	const datasetId = process.env.LOGGING_DATASET_ID;
 	const hfToken = process.env.LOGGING_HF_TOKEN || process.env.DEFAULT_HF_TOKEN;
 
 	if (!hfToken) {
@@ -58,7 +59,7 @@ function createQueryLogger(): Logger | null {
 			timestamp: pino.stdTimeFunctions.isoTime,
 		};
 
-		// Only log to HF dataset, no console output for queries
+	// Only log to HF dataset, no console output for queries
 		return pino({
 			...baseOptions,
 			transport: {
@@ -73,6 +74,48 @@ function createQueryLogger(): Logger | null {
 }
 
 const queryLogger: Logger | null = createQueryLogger();
+
+function createSystemLogger(): Logger | null {
+	// Disable during tests
+	if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') {
+		return null;
+	}
+
+	// Require a dataset
+	if (!DATASET_CONFIGURED) {
+		return null;
+	}
+
+	if (!SYSTEM_LOGS_ENABLED) {
+		return null;
+	}
+
+	const hfToken = process.env.LOGGING_HF_TOKEN || process.env.DEFAULT_HF_TOKEN;
+	if (!hfToken) {
+		console.warn('[System Logger] System logging disabled: No HF token found (set LOGGING_HF_TOKEN or DEFAULT_HF_TOKEN)');
+		return null;
+	}
+
+	try {
+		const transportPath = join(__dirname, 'hf-dataset-transport.js');
+		const baseOptions: LoggerOptions = {
+			level: 'info',
+			timestamp: pino.stdTimeFunctions.isoTime,
+		};
+		return pino({
+			...baseOptions,
+			transport: {
+				target: transportPath,
+				options: { sync: false, logType: 'System' },
+			},
+		});
+	} catch (error) {
+		console.error('[System Logger] Failed to setup system logging transport:', error);
+		return null;
+	}
+}
+
+const systemLogger: Logger | null = createSystemLogger();
 
 // Stable session ID for this MCP server instance (process lifetime)
 const mcpServerSessionId = crypto.randomUUID();
@@ -178,10 +221,12 @@ export function logSystemEvent(
 		requestJson?: unknown;
 	}
 ): void {
-	// Use a stable mcpServerSessionId per process/transport instance
-	const mcpServerSessionId = getMcpServerSessionId();
+	if (!systemLogger) {
+		return;
+	}
 
-	logQuery({
+	const mcpServerSessionId = getMcpServerSessionId();
+	systemLogger.info({
 		query: sessionId, // Use sessionId as the "query" for system events
 		methodName,
 		parameters: JSON.stringify({ sessionId }),

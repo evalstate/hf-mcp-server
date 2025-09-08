@@ -5,6 +5,7 @@ import type { Request, Response } from 'express';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { extractQueryParamsToHeaders } from '../utils/query-params.js';
+import { logSystemEvent } from '../utils/query-logger.js';
 
 interface SSEConnection extends BaseSession<SSEServerTransport> {
 	cleanup: () => Promise<void>;
@@ -27,13 +28,16 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 		this.startStaleConnectionCheck();
 		this.startPingKeepAlive();
 
-		logger.info('SSE transport routes initialized', {
-			heartbeatInterval: this.HEARTBEAT_INTERVAL,
-			staleCheckInterval: this.STALE_CHECK_INTERVAL,
-			staleTimeout: this.STALE_TIMEOUT,
-			pingEnabled: this.PING_ENABLED,
-			pingInterval: this.PING_INTERVAL,
-		});
+			logger.info(
+				{
+					heartbeatInterval: this.HEARTBEAT_INTERVAL,
+					staleCheckInterval: this.STALE_CHECK_INTERVAL,
+					staleTimeout: this.STALE_TIMEOUT,
+					pingEnabled: this.PING_ENABLED,
+					pingInterval: this.PING_INTERVAL,
+				},
+				'SSE transport routes initialized'
+			);
 		return Promise.resolve();
 	}
 
@@ -95,6 +99,13 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			const server = result.server;
 
 			logger.info({ sessionId }, 'New SSE connection established');
+
+			// Log system initialize event
+			logSystemEvent('initialize', sessionId, {
+				clientSessionId: sessionId,
+				isAuthenticated,
+				requestJson: req.body ?? {},
+			});
 
 			// Create comprehensive cleanup function
 			const cleanup = this.createCleanupFunction(sessionId);
@@ -222,6 +233,11 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 	protected async removeStaleSession(sessionId: string): Promise<void> {
 		logger.info({ sessionId }, 'Removing stale SSE connection');
 		await this.cleanupSession(sessionId);
+
+		// Log system session delete event
+		logSystemEvent('session_delete', sessionId, {
+			clientSessionId: sessionId,
+		});
 	}
 
 	async cleanup(): Promise<void> {
@@ -253,6 +269,9 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 
 		try {
 			await this.cleanupSession(sessionId);
+			logSystemEvent('session_delete', sessionId, {
+				clientSessionId: sessionId,
+			});
 			return true;
 		} catch (error) {
 			logger.error({ error, sessionId }, 'Error closing connection');

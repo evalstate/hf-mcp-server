@@ -1,5 +1,4 @@
-import { pino, type Logger } from 'pino';
-import type { LoggerOptions, Level } from 'pino';
+import pino, { type Logger, type LoggerOptions, type Level } from 'pino';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
