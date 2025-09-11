@@ -227,7 +227,7 @@ export const createProxyServerFactory = (
 		for (const connection of connections) {
 			if (!connection.success) continue;
 
-			registerRemoteTools(server, connection.connection, hfToken);
+			registerRemoteTools(server, connection.connection, hfToken, sessionInfo);
 
 			// Register Qwen Image prompt enhancer for specific tool
 			if (connection.connection.name?.toLowerCase() === 'mcp-tools/qwen-image') {

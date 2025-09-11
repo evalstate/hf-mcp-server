@@ -9,11 +9,13 @@ import {
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RequestHandlerExtra, RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { logger } from './utils/logger.js';
+import { logGradioEvent } from './utils/query-logger.js';
 import { z } from 'zod';
 import type { GradioEndpoint } from './utils/mcp-api-client.js';
 import { spaceInfo } from '@huggingface/hub';
 import { gradioMetrics, getMetricsSafeName } from './utils/gradio-metrics.js';
 import { createGradioToolName } from './utils/gradio-utils.js';
+import { createAudioPlayerUIResource } from './utils/ui/audio-player.js';
 
 // Define types for JSON Schema
 interface JsonSchemaProperty {
@@ -359,13 +361,26 @@ function createToolHandler(
 	connection: EndpointConnection,
 	tool: Tool,
 	outwardFacingName: string,
-	hfToken?: string
+	hfToken?: string,
+	sessionInfo?: {
+		clientSessionId?: string;
+		isAuthenticated?: boolean;
+		clientInfo?: { name: string; version: string };
+	}
 ): (
 	params: Record<string, unknown>,
 	extra: RequestHandlerExtra<ServerRequest, ServerNotification>
 ) => Promise<typeof CallToolResultSchema._type> {
 	return async (params: Record<string, unknown>, extra) => {
 		logger.info({ tool: tool.name, params }, 'Calling remote tool');
+
+		// Track metrics for logging
+		const startTime = Date.now();
+		let success = false;
+		let error: string | undefined;
+		let responseSizeBytes: number | undefined;
+		let notificationCount = 0;
+
 		try {
 			// Since we use schema fetch, we always need to create SSE connection for tool execution
 			if (!connection.sseUrl) {
@@ -385,6 +400,9 @@ function createToolHandler(
 				requestOptions.onprogress = async (progress) => {
 					logger.trace({ tool: tool.name, progressToken, progress }, 'Relaying progress notification');
 
+					// Track notification count
+					notificationCount++;
+
 					// Relay the progress notification to our client
 					await extra.sendNotification({
 						method: 'notifications/progress',
@@ -398,36 +416,113 @@ function createToolHandler(
 				};
 			}
 
-			const result = await activeClient.request(
-				{
-					method: 'tools/call',
-					params: {
-						name: tool.name,
-						arguments: params,
-						_meta: progressToken !== undefined ? { progressToken } : undefined,
+			try {
+				const result = await activeClient.request(
+					{
+						method: 'tools/call',
+						params: {
+							name: tool.name,
+							arguments: params,
+							_meta: progressToken !== undefined ? { progressToken } : undefined,
+						},
 					},
-				},
-				CallToolResultSchema,
-				requestOptions
-			);
-			// For metrics, use the safe name utility
-			const metricsName = getMetricsSafeName(outwardFacingName);
+					CallToolResultSchema,
+					requestOptions
+				);
 
-			if (result.isError) {
-				logger.warn({ tool: tool.name, error: result.content }, 'Gradio tool call returned error');
-				gradioMetrics.recordFailure(metricsName);
-			} else {
-				logger.debug({ tool: tool.name }, 'Gradio tool call completed successfully');
-				gradioMetrics.recordSuccess(metricsName);
+				// Calculate response size (rough estimate based on JSON serialization)
+				try {
+					responseSizeBytes = JSON.stringify(result).length;
+				} catch {
+					// If serialization fails, don't worry about size
+				}
+
+				success = !result.isError;
+				if (result.isError) {
+					error =
+						Array.isArray(result.content) && result.content.length > 0 ? String(result.content[0]) : 'Unknown error';
+				}
+
+				// Special handling: if the tool name contains "_mcpui" and it returns a single text URL,
+				// wrap it as an embedded audio player MCP-UI resource.
+				try {
+					const hasUiSuffix = tool.name.includes('_mcpui');
+					if (!result.isError && hasUiSuffix && Array.isArray(result.content) && result.content.length === 1) {
+						const item = result.content[0] as unknown as { type?: string; text?: string };
+						const text = typeof item?.text === 'string' ? item.text.trim() : '';
+						const looksLikeUrl = /^https?:\/\//i.test(text);
+
+						if ((item.type === 'text' || !item.type) && looksLikeUrl) {
+							let base64Audio: string | undefined;
+							const url = text;
+
+							try {
+								const response = await fetch(url);
+								if (response.ok && response.headers.get('content-type')?.startsWith('audio/')) {
+									const arrayBuffer = await response.arrayBuffer();
+									base64Audio = Buffer.from(arrayBuffer).toString('base64');
+								}
+							} catch (fetchError) {
+								logger.warn({ url, error: fetchError }, 'Failed to fetch audio URL for UI embedding');
+							}
+
+							if (base64Audio) {
+								const audioPlayerResource = createAudioPlayerUIResource(url, {
+									title: `Generated Audio - ${connection.name || connection.endpointId}`,
+									subtitle: `${connection.endpointId}`,
+									base64Audio,
+									mimeType: 'audio/wav',
+								});
+
+								return {
+									content: [
+										result.content[0],
+										{
+											type: 'resource',
+											resource: audioPlayerResource.resource,
+										},
+									],
+									isError: false,
+								};
+							}
+						}
+					}
+				} catch (uiError) {
+					logger.warn(
+						{ tool: tool.name, error: uiError },
+						'Failed to process UI enhancement, returning original result'
+					);
+				}
+
+				return result;
+			} catch (callError) {
+				// Handle request errors
+				success = false;
+				error = callError instanceof Error ? callError.message : String(callError);
+				throw callError;
 			}
-			return result;
-		} catch (error) {
-			// this is a
-			logger.error({ tool: tool.name, error }, 'Remote tool call failed');
-			// For metrics, use the safe name utility
+		} catch (err) {
+			logger.error({ tool: tool.name, error: err }, 'Remote tool call failed');
 			const metricsName = getMetricsSafeName(outwardFacingName);
 			gradioMetrics.recordFailure(metricsName);
-			throw error;
+			// Set error if not already set
+			if (!error) {
+				error = err instanceof Error ? err.message : String(err);
+			}
+			throw err;
+		} finally {
+			// Always log the Gradio event, even if there was a crash
+			const endTime = Date.now();
+			logGradioEvent(connection.name || connection.endpointId, sessionId, {
+				durationMs: endTime - startTime,
+				isAuthenticated: !!hfToken,
+				clientName: sessionInfo?.clientInfo?.name,
+				clientVersion: sessionInfo?.clientInfo?.version,
+				success,
+				error,
+				responseSizeBytes,
+				notificationCount,
+			});
 		}
 	};
 }
@@ -435,7 +530,16 @@ function createToolHandler(
 /**
  * Registers multiple remote tools from a Gradio endpoint
  */
-export function registerRemoteTools(server: McpServer, connection: EndpointConnection, hfToken?: string): void {
+export function registerRemoteTools(
+	server: McpServer,
+	connection: EndpointConnection,
+	hfToken?: string,
+	sessionInfo?: {
+		clientSessionId?: string;
+		isAuthenticated?: boolean;
+		clientInfo?: { name: string; version: string };
+	}
+): void {
 	connection.tools.forEach((tool, toolIndex) => {
 		// Generate tool name
 		const outwardFacingName = createGradioToolName(
@@ -452,7 +556,7 @@ export function registerRemoteTools(server: McpServer, connection: EndpointConne
 		const schemaShape = convertToolSchemaToZod(tool);
 
 		// Create handler
-		const handler = createToolHandler(connection, tool, outwardFacingName, hfToken);
+		const handler = createToolHandler(connection, tool, outwardFacingName, hfToken, sessionInfo);
 
 		// Log registration
 		logger.trace(

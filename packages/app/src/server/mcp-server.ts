@@ -2,8 +2,6 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod';
 import { createRequire } from 'module';
 import { whoAmI, type WhoAmI } from '@huggingface/hub';
-import { createUIResource } from '@mcp-ui/server';
-//
 import {
 	SpaceSearchTool,
 	formatSearchResults,
@@ -174,20 +172,6 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		server.tool('hf_whoami', whoDescription, {}, { title: 'Hugging Face User Info' }, () => {
 			return { content: [{ type: 'text', text: response }] };
 		});
-
-		server.tool('ui_tool', 'generate an mcp-ui resource', {}, { title: 'MCP-UI Demo' }, () => {
-			return {
-				content: [
-					createUIResource({
-						uri: 'ui://huggingface-mcp/audio1234',
-						content: { type: 'rawHtml', htmlString: '<p>Powered by Hugging Face 🤗</p>' },
-						encoding: 'blob',
-					}),
-				],
-			};
-		});
-
-		// UI demo tool removed
 
 		/** always leave tool active so flow can complete / allow uid change */
 		if (process.env.AUTHENTICATE_TOOL === 'true') {

@@ -101,10 +101,12 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 			logger.info({ sessionId }, 'New SSE connection established');
 
 			// Log system initialize event
+			const requestBody = req.body as { params?: { capabilities?: unknown } } | undefined;
 			logSystemEvent('initialize', sessionId, {
 				clientSessionId: sessionId,
 				isAuthenticated,
 				requestJson: req.body ?? {},
+				capabilities: requestBody?.params?.capabilities,
 			});
 
 			// Create comprehensive cleanup function
