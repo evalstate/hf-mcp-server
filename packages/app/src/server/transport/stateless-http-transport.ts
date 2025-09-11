@@ -177,6 +177,7 @@ export class StatelessHttpTransport extends BaseTransport {
 					clientName: initClientInfo?.name,
 					clientVersion: initClientInfo?.version,
 					requestJson: requestBody.params || '{}',
+					capabilities: requestBody?.params?.capabilities,
 				});
 			} else if (sessionId) {
 				// Try to resume existing session

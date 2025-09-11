@@ -2,7 +2,6 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod';
 import { createRequire } from 'module';
 import { whoAmI, type WhoAmI } from '@huggingface/hub';
-
 import {
 	SpaceSearchTool,
 	formatSearchResults,
@@ -92,7 +91,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			clientInfo?: { name: string; version: string };
 		}
 	): Promise<ServerFactoryResult> => {
-		logger.debug('=== CREATING NEW MCP SERVER INSTANCE ===', { skipGradio, sessionInfo });
+		logger.debug({ skipGradio, sessionInfo }, '=== CREATING NEW MCP SERVER INSTANCE ===');
 		// Extract auth using shared utility
 		const { hfToken } = extractAuthBouquetAndMix(headers);
 
@@ -125,7 +124,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				clientName: sessionInfo?.clientInfo?.name,
 				clientVersion: sessionInfo?.clientInfo?.version,
 			};
-			logger.debug('Query logging options:', { sessionInfo, options });
+			logger.debug({ sessionInfo, options }, 'Query logging options:');
 			return options;
 		};
 
@@ -499,7 +498,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				// Re-evaluate flag dynamically to reflect UI changes without restarting server
 				const currentSelection = await toolSelectionStrategy.selectTools(toolSelectionContext);
 				const allowReadme = currentSelection.enabledToolIds.includes('INCLUDE_README');
-				const wantReadme = (params as { include_readme?: boolean }).include_readme !== false; // default ON if param present
+				const wantReadme = (params as { include_readme?: boolean }).include_readme === true; // explicit opt-in required
 				const includeReadme = allowReadme && wantReadme;
 
 				const tool = new HubInspectTool(hfToken, undefined);
@@ -509,7 +508,8 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				const repoIds = Array.isArray(repoIdsParam) ? repoIdsParam : [];
 				const firstRepoId = typeof repoIds[0] === 'string' ? (repoIds[0] as string) : '';
 				const repoType = (params as { repo_type?: unknown }).repo_type as unknown;
-				const repoTypeSafe = repoType === 'model' || repoType === 'dataset' || repoType === 'space' ? repoType : undefined;
+				const repoTypeSafe =
+					repoType === 'model' || repoType === 'dataset' || repoType === 'space' ? repoType : undefined;
 
 				logPromptQuery(
 					HUB_INSPECT_TOOL_CONFIG.name,

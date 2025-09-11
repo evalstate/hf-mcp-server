@@ -120,7 +120,10 @@ export class HfDatasetLogger {
 		const filename = `logs-${timestamp}-${this.sessionId}.jsonl`;
 
 		const dateFolder = new Date().toISOString().split('T')[0];
-		const folder = this.logType === 'Query' ? 'queries' : 'logs';
+		const folder = this.logType === 'Query' ? 'queries' 
+			: this.logType === 'System' ? 'sessions' 
+			: this.logType === 'Gradio' ? 'gradio'
+			: 'logs';
 		const pathInRepo = `${folder}/${dateFolder}/${filename}`;
 
 		console.log(`[HF Dataset ${this.logType}] Uploading to path: ${pathInRepo}`);
@@ -229,13 +232,13 @@ function createNoOpTransport(reason: string, logType = 'Logs'): Transform {
 function safeStringifyLog(log: LogEntry, sessionId: string, logType: string): string {
 	if (!log) return ''; // Skip null/undefined logs
 
-	if (logType === 'Query') {
-		// For query logs, preserve pino's time field but strip other pino metadata
+	if (logType === 'Query' || logType === 'System' || logType === 'Gradio') {
+		// For query, system, and gradio logs, preserve pino's time field but strip other pino metadata
 		// Pino adds level, time, pid, hostname, msg - we want to keep time but strip the rest
-		const { level: _level, pid: _pid, hostname: _hostname, msg: _msg, ...queryLogEntry } = log;
+		const { level: _level, pid: _pid, hostname: _hostname, msg: _msg, ...logEntry } = log;
 
-		// Return the query log entry with pino's time field preserved
-		return safeStringify.default(queryLogEntry);
+		// Return the log entry with pino's time field preserved
+		return safeStringify.default(logEntry);
 	}
 
 	// For standard logs, preserve pino defaults while creating structured format
@@ -272,8 +275,8 @@ export default async function (opts: HfTransportOptions = {}): Promise<Transform
 		return createNoOpTransport('disabled during tests', logType);
 	}
 
-	// Use different dataset ID based on log type
-	const datasetId = logType === 'Query' ? process.env.QUERY_DATASET_ID : process.env.LOGGING_DATASET_ID;
+	// All logs go to a single dataset; use LOGGING_DATASET_ID
+	const datasetId = process.env.LOGGING_DATASET_ID;
 	if (!datasetId) {
 		return createNoOpTransport('no dataset ID configured', logType);
 	}

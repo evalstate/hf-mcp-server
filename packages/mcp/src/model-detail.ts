@@ -148,18 +148,14 @@ export class ModelDetailTool {
 			});
 
 			// Extract inference providers from modelData if available
-			const inferenceProviders = Object.entries(modelData.inferenceProviderMapping)
-				.map(([provider, providerData]) => {
-					if (!providerData) {
-						return;
-					}
-					return {
-						provider,
-						status: providerData.status,
-						providerId: providerData.providerId,
-						task: providerData.task,
-					};
-				})
+			// huggingface.js now normalizes inferenceProviderMapping to an array when requested
+			const inferenceProviders = (modelData.inferenceProviderMapping ?? [])
+				.map((entry) => ({
+					provider: entry.provider,
+					status: entry.status,
+					providerId: entry.providerId,
+					task: entry.task,
+				}))
 				.filter((el) => !!el);
 			// Build the structured model information
 			const modelDetails: ModelInformation = {
@@ -274,6 +270,14 @@ export class ModelDetailTool {
 			return formatModelDetails(modelDetails);
 		} catch (error) {
 			if (error instanceof Error) {
+				// Check for common HTTP error patterns in the message
+				if (error.message.includes('404') || error.message.includes('Not Found')) {
+					throw new Error(`Model '${modelId}' not found. Please check the model ID.`);
+				}
+				if (error.message.includes('401') || error.message.includes('403') || 
+					error.message.includes('username') || error.message.includes('password')) {
+					throw new Error(`Authentication required or insufficient permissions to access model '${modelId}'.`);
+				}
 				throw new Error(`Failed to get model details: ${error.message}`);
 			}
 			throw error;

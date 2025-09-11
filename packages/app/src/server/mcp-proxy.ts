@@ -124,7 +124,7 @@ export const createProxyServerFactory = (
 			clientInfo?: { name: string; version: string };
 		}
 	): Promise<ServerFactoryResult> => {
-		logger.debug('=== PROXY FACTORY CALLED ===', { skipGradio });
+		logger.debug({ skipGradio }, '=== PROXY FACTORY CALLED ===');
 
 		// Extract auth, bouquet, and gradio using shared utility
 		const { hfToken, bouquet, gradio } = extractAuthBouquetAndMix(headers);
@@ -227,7 +227,7 @@ export const createProxyServerFactory = (
 		for (const connection of connections) {
 			if (!connection.success) continue;
 
-			registerRemoteTools(server, connection.connection, hfToken);
+			registerRemoteTools(server, connection.connection, hfToken, sessionInfo);
 
 			// Register Qwen Image prompt enhancer for specific tool
 			if (connection.connection.name?.toLowerCase() === 'mcp-tools/qwen-image') {

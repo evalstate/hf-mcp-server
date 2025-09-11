@@ -7,6 +7,7 @@ import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { extractQueryParamsToHeaders } from '../utils/query-params.js';
 import { OAUTH_RESOURCE } from '../../shared/constants.js';
+import { logSystemEvent } from '../utils/query-logger.js';
 
 interface StreamableHttpConnection extends BaseSession<StreamableHTTPServerTransport> {
 	activeResponse?: Response;
@@ -20,13 +21,16 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 		this.startStaleConnectionCheck();
 		this.startPingKeepAlive();
 
-		logger.info('StreamableHTTP transport initialized', {
-			heartbeatInterval: this.HEARTBEAT_INTERVAL,
-			staleCheckInterval: this.STALE_CHECK_INTERVAL,
-			staleTimeout: this.STALE_TIMEOUT,
-			pingEnabled: this.PING_ENABLED,
-			pingInterval: this.PING_INTERVAL,
-		});
+		logger.info(
+			{
+				heartbeatInterval: this.HEARTBEAT_INTERVAL,
+				staleCheckInterval: this.STALE_CHECK_INTERVAL,
+				staleTimeout: this.STALE_TIMEOUT,
+				pingEnabled: this.PING_ENABLED,
+				pingInterval: this.PING_INTERVAL,
+			},
+			'StreamableHTTP transport initialized'
+		);
 		return Promise.resolve();
 	}
 
@@ -227,6 +231,12 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 			onsessioninitialized: (sessionId: string) => {
 				logger.info({ sessionId }, 'Session initialized');
 
+				// Log system initialize event
+				logSystemEvent('initialize', sessionId, {
+					clientSessionId: sessionId,
+					isAuthenticated: !!requestHeaders?.['authorization'],
+				});
+
 				// Create session object and store it immediately
 				const session: Session = {
 					transport,
@@ -278,6 +288,9 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 
 	private async removeSession(sessionId: string): Promise<void> {
 		await this.cleanupSession(sessionId);
+		logSystemEvent('session_delete', sessionId, {
+			clientSessionId: sessionId,
+		});
 	}
 
 	/**
