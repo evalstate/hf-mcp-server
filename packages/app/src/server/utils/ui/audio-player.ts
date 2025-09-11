@@ -1,4 +1,4 @@
-import { createUIResource } from '@mcp-ui/server';
+import { createUIResource, type UIResource } from '@mcp-ui/server';
 
 export interface AudioPlayerOptions {
 	/** Title shown above the player, e.g. "Generated Audio - Speech Synthesis" */
@@ -161,7 +161,7 @@ export function buildAudioPlayerHTML({
 /**
  * Convenience helper to wrap the HTML as a UIResource for MCP-UI transports.
  */
-export function createAudioPlayerUIResource(uri: string, options: AudioPlayerOptions) {
+export function createAudioPlayerUIResource(uri: string, options: AudioPlayerOptions): UIResource {
 	return createUIResource({
 		uri,
 		encoding: 'text',
