@@ -41,6 +41,9 @@ importers:
 
   packages/app:
     dependencies:
+      '@huggingface/hub':
+        specifier: ^2.1.0
+        version: 2.6.2
       '@llmindset/hf-mcp':
         specifier: workspace:^
         version: link:../mcp
