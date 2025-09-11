@@ -54,6 +54,7 @@
 	},
 	"dependencies": {
 		"@llmindset/hf-mcp": "workspace:^",
+		"@huggingface/hub": "^2.1.0",
 		"@mcp-ui/server": "^5.10.0",
 		"@modelcontextprotocol/sdk": "^1.11.2",
 		"@radix-ui/react-checkbox": "^1.2.3",
