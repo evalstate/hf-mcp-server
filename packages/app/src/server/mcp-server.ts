@@ -498,7 +498,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				// Re-evaluate flag dynamically to reflect UI changes without restarting server
 				const currentSelection = await toolSelectionStrategy.selectTools(toolSelectionContext);
 				const allowReadme = currentSelection.enabledToolIds.includes('INCLUDE_README');
-				const wantReadme = (params as { include_readme?: boolean }).include_readme !== false; // default ON if param present
+				const wantReadme = (params as { include_readme?: boolean }).include_readme === true; // explicit opt-in required
 				const includeReadme = allowReadme && wantReadme;
 
 				const tool = new HubInspectTool(hfToken, undefined);

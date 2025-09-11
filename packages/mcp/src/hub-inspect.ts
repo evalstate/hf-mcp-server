@@ -17,7 +17,7 @@ export const HUB_INSPECT_TOOL_CONFIG = {
 			.max(10, 'Provide at most 10 repo ids')
 			.describe('Repo IDs for (models|dataset/space) - usually in author/name format (e.g. openai/gpt-oss-120b)'),
 		repo_type: z.enum(['model', 'dataset', 'space']).optional().describe('Specify lookup type; otherwise auto-detects'),
-		include_readme: z.boolean().default(true).describe('Include README from the repo'),
+		include_readme: z.boolean().default(false).describe('Include README from the repo'),
 	}),
 	annotations: {
 		title: 'Hub Repo Details',
@@ -51,7 +51,9 @@ export class HubInspectTool {
 				successCount += 1;
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
-				parts.push(`# ${id}\n\n- Error: ${msg}`);
+				// Improve error message formatting
+				const cleanMsg = msg.replace(/Invalid username or password/g, 'Not found or authentication required');
+				parts.push(`# ${id}\n\n- Error: ${cleanMsg}`);
 			}
 		}
 

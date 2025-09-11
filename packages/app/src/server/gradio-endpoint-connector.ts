@@ -444,7 +444,7 @@ function createToolHandler(
 				}
 
 				// Special handling: if the tool name contains "_mcpui" and it returns a single text URL,
-				// wrap it as an embedded audio player MCP-UI resource.
+				// wrap it as an embedded audio player UI resource.
 				try {
 					const hasUiSuffix = tool.name.includes('_mcpui');
 					if (!result.isError && hasUiSuffix && Array.isArray(result.content) && result.content.length === 1) {
@@ -457,40 +457,36 @@ function createToolHandler(
 							const url = text;
 
 							try {
-								const response = await fetch(url);
-								if (response.ok && response.headers.get('content-type')?.startsWith('audio/')) {
-									const arrayBuffer = await response.arrayBuffer();
-									base64Audio = Buffer.from(arrayBuffer).toString('base64');
+								const resp = await fetch(url);
+								if (resp.ok) {
+									const buf = Buffer.from(await resp.arrayBuffer());
+									base64Audio = buf.toString('base64');
 								}
-							} catch (fetchError) {
-								logger.warn({ url, error: fetchError }, 'Failed to fetch audio URL for UI embedding');
+							} catch (e) {
+								logger.debug(
+									{ tool: tool.name, url, error: e instanceof Error ? e.message : String(e) },
+									'Failed to inline audio; falling back to URL source'
+								);
 							}
 
-							if (base64Audio) {
-								const audioPlayerResource = createAudioPlayerUIResource(url, {
-									title: `Generated Audio - ${connection.name || connection.endpointId}`,
-									subtitle: `${connection.endpointId}`,
-									base64Audio,
-									mimeType: 'audio/wav',
-								});
+							const title = `${connection.name || 'MCP UI tool'}`;
+							const uriSafeName = (connection.name || 'audio').replace(/[^a-z0-9-_]+/gi, '-');
+							const uiUri = `ui://huggingface-mcp/${uriSafeName}/${Date.now().toString()}`;
 
-								return {
-									content: [
-										result.content[0],
-										{
-											type: 'resource',
-											resource: audioPlayerResource.resource,
-										},
-									],
-									isError: false,
-								};
-							}
+							const uiResource = createAudioPlayerUIResource(uiUri, {
+								title,
+								base64Audio,
+								srcUrl: base64Audio ? undefined : url,
+								mimeType: `audio/wav`,
+							});
+
+							return { isError: false, content: [result.content[0], uiResource] } as typeof CallToolResultSchema._type;
 						}
 					}
-				} catch (uiError) {
-					logger.warn(
-						{ tool: tool.name, error: uiError },
-						'Failed to process UI enhancement, returning original result'
+				} catch (e) {
+					logger.debug(
+						{ tool: tool.name, error: e instanceof Error ? e.message : String(e) },
+						'MCP UI transform skipped'
 					);
 				}
 
@@ -513,7 +509,7 @@ function createToolHandler(
 		} finally {
 			// Always log the Gradio event, even if there was a crash
 			const endTime = Date.now();
-			logGradioEvent(connection.name || connection.endpointId, sessionId, {
+			logGradioEvent(connection.name || connection.endpointId, sessionInfo?.clientSessionId || 'unknown', {
 				durationMs: endTime - startTime,
 				isAuthenticated: !!hfToken,
 				clientName: sessionInfo?.clientInfo?.name,

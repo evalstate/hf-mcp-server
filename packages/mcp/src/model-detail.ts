@@ -270,6 +270,14 @@ export class ModelDetailTool {
 			return formatModelDetails(modelDetails);
 		} catch (error) {
 			if (error instanceof Error) {
+				// Check for common HTTP error patterns in the message
+				if (error.message.includes('404') || error.message.includes('Not Found')) {
+					throw new Error(`Model '${modelId}' not found. Please check the model ID.`);
+				}
+				if (error.message.includes('401') || error.message.includes('403') || 
+					error.message.includes('username') || error.message.includes('password')) {
+					throw new Error(`Authentication required or insufficient permissions to access model '${modelId}'.`);
+				}
 				throw new Error(`Failed to get model details: ${error.message}`);
 			}
 			throw error;

@@ -175,6 +175,14 @@ export class DatasetDetailTool {
 			return formatDatasetDetails(datasetDetails);
 		} catch (error) {
 			if (error instanceof Error) {
+				// Check for common HTTP error patterns in the message
+				if (error.message.includes('404') || error.message.includes('Not Found')) {
+					throw new Error(`Dataset '${datasetId}' not found. Please check the dataset ID.`);
+				}
+				if (error.message.includes('401') || error.message.includes('403') || 
+					error.message.includes('username') || error.message.includes('password')) {
+					throw new Error(`Authentication required or insufficient permissions to access dataset '${datasetId}'.`);
+				}
 				throw new Error(`Failed to get dataset details: ${error.message}`);
 			}
 			throw error;
