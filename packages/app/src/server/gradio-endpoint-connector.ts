@@ -498,14 +498,20 @@ function createToolHandler(
 				throw callError;
 			}
 		} catch (err) {
-			logger.error({ tool: tool.name, error: err }, 'Remote tool call failed');
+			// Ensure meaningful error output instead of [object Object]
+			const errObj = err instanceof Error
+				? err
+				: new Error(typeof err === 'string' ? err : (() => {
+					try { return JSON.stringify(err); } catch { return String(err); }
+				})());
+			logger.error({ tool: tool.name, err: errObj, errMessage: errObj.message }, 'Remote tool call failed');
 			const metricsName = getMetricsSafeName(outwardFacingName);
 			gradioMetrics.recordFailure(metricsName);
 			// Set error if not already set
 			if (!error) {
-				error = err instanceof Error ? err.message : String(err);
+				error = errObj.message;
 			}
-			throw err;
+			throw errObj;
 		} finally {
 			// Always log the Gradio event, even if there was a crash
 			const endTime = Date.now();
