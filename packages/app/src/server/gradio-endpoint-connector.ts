@@ -439,8 +439,41 @@ function createToolHandler(
 
 				success = !result.isError;
 				if (result.isError) {
-					error =
-						Array.isArray(result.content) && result.content.length > 0 ? String(result.content[0]) : 'Unknown error';
+					// Extract a meaningful error message from MCP content items
+					const first = Array.isArray(result.content) && result.content.length > 0 ? (result.content[0] as unknown) : undefined;
+					let message: string | undefined;
+					if (typeof first === 'string') {
+						message = first;
+					} else if (first && typeof first === 'object') {
+						const obj = first as Record<string, unknown>;
+						if (typeof obj.text === 'string') {
+							message = obj.text;
+						} else if (typeof obj.message === 'string') {
+							message = obj.message;
+						} else if (typeof obj.error === 'string') {
+							message = obj.error;
+						} else {
+							try {
+								message = JSON.stringify(obj);
+							} catch {
+								message = String(obj);
+							}
+						}
+					} else if (first !== undefined) {
+						// Fallback for other primitive types
+						message = String(first);
+					}
+
+					error = message || 'Unknown error';
+
+					// Bubble up the error so upstream callers and metrics can track failures
+					throw new Error(error);
+				}
+
+				// Record success in gradio metrics when no error and no exception thrown
+				if (success) {
+					const metricsName = getMetricsSafeName(outwardFacingName);
+					gradioMetrics.recordSuccess(metricsName);
 				}
 
 				// Special handling: if the tool name contains "_mcpui" and it returns a single text URL,

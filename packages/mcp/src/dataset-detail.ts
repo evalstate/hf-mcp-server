@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { datasetInfo } from '@huggingface/hub';
+import { datasetInfo, HubApiError } from '@huggingface/hub';
 import { formatDate, formatNumber } from './utilities.js';
 import type { ToolResult } from './types/tool-result.js';
 import { fetchReadmeContent } from './readme-utils.js';
@@ -175,15 +175,31 @@ export class DatasetDetailTool {
 			return formatDatasetDetails(datasetDetails);
 		} catch (error) {
 			if (error instanceof Error) {
-				// Check for common HTTP error patterns in the message
-				if (error.message.includes('404') || error.message.includes('Not Found')) {
+				const msg = error.message || '';
+				// Map well-known patterns and status codes to friendly messages
+				const isNotFound =
+					(error instanceof HubApiError && error.statusCode === 404) ||
+					msg.includes('404') ||
+					msg.includes('Not Found') ||
+					msg.includes('Repository not found');
+
+				if (isNotFound) {
 					throw new Error(`Dataset '${datasetId}' not found. Please check the dataset ID.`);
 				}
-				if (error.message.includes('401') || error.message.includes('403') || 
-					error.message.includes('username') || error.message.includes('password')) {
+
+				const isUnauthorized =
+					(error instanceof HubApiError && (error.statusCode === 401 || error.statusCode === 403)) ||
+					msg.includes('401') ||
+					msg.includes('403') ||
+					msg.includes('username') ||
+					msg.includes('password') ||
+					msg.includes('Your access token must start with');
+
+				if (isUnauthorized) {
 					throw new Error(`Authentication required or insufficient permissions to access dataset '${datasetId}'.`);
 				}
-				throw new Error(`Failed to get dataset details: ${error.message}`);
+
+				throw new Error(`Failed to get dataset details: ${msg}`);
 			}
 			throw error;
 		}

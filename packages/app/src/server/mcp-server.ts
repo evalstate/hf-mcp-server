@@ -380,7 +380,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			MODEL_DETAIL_TOOL_CONFIG.annotations,
 			async (params: ModelDetailParams) => {
 				const modelDetail = new ModelDetailTool(hfToken, undefined);
-				const result = await modelDetail.getDetails(params.model_id);
+				const result = await modelDetail.getDetails(params.model_id, false);
 				logPromptQuery(
 					MODEL_DETAIL_TOOL_CONFIG.name,
 					params.model_id,
@@ -458,7 +458,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			DATASET_DETAIL_TOOL_CONFIG.annotations,
 			async (params: DatasetDetailParams) => {
 				const datasetDetail = new DatasetDetailTool(hfToken, undefined);
-				const result = await datasetDetail.getDetails(params.dataset_id);
+				const result = await datasetDetail.getDetails(params.dataset_id, false);
 				logPromptQuery(
 					DATASET_DETAIL_TOOL_CONFIG.name,
 					params.dataset_id,

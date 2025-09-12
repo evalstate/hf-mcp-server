@@ -1,4 +1,4 @@
-import { modelInfo } from '@huggingface/hub';
+import { modelInfo, HubApiError } from '@huggingface/hub';
 import { z } from 'zod';
 import { formatDate, formatNumber } from './utilities.js';
 import type { ToolResult } from './types/tool-result.js';
@@ -270,15 +270,31 @@ export class ModelDetailTool {
 			return formatModelDetails(modelDetails);
 		} catch (error) {
 			if (error instanceof Error) {
-				// Check for common HTTP error patterns in the message
-				if (error.message.includes('404') || error.message.includes('Not Found')) {
+				const msg = error.message || '';
+				// Map well-known patterns and status codes to friendly messages
+				const isNotFound =
+					(error instanceof HubApiError && error.statusCode === 404) ||
+					msg.includes('404') ||
+					msg.includes('Not Found') ||
+					msg.includes('Repository not found');
+
+				if (isNotFound) {
 					throw new Error(`Model '${modelId}' not found. Please check the model ID.`);
 				}
-				if (error.message.includes('401') || error.message.includes('403') || 
-					error.message.includes('username') || error.message.includes('password')) {
+
+				const isUnauthorized =
+					(error instanceof HubApiError && (error.statusCode === 401 || error.statusCode === 403)) ||
+					msg.includes('401') ||
+					msg.includes('403') ||
+					msg.includes('username') ||
+					msg.includes('password') ||
+					msg.includes('Your access token must start with');
+
+				if (isUnauthorized) {
 					throw new Error(`Authentication required or insufficient permissions to access model '${modelId}'.`);
 				}
-				throw new Error(`Failed to get model details: ${error.message}`);
+
+				throw new Error(`Failed to get model details: ${msg}`);
 			}
 			throw error;
 		}
