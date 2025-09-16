@@ -323,7 +323,7 @@ export function logGradioEvent(
 		clientName?: string;
 		clientVersion?: string;
 		success: boolean;
-		error?: string;
+		error?: unknown;
 		responseSizeBytes?: number;
 		notificationCount?: number;
 	}
@@ -334,6 +334,22 @@ export function logGradioEvent(
 
 	const mcpServerSessionId = getMcpServerSessionId();
 
+	// Normalize error to a readable string
+	let errorString: string | null = null;
+	if (options.error !== undefined && options.error !== null) {
+		if (typeof options.error === 'string') {
+			errorString = options.error;
+		} else if (options.error instanceof Error) {
+			errorString = options.error.message;
+		} else {
+			try {
+				errorString = JSON.stringify(options.error);
+			} catch {
+				errorString = String(options.error);
+			}
+		}
+	}
+
 	gradioLogger.info(
 		{
 			sessionId,
@@ -343,7 +359,7 @@ export function logGradioEvent(
 			authorized: options.isAuthenticated ?? false,
 			durationMs: options.durationMs,
 			success: options.success,
-			error: options.error || null,
+			error: errorString,
 			responseSizeBytes: options.responseSizeBytes || null,
 			notificationCount: options.notificationCount || 0,
 			mcpServerSessionId,

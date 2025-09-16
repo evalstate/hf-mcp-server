@@ -34,6 +34,10 @@ import {
 	SpaceFilesTool,
 	type SpaceFilesParams,
 	type SpaceInfoParams,
+	UseSpaceTool,
+	USE_SPACE_TOOL_CONFIG,
+	formatUseSpaceResult,
+	type UseSpaceParams,
 	UserSummaryPrompt,
 	USER_SUMMARY_PROMPT_CONFIG,
 	type UserSummaryParams,
@@ -608,6 +612,31 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				const result = await spaceFilesTool.listFiles(params);
 				return {
 					content: [{ type: 'text', text: result }],
+				};
+			}
+		);
+
+		toolInstances[USE_SPACE_TOOL_CONFIG.name] = server.tool(
+			USE_SPACE_TOOL_CONFIG.name,
+			USE_SPACE_TOOL_CONFIG.description,
+			USE_SPACE_TOOL_CONFIG.schema.shape,
+			USE_SPACE_TOOL_CONFIG.annotations,
+			async (params: UseSpaceParams) => {
+				const useSpaceTool = new UseSpaceTool(hfToken, undefined);
+				const result = await formatUseSpaceResult(useSpaceTool, params);
+				logPromptQuery(
+					USE_SPACE_TOOL_CONFIG.name,
+					params.space_id,
+					{ space_id: params.space_id },
+					{
+						...getLoggingOptions(),
+						totalResults: result.metadata.totalResults,
+						resultsShared: result.metadata.resultsShared,
+						responseCharCount: result.metadata.formatted.length,
+					}
+				);
+				return {
+					content: result.content,
 				};
 			}
 		);
