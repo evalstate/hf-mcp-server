@@ -1,6 +1,6 @@
 import { logger } from './logger.js';
 import type { AppSettings, SpaceTool } from '../../shared/settings.js';
-import { ALL_BUILTIN_TOOL_IDS, HUB_INSPECT_TOOL_ID, TOOL_ID_GROUPS } from '@llmindset/hf-mcp';
+import { ALL_BUILTIN_TOOL_IDS, HUB_INSPECT_TOOL_ID, TOOL_ID_GROUPS, USE_SPACE_TOOL_ID } from '@llmindset/hf-mcp';
 import type { McpApiClient } from './mcp-api-client.js';
 import { extractAuthBouquetAndMix } from '../utils/auth-utils.js';
 
@@ -57,6 +57,10 @@ export const BOUQUETS: Record<string, AppSettings> = {
 		builtInTools: [HUB_INSPECT_TOOL_ID],
 		spaceTools: [],
 	},
+	mcp_ui: {
+		builtInTools: [USE_SPACE_TOOL_ID],
+		spaceTools: [],
+	},
 };
 
 /**
@@ -76,12 +80,20 @@ export class ToolSelectionStrategy {
 	 */
 	private parseGradioEndpoints(gradioParam: string): SpaceTool[] {
 		const spaceTools: SpaceTool[] = [];
+		const trimmed = gradioParam.trim();
+		// Treat special sentinel "none" as "disable gradio" without warning
+		if (trimmed.toLowerCase() === 'none') {
+			return spaceTools;
+		}
+
 		const entries = gradioParam
 			.split(',')
 			.map((s) => s.trim())
 			.filter((s) => s.length > 0);
 
 		for (const entry of entries) {
+			// Skip explicit "none" entries within a list silently
+			if (entry.toLowerCase() === 'none') continue;
 			// Validate exactly one slash
 			const slashCount = (entry.match(/\//g) || []).length;
 			if (slashCount !== 1) {

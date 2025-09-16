@@ -195,6 +195,9 @@ importers:
       '@huggingface/hub':
         specifier: ^2.1.0
         version: 2.6.2
+      '@mcp-ui/server':
+        specifier: ^5.10.0
+        version: 5.10.0
       turndown:
         specifier: ^7.2.0
         version: 7.2.1
