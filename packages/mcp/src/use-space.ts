@@ -18,7 +18,8 @@ export interface UseSpaceParams {
 
 export const USE_SPACE_TOOL_CONFIG = {
 	name: 'use_space',
-	description: 'Give the User access to a Hugging Face Space with mcp_ui. This tool will return a link accessible to the User that may not be visible to the Assistant',
+	description:
+		'Give the User access to a Hugging Face Space with mcp_ui. This tool will return a link accessible to the User that may not be visible to the Assistant',
 	schema: z.object({
 		space_id: z.string().min(1).describe("Space ID in 'username/repo' format"),
 	}),
@@ -66,7 +67,7 @@ export class UseSpaceTool extends HfApiCall<UseSpaceParams, UseSpaceResult> {
 					content: { type: 'externalUrl', iframeUrl },
 					encoding: 'text',
 					uiMetadata: {
-						'preferred-frame-size': ['1024', '960'],
+						'preferred-frame-size': ['1024px', '960px'],
 					},
 				});
 
