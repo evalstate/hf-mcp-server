@@ -3,11 +3,11 @@ import { HfApiCall } from './hf-api-call.js';
 import { spaceInfo, type SpaceEntry } from '@huggingface/hub';
 import type { ToolResult } from './types/tool-result.js';
 import './types/mcp-ui-server-shim.js';
-import { createUIResource } from '@mcp-ui/server';
+import { createUIResource, type UIResource } from '@mcp-ui/server';
 // Define the return type that matches MCP server expectations
 interface UseSpaceResult {
 	[x: string]: unknown;
-	content: Array<{ type: 'text'; text: string } | { type: 'resource'; resource: any }>;
+	content: Array<{ type: 'text'; text: string } | UIResource>;
 	metadata: ToolResult;
 }
 
