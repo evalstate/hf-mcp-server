@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { parseSchemaResponse, convertJsonSchemaToZod } from '../../src/server/gradio-endpoint-connector.js';
+import {
+	parseSchemaResponse,
+	convertJsonSchemaToZod,
+	stripImageContentFromResult,
+} from '../../src/server/gradio-endpoint-connector.js';
 import { z } from 'zod';
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 
 describe('parseSchemaResponse', () => {
 	const endpointId = 'endpoint1';
@@ -270,6 +275,60 @@ describe('parseSchemaResponse', () => {
 
 			expect(() => parseSchemaResponse(invalidSchema, endpointId, subdomain)).toThrow('No tools found in schema');
 		});
+	});
+});
+
+describe('stripImageContentFromResult', () => {
+	const baseOptions = { toolName: 'test-tool', outwardFacingName: 'gr1_test' } as const;
+
+	it('should return original result when disabled', () => {
+		const result = {
+			isError: false,
+			content: [{ type: 'text', text: 'hello' }],
+		} as typeof CallToolResultSchema._type;
+
+		const filtered = stripImageContentFromResult(result, { ...baseOptions, enabled: false });
+
+		expect(filtered).toBe(result);
+	});
+
+	it('should remove image-only content and add fallback text', () => {
+		const result = {
+			isError: false,
+			content: [
+				{
+					type: 'image',
+					mimeType: 'image/png',
+					data: 'base64data',
+				},
+			],
+		} as typeof CallToolResultSchema._type;
+
+		const filtered = stripImageContentFromResult(result, { ...baseOptions, enabled: true });
+
+		expect(filtered).not.toBe(result);
+		expect(filtered.content).toHaveLength(1);
+		expect(filtered.content?.[0]).toEqual({
+			type: 'text',
+			text: 'Image content omitted due to client configuration (no_image_content=true).',
+		});
+	});
+
+	it('should preserve non-image content while removing images', () => {
+		const result = {
+			isError: false,
+			content: [
+				{ type: 'text', text: 'keep me' },
+				{ type: 'image', mimeType: 'image/png', data: 'base64data' },
+			],
+		} as typeof CallToolResultSchema._type;
+
+		const filtered = stripImageContentFromResult(result, { ...baseOptions, enabled: true });
+
+		expect(filtered.content).toHaveLength(1);
+		expect(filtered.content?.[0]).toEqual({ type: 'text', text: 'keep me' });
+		// Ensure original payload remains unchanged for type safety consumers
+		expect(result.content).toHaveLength(2);
 	});
 });
 

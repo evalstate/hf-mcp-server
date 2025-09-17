@@ -6,7 +6,7 @@ import { logger } from '../utils/logger.js';
 import { JsonRpcErrors, extractJsonRpcId } from './json-rpc-errors.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { extractQueryParamsToHeaders } from '../utils/query-params.js';
-import { OAUTH_RESOURCE } from '../../shared/constants.js';
+import { buildOAuthResourceHeader } from '../utils/oauth-resource.js';
 import { logSystemEvent } from '../utils/query-logger.js';
 
 interface StreamableHttpConnection extends BaseSession<StreamableHTTPServerTransport> {
@@ -131,7 +131,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 				if (!authResult.shouldContinue) {
 					this.trackError(authResult.statusCode || 401);
 					this.metrics.trackMethod(trackingName, undefined, true);
-					res.set('WWW-Authenticate', OAUTH_RESOURCE);
+					res.set('WWW-Authenticate', buildOAuthResourceHeader(req));
 					res.status(authResult.statusCode || 401).send('Unauthorized');
 					return;
 				}

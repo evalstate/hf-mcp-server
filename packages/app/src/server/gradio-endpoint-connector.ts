@@ -51,6 +51,59 @@ interface EndpointConnection {
 	isPrivate?: boolean;
 }
 
+interface RegisterRemoteToolsOptions {
+	stripImageContent?: boolean;
+}
+
+interface ImageFilterOptions {
+	enabled: boolean;
+	toolName: string;
+	outwardFacingName: string;
+}
+
+export function stripImageContentFromResult(
+	callResult: typeof CallToolResultSchema._type,
+	{ enabled, toolName, outwardFacingName }: ImageFilterOptions
+): typeof CallToolResultSchema._type {
+	if (!enabled) {
+		return callResult;
+	}
+
+	const content = callResult.content;
+	if (!Array.isArray(content) || content.length === 0) {
+		return callResult;
+	}
+
+	const filteredContent = content.filter((item) => {
+		if (!item || typeof item !== 'object') {
+			return true;
+		}
+
+		const candidate = item as { type?: unknown };
+		const typeValue = typeof candidate.type === 'string' ? candidate.type.toLowerCase() : undefined;
+		return typeValue !== 'image';
+	});
+
+	if (filteredContent.length === content.length) {
+		return callResult;
+	}
+
+	const removedCount = content.length - filteredContent.length;
+	logger.debug(
+		{ tool: toolName, outwardFacingName, removedCount },
+		'Stripped image content from remote tool response'
+	);
+
+	if (filteredContent.length === 0) {
+		filteredContent.push({
+			type: 'text',
+			text: 'Image content omitted due to client configuration (no_image_content=true).',
+		});
+	}
+
+	return { ...callResult, content: filteredContent };
+}
+
 type EndpointConnectionResult =
 	| {
 			success: true;
@@ -366,7 +419,8 @@ function createToolHandler(
 		clientSessionId?: string;
 		isAuthenticated?: boolean;
 		clientInfo?: { name: string; version: string };
-	}
+	},
+	options: RegisterRemoteToolsOptions = {}
 ): (
 	params: Record<string, unknown>,
 	extra: RequestHandlerExtra<ServerRequest, ServerNotification>
@@ -513,7 +567,16 @@ function createToolHandler(
 								mimeType: `audio/wav`,
 							});
 
-							return { isError: false, content: [result.content[0], uiResource] } as typeof CallToolResultSchema._type;
+							const decoratedResult = {
+								isError: false,
+								content: [result.content[0], uiResource],
+							} as typeof CallToolResultSchema._type;
+
+							return stripImageContentFromResult(decoratedResult, {
+								enabled: !!options.stripImageContent,
+								toolName: tool.name,
+								outwardFacingName,
+							});
 						}
 					}
 				} catch (e) {
@@ -523,7 +586,11 @@ function createToolHandler(
 					);
 				}
 
-				return result;
+				return stripImageContentFromResult(result, {
+					enabled: !!options.stripImageContent,
+					toolName: tool.name,
+					outwardFacingName,
+				});
 			} catch (callError) {
 				// Handle request errors
 				success = false;
@@ -573,7 +640,8 @@ export function registerRemoteTools(
 		clientSessionId?: string;
 		isAuthenticated?: boolean;
 		clientInfo?: { name: string; version: string };
-	}
+	},
+	options: RegisterRemoteToolsOptions = {}
 ): void {
 	connection.tools.forEach((tool, toolIndex) => {
 		// Generate tool name
@@ -591,7 +659,7 @@ export function registerRemoteTools(
 		const schemaShape = convertToolSchemaToZod(tool);
 
 		// Create handler
-		const handler = createToolHandler(connection, tool, outwardFacingName, hfToken, sessionInfo);
+		const handler = createToolHandler(connection, tool, outwardFacingName, hfToken, sessionInfo, options);
 
 		// Log registration
 		logger.trace(

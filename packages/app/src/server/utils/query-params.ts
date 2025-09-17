@@ -12,6 +12,9 @@ export function extractQueryParamsToHeaders(req: Request, headers: Record<string
 	const forceauth = req.query.forceauth as string | undefined;
 	const login = req.query.login;
 	const auth = req.query.auth;
+	const noImageContent = Array.isArray(req.query.no_image_content)
+		? req.query.no_image_content[0]
+		: req.query.no_image_content;
 
 	if (bouquet) {
 		headers['x-mcp-bouquet'] = bouquet;
@@ -22,6 +25,13 @@ export function extractQueryParamsToHeaders(req: Request, headers: Record<string
 	if (gradio) {
 		headers['x-mcp-gradio'] = gradio;
 	}
+
+	if (typeof noImageContent === 'string') {
+		const normalized = noImageContent.trim().toLowerCase();
+		if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === '') {
+			headers['x-mcp-no-image-content'] = 'true';
+		}
+}
 
 	// Check if forceauth, login, or auth appears in the URL (with or without values)
 	if (forceauth || login !== undefined || auth !== undefined) {
