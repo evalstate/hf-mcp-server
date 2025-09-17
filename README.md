@@ -1,6 +1,6 @@
 # Hugging Face Official MCP Server 
 
-<img src='hf-logo.svg' width='100'>
+<img src='https://github.com/evalstate/hf-mcp-server/blob/main/hf-logo.svg' width='100'>
 
 Welcome to the official Hugging Face MCP Server 🤗. Connect your LLM to the Hugging Face Hub and thousands of Gradio AI Applications.
 
