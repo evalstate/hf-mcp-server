@@ -128,6 +128,8 @@ export const createProxyServerFactory = (
 
 		// Extract auth, bouquet, and gradio using shared utility
 		const { hfToken, bouquet, gradio } = extractAuthBouquetAndMix(headers);
+		const rawNoImageHeader = headers ? headers['x-mcp-no-image-content'] : undefined;
+		const stripImageContent = typeof rawNoImageHeader === 'string' && rawNoImageHeader.toLowerCase() === 'true';
 
 		// Skip expensive operations for requests that skip Gradio
 		let settings = userSettings;
@@ -227,7 +229,7 @@ export const createProxyServerFactory = (
 		for (const connection of connections) {
 			if (!connection.success) continue;
 
-			registerRemoteTools(server, connection.connection, hfToken, sessionInfo);
+			registerRemoteTools(server, connection.connection, hfToken, sessionInfo, { stripImageContent });
 
 			// Register Qwen Image prompt enhancer for specific tool
 			if (connection.connection.name?.toLowerCase() === 'mcp-tools/qwen-image') {

@@ -123,4 +123,37 @@ describe('extractQueryParamsToHeaders', () => {
 		expect(headers['x-mcp-mix']).toBe('search');
 		expect(headers['x-mcp-gradio']).toBe('evalstate/flux1_schnell');
 	});
+
+	it('should set no-image header when no_image_content=true', () => {
+		const req = {
+			query: { no_image_content: 'true' },
+		} as unknown as Request;
+
+		const headers: Record<string, string> = {};
+		extractQueryParamsToHeaders(req, headers);
+
+		expect(headers['x-mcp-no-image-content']).toBe('true');
+	});
+
+	it('should set no-image header when no_image_content is empty', () => {
+		const req = {
+			query: { no_image_content: '' },
+		} as unknown as Request;
+
+		const headers: Record<string, string> = {};
+		extractQueryParamsToHeaders(req, headers);
+
+		expect(headers['x-mcp-no-image-content']).toBe('true');
+	});
+
+	it('should ignore no_image_content when false', () => {
+		const req = {
+			query: { no_image_content: 'false' },
+		} as unknown as Request;
+
+		const headers: Record<string, string> = {};
+		extractQueryParamsToHeaders(req, headers);
+
+		expect(headers['x-mcp-no-image-content']).toBeUndefined();
+	});
 });

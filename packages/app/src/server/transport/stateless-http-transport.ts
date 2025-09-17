@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url';
 import { isJSONRPCNotification } from '@modelcontextprotocol/sdk/types.js';
 import { extractQueryParamsToHeaders } from '../utils/query-params.js';
 import { isBrowser } from '../utils/browser-detection.js';
-import { OAUTH_RESOURCE } from '../../shared/constants.js';
+import { buildOAuthResourceHeader } from '../utils/oauth-resource.js';
 import { randomUUID } from 'node:crypto';
 import { logSystemEvent } from '../utils/query-logger.js';
 
@@ -152,7 +152,7 @@ export class StatelessHttpTransport extends BaseTransport {
 
 		const authResult = await this.validateAuthAndTrackMetrics(headers);
 		if (!authResult.shouldContinue || trackingName === 'tools/call:Authenticate') {
-			res.set('WWW-Authenticate', OAUTH_RESOURCE);
+			res.set('WWW-Authenticate', buildOAuthResourceHeader(req));
 			res.status(authResult.statusCode || 401).send('Unauthorized');
 			return;
 		}
