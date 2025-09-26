@@ -3,6 +3,8 @@ import type { AppSettings, SpaceTool } from '../../shared/settings.js';
 import { ALL_BUILTIN_TOOL_IDS, HUB_INSPECT_TOOL_ID, TOOL_ID_GROUPS, USE_SPACE_TOOL_ID } from '@llmindset/hf-mcp';
 import type { McpApiClient } from './mcp-api-client.js';
 import { extractAuthBouquetAndMix } from '../utils/auth-utils.js';
+import { GRADIO_IMAGE_FILTER_FLAG, README_INCLUDE_FLAG } from '../../shared/behavior-flags.js';
+import { normalizeBuiltInTools } from '../../shared/tool-normalizer.js';
 
 export enum ToolSelectionMode {
 	BOUQUET_OVERRIDE = 'bouquet_override',
@@ -50,11 +52,15 @@ export const BOUQUETS: Record<string, AppSettings> = {
 	},
 	// Test bouquets for README inclusion behavior
 	hub_repo_details_readme: {
-		builtInTools: [HUB_INSPECT_TOOL_ID, 'INCLUDE_README'],
+		builtInTools: [HUB_INSPECT_TOOL_ID, README_INCLUDE_FLAG],
 		spaceTools: [],
 	},
 	hub_repo_details: {
 		builtInTools: [HUB_INSPECT_TOOL_ID],
+		spaceTools: [],
+	},
+	no_gradio_images: {
+		builtInTools: [GRADIO_IMAGE_FILTER_FLAG],
 		spaceTools: [],
 	},
 	mcp_ui: {
@@ -146,7 +152,9 @@ export class ToolSelectionStrategy {
 
 		// 1. Bouquet override (highest precedence)
 		if (bouquet && BOUQUETS[bouquet]) {
-			const enabledToolIds = this.applySearchEnablesFetch(BOUQUETS[bouquet].builtInTools);
+			const enabledToolIds = normalizeBuiltInTools(
+				this.applySearchEnablesFetch(BOUQUETS[bouquet].builtInTools)
+			);
 			logger.debug({ bouquet, enabledToolIds, gradioCount: gradioSpaceTools.length }, 'Using bouquet override');
 			return {
 				mode: ToolSelectionMode.BOUQUET_OVERRIDE,
@@ -162,8 +170,9 @@ export class ToolSelectionStrategy {
 		// 3. Apply mix if specified and we have base settings
 		if (mix && BOUQUETS[mix] && baseSettings) {
 			const mixedTools = [...baseSettings.builtInTools, ...BOUQUETS[mix].builtInTools];
-			const dedupedTools = [...new Set(mixedTools)]; // dedupe
-			const enabledToolIds = this.applySearchEnablesFetch(dedupedTools);
+			const enabledToolIds = normalizeBuiltInTools(
+				this.applySearchEnablesFetch([...new Set(mixedTools)])
+			);
 
 			logger.debug(
 				{
@@ -191,7 +200,9 @@ export class ToolSelectionStrategy {
 				? ToolSelectionMode.EXTERNAL_API
 				: ToolSelectionMode.INTERNAL_API;
 
-			const enabledToolIds = this.applySearchEnablesFetch(baseSettings.builtInTools);
+			const enabledToolIds = normalizeBuiltInTools(
+				this.applySearchEnablesFetch(baseSettings.builtInTools)
+			);
 
 			logger.debug(
 				{
@@ -215,7 +226,9 @@ export class ToolSelectionStrategy {
 
 		// 5. Fallback - all tools enabled
 		logger.warn('No settings available, using fallback (all tools enabled)');
-		const enabledToolIds = this.applySearchEnablesFetch([...ALL_BUILTIN_TOOL_IDS]);
+		const enabledToolIds = normalizeBuiltInTools(
+			this.applySearchEnablesFetch([...ALL_BUILTIN_TOOL_IDS])
+		);
 		return {
 			mode: ToolSelectionMode.FALLBACK,
 			enabledToolIds,

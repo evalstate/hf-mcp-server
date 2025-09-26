@@ -13,28 +13,24 @@ import { Button } from './components/ui/button';
 import { Separator } from './components/ui/separator';
 import { Copy, Settings } from 'lucide-react';
 import type { TransportInfo } from '../shared/transport-info.js';
+import { GRADIO_IMAGE_FILTER_FLAG, README_INCLUDE_FLAG } from '../shared/behavior-flags.js';
+import { normalizeBuiltInTools } from '../shared/tool-normalizer.js';
 import {
 	SPACE_SEARCH_TOOL_ID,
 	MODEL_SEARCH_TOOL_ID,
-	MODEL_DETAIL_TOOL_ID,
 	PAPER_SEARCH_TOOL_ID,
 	DATASET_SEARCH_TOOL_ID,
-	DATASET_DETAIL_TOOL_ID,
 	DUPLICATE_SPACE_TOOL_ID,
-	SPACE_INFO_TOOL_ID,
 	SPACE_FILES_TOOL_ID,
 	DOCS_SEMANTIC_SEARCH_TOOL_ID,
 	DOC_FETCH_TOOL_ID,
 	HUB_INSPECT_TOOL_ID,
 	SEMANTIC_SEARCH_TOOL_CONFIG,
 	MODEL_SEARCH_TOOL_CONFIG,
-	MODEL_DETAIL_TOOL_CONFIG,
 	PAPER_SEARCH_TOOL_CONFIG,
 	DATASET_SEARCH_TOOL_CONFIG,
-	DATASET_DETAIL_TOOL_CONFIG,
 	HUB_INSPECT_TOOL_CONFIG,
 	DUPLICATE_SPACE_TOOL_CONFIG,
-	SPACE_INFO_TOOL_CONFIG,
 	SPACE_FILES_TOOL_CONFIG,
 	DOCS_SEMANTIC_SEARCH_CONFIG,
 	DOC_FETCH_CONFIG,
@@ -77,6 +73,8 @@ function App() {
 
 	// Use SWR for settings
 	const { data: settings } = useSWR<AppSettings>('/api/settings', fetcher);
+	const readmeFlagEnabled = settings?.builtInTools?.includes(README_INCLUDE_FLAG) ?? false;
+	const gradioImageFilterEnabled = settings?.builtInTools?.includes(GRADIO_IMAGE_FILTER_FLAG) ?? false;
 
 	// Simple state: 3 text boxes, 3 checkboxes
 	const [spaceNames, setSpaceNames] = useState<string[]>(['', '', '']);
@@ -114,10 +112,11 @@ function App() {
 		try {
 			// Optimistic update - immediately update the UI
 			const currentSettings = settings || { builtInTools: [] };
-			const currentTools = currentSettings.builtInTools;
-			const newTools = checked
+			const currentTools = normalizeBuiltInTools(currentSettings.builtInTools);
+			const updatedTools = checked
 				? [...currentTools.filter((id) => id !== toolId), toolId]
 				: currentTools.filter((id) => id !== toolId);
+			const newTools = normalizeBuiltInTools(updatedTools);
 
 			const optimisticSettings = {
 				...currentSettings,
@@ -254,23 +253,11 @@ function App() {
 			description: MODEL_SEARCH_TOOL_CONFIG.description,
 			settings: { enabled: settings?.builtInTools?.includes(MODEL_SEARCH_TOOL_ID) ?? true },
 		},
-		model_details: {
-			id: MODEL_DETAIL_TOOL_ID,
-			label: MODEL_DETAIL_TOOL_CONFIG.annotations.title,
-			description: MODEL_DETAIL_TOOL_CONFIG.description,
-			settings: { enabled: settings?.builtInTools?.includes(MODEL_DETAIL_TOOL_ID) ?? true },
-		},
 		dataset_search: {
 			id: DATASET_SEARCH_TOOL_ID,
 			label: DATASET_SEARCH_TOOL_CONFIG.annotations.title,
 			description: DATASET_SEARCH_TOOL_CONFIG.description,
 			settings: { enabled: settings?.builtInTools?.includes(DATASET_SEARCH_TOOL_ID) ?? true },
-		},
-		dataset_details: {
-			id: DATASET_DETAIL_TOOL_ID,
-			label: DATASET_DETAIL_TOOL_CONFIG.annotations.title,
-			description: DATASET_DETAIL_TOOL_CONFIG.description,
-			settings: { enabled: settings?.builtInTools?.includes(DATASET_DETAIL_TOOL_ID) ?? true },
 		},
 		hub_repo_details: {
 			id: HUB_INSPECT_TOOL_ID,
@@ -279,11 +266,11 @@ function App() {
 			settings: { enabled: settings?.builtInTools?.includes(HUB_INSPECT_TOOL_ID) ?? true },
 		},
 		include_readme: {
-			id: 'INCLUDE_README',
-			label: 'Include README (flag)',
+			id: README_INCLUDE_FLAG,
+			label: 'Allow README Include (flag)',
 			description:
-				'Adds README content to hub_repo_details output when enabled. This is a behavior flag, not a tool. Requires reconnect to take effect',
-			settings: { enabled: settings?.builtInTools?.includes('INCLUDE_README') ?? false },
+				'Allows hub_repo_details to attach README content when the tool request explicitly opts in. Requires reconnect to take effect.',
+			settings: { enabled: readmeFlagEnabled },
 		},
 		doc_semantic_search: {
 			id: DOCS_SEMANTIC_SEARCH_TOOL_ID,
@@ -306,12 +293,6 @@ function App() {
 			description: DUPLICATE_SPACE_TOOL_CONFIG.description || 'Duplicate a Hugging Face Space to your account.',
 			settings: { enabled: settings?.builtInTools?.includes(DUPLICATE_SPACE_TOOL_ID) ?? true },
 		},
-		space_info: {
-			id: SPACE_INFO_TOOL_ID,
-			label: SPACE_INFO_TOOL_CONFIG.annotations.title,
-			description: SPACE_INFO_TOOL_CONFIG.description || 'Get detailed information about Hugging Face Spaces.',
-			settings: { enabled: settings?.builtInTools?.includes(SPACE_INFO_TOOL_ID) ?? true },
-		},
 		space_files: {
 			id: SPACE_FILES_TOOL_ID,
 			label: SPACE_FILES_TOOL_CONFIG.annotations.title,
@@ -319,6 +300,14 @@ function App() {
 				SPACE_FILES_TOOL_CONFIG.description || 'List all files in a static Hugging Face Space with download URLs.',
 			settings: { enabled: settings?.builtInTools?.includes(SPACE_FILES_TOOL_ID) ?? true },
 		},
+		no_gradio_images: {
+			id: GRADIO_IMAGE_FILTER_FLAG,
+			label: 'Disable Gradio Images (flag)',
+			description:
+				"Strips image responses from Gradio spaces. Mirrors the 'no_image_content' URL parameter and requires reconnect to take effect.",
+			settings: { enabled: gradioImageFilterEnabled },
+		},
+
 	};
 
 	return (

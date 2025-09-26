@@ -3,6 +3,7 @@ import type { ServerFactory, ServerFactoryResult } from './transport/base-transp
 import type { McpApiClient } from './utils/mcp-api-client.js';
 import type { WebServer } from './web-server.js';
 import type { AppSettings } from '../shared/settings.js';
+import { GRADIO_IMAGE_FILTER_FLAG } from '../shared/behavior-flags.js';
 import { logger } from './utils/logger.js';
 import { connectToGradioEndpoints, registerRemoteTools } from './gradio-endpoint-connector.js';
 import { extractAuthBouquetAndMix } from './utils/auth-utils.js';
@@ -129,7 +130,8 @@ export const createProxyServerFactory = (
 		// Extract auth, bouquet, and gradio using shared utility
 		const { hfToken, bouquet, gradio } = extractAuthBouquetAndMix(headers);
 		const rawNoImageHeader = headers ? headers['x-mcp-no-image-content'] : undefined;
-		const stripImageContent = typeof rawNoImageHeader === 'string' && rawNoImageHeader.toLowerCase() === 'true';
+		const noImageFromHeader =
+			typeof rawNoImageHeader === 'string' && rawNoImageHeader.toLowerCase() === 'true';
 
 		// Skip expensive operations for requests that skip Gradio
 		let settings = userSettings;
@@ -147,6 +149,9 @@ export const createProxyServerFactory = (
 			logger.debug('Skipping Gradio endpoints (initialize or non-Gradio tool call)');
 			return result;
 		}
+
+		const noImageFromSettings = settings?.builtInTools?.includes(GRADIO_IMAGE_FILTER_FLAG) ?? false;
+		const stripImageContent = noImageFromHeader || noImageFromSettings;
 
 		// Skip Gradio endpoints if bouquet is not "all"
 		if (bouquet && bouquet !== 'all') {

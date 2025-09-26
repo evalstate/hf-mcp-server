@@ -62,6 +62,7 @@ import { logSearchQuery, logPromptQuery } from './utils/query-logger.js';
 import { DEFAULT_SPACE_TOOLS, type AppSettings } from '../shared/settings.js';
 import { extractAuthBouquetAndMix } from './utils/auth-utils.js';
 import { ToolSelectionStrategy, type ToolSelectionContext } from './utils/tool-selection-strategy.js';
+import { hasReadmeFlag } from '../shared/behavior-flags.js';
 
 // Fallback settings when API fails (enables all tools)
 export const BOUQUET_FALLBACK: AppSettings = {
@@ -157,7 +158,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			disable(): void;
 		}
 
-		// Get tool selection first (needed for runtime configuration like INCLUDE_README)
+		// Get tool selection first (needed for runtime configuration like ALLOW_README_INCLUDE)
 		const toolSelectionContext: ToolSelectionContext = {
 			headers,
 			userSettings,
@@ -481,7 +482,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		);
 
 		// Compute README availability; adjust description and schema accordingly
-		const hubInspectReadmeAllowed = toolSelection.enabledToolIds.includes('INCLUDE_README');
+		const hubInspectReadmeAllowed = hasReadmeFlag(toolSelection.enabledToolIds);
 		const hubInspectDescription = hubInspectReadmeAllowed
 			? `${HUB_INSPECT_TOOL_CONFIG.description} README file is included from the external repository.`
 			: HUB_INSPECT_TOOL_CONFIG.description;
@@ -501,7 +502,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			async (params: Record<string, unknown>) => {
 				// Re-evaluate flag dynamically to reflect UI changes without restarting server
 				const currentSelection = await toolSelectionStrategy.selectTools(toolSelectionContext);
-				const allowReadme = currentSelection.enabledToolIds.includes('INCLUDE_README');
+				const allowReadme = hasReadmeFlag(currentSelection.enabledToolIds);
 				const wantReadme = (params as { include_readme?: boolean }).include_readme === true; // explicit opt-in required
 				const includeReadme = allowReadme && wantReadme;
 

@@ -4,7 +4,6 @@
 
 Welcome to the official Hugging Face MCP Server 🤗. Connect your LLM to the Hugging Face Hub and thousands of Gradio AI Applications.
 
-
 ## Installing the MCP Server
 
 Follow the instructions below to get started:
