@@ -683,6 +683,15 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			},
 		});
 
+		// Remove the completions capability that was auto-added by prompt registration
+		// The MCP SDK automatically adds this when prompts are registered, but we don't want it
+		// @ts-ignore - accessing private property to remove unwanted capability
+		if (server.server._capabilities?.completions) {
+			// @ts-ignore
+			delete server.server._capabilities.completions;
+			logger.debug('Removed auto-added completions capability');
+		}
+
 		if (!skipGradio) {
 			void applyToolStates();
 
