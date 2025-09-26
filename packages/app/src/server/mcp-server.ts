@@ -685,9 +685,9 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 
 		// Remove the completions capability that was auto-added by prompt registration
 		// The MCP SDK automatically adds this when prompts are registered, but we don't want it
-		// @ts-expect-error
+		// @ts-expect-error quick workaround for an SDK issue (adding prompt/resource adds completions)
 		if (server.server._capabilities?.completions) {
-			// @ts-expect-error
+			// @ts-expect-error quick workaround for an SDK issue (adding prompt/resource adds completions)
 			delete server.server._capabilities.completions;
 			logger.debug('Removed auto-added completions capability');
 		}
