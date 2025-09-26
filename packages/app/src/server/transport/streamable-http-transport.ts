@@ -249,6 +249,7 @@ export class StreamableHttpTransport extends StatefulTransport<Session> {
 						isAuthenticated: !!requestHeaders?.['authorization'],
 						capabilities: {},
 					},
+					cleaningUp: false,
 				};
 
 				this.sessions.set(sessionId, session);

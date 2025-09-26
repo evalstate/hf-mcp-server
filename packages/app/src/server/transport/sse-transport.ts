@@ -125,6 +125,7 @@ export class SseTransport extends StatefulTransport<SSEConnection> {
 					isAuthenticated: authResult.shouldContinue && !!headers['authorization'],
 					capabilities: {},
 				},
+				cleaningUp: false,
 			};
 
 			this.sessions.set(sessionId, connection);
