@@ -10,6 +10,7 @@ import type { AppSettings } from '../../../src/shared/settings.js';
 import type { TransportInfo } from '../../../src/shared/transport-info.js';
 import { ALL_BUILTIN_TOOL_IDS, TOOL_ID_GROUPS } from '@llmindset/hf-mcp';
 import { extractAuthBouquetAndMix } from '../../../src/server/utils/auth-utils.js';
+import { normalizeBuiltInTools } from '../../../src/shared/tool-normalizer.js';
 
 describe('extractBouquetAndMix', () => {
 	it('should extract bouquet from headers', () => {
@@ -169,7 +170,7 @@ describe('ToolSelectionStrategy', () => {
 			const result = await strategy.selectTools(context);
 
 			expect(result.mode).toBe(ToolSelectionMode.BOUQUET_OVERRIDE);
-			expect(result.enabledToolIds).toEqual(ALL_BUILTIN_TOOL_IDS);
+			expect(result.enabledToolIds).toEqual(normalizeBuiltInTools(ALL_BUILTIN_TOOL_IDS));
 			expect(result.reason).toBe('Bouquet override: all');
 		});
 
@@ -183,7 +184,7 @@ describe('ToolSelectionStrategy', () => {
 
 			// Should fall through to fallback since no valid bouquet or user settings
 			expect(result.mode).toBe(ToolSelectionMode.FALLBACK);
-			expect(result.enabledToolIds).toEqual(ALL_BUILTIN_TOOL_IDS);
+			expect(result.enabledToolIds).toEqual(normalizeBuiltInTools(ALL_BUILTIN_TOOL_IDS));
 		});
 
 		it('should prefer bouquet over mix when both are present', async () => {
@@ -287,7 +288,7 @@ describe('ToolSelectionStrategy', () => {
 
 			// Should fall through to fallback since no user settings to mix with
 			expect(result.mode).toBe(ToolSelectionMode.FALLBACK);
-			expect(result.enabledToolIds).toEqual(ALL_BUILTIN_TOOL_IDS);
+			expect(result.enabledToolIds).toEqual(normalizeBuiltInTools(ALL_BUILTIN_TOOL_IDS));
 		});
 
 		it('should ignore invalid mix bouquet names', async () => {
@@ -380,7 +381,7 @@ describe('ToolSelectionStrategy', () => {
 			const result = await strategy.selectTools(context);
 
 			expect(result.mode).toBe(ToolSelectionMode.FALLBACK);
-			expect(result.enabledToolIds).toEqual(ALL_BUILTIN_TOOL_IDS);
+			expect(result.enabledToolIds).toEqual(normalizeBuiltInTools(ALL_BUILTIN_TOOL_IDS));
 			expect(result.reason).toBe('Fallback - no settings available');
 			expect(result.baseSettings).toBeUndefined();
 		});
@@ -394,7 +395,7 @@ describe('ToolSelectionStrategy', () => {
 			const result = await strategy.selectTools(context);
 
 			expect(result.mode).toBe(ToolSelectionMode.FALLBACK);
-			expect(result.enabledToolIds).toEqual(ALL_BUILTIN_TOOL_IDS);
+			expect(result.enabledToolIds).toEqual(normalizeBuiltInTools(ALL_BUILTIN_TOOL_IDS));
 		});
 	});
 
@@ -457,7 +458,7 @@ describe('ToolSelectionStrategy', () => {
 				expect(result.mixedBouquet).toBe(bouquetName);
 
 				const expectedTools = [...new Set([...userSettings.builtInTools, ...bouquetConfig.builtInTools])];
-				expect(result.enabledToolIds).toEqual(expectedTools);
+				expect(result.enabledToolIds).toEqual(normalizeBuiltInTools(expectedTools));
 			}
 		});
 
@@ -494,7 +495,7 @@ describe('ToolSelectionStrategy', () => {
 
 			// Should get user's minimal tools + ALL built-in tools (deduplicated)
 			const expectedBuiltInTools = [...new Set([...userSettings.builtInTools, ...ALL_BUILTIN_TOOL_IDS])];
-			expect(result.enabledToolIds).toEqual(expectedBuiltInTools);
+			expect(result.enabledToolIds).toEqual(normalizeBuiltInTools(expectedBuiltInTools));
 
 			// Should preserve base settings including gradio endpoints
 			expect(result.baseSettings).toEqual(userSettings);
