@@ -69,6 +69,7 @@ export interface BaseSession<T = unknown> {
 	server: McpServer;
 	metadata: SessionMetadata;
 	heartbeatInterval?: NodeJS.Timeout;
+	cleaningUp?: boolean;
 }
 
 /**
@@ -680,6 +681,13 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 		try {
 			const session = this.sessions.get(sessionId);
 			if (!session) return;
+
+			// Prevent recursive cleanup
+			if (session.cleaningUp) {
+				logger.debug({ sessionId }, 'Session already being cleaned up, skipping');
+				return;
+			}
+			session.cleaningUp = true;
 
 			logger.debug({ sessionId }, 'Cleaning up session');
 

@@ -4,6 +4,7 @@ import type { AppSettings } from '../../shared/settings.js';
 import type { TransportInfo } from '../../shared/transport-info.js';
 import { BOUQUET_FALLBACK } from '../mcp-server.js';
 import { ALL_BUILTIN_TOOL_IDS } from '@llmindset/hf-mcp';
+import { normalizeBuiltInTools } from '../../shared/tool-normalizer.js';
 import { apiMetrics } from '../utils/api-metrics.js';
 export interface ToolStateChangeCallback {
 	(toolId: string, enabled: boolean): void;
@@ -25,6 +26,14 @@ export interface ApiClientConfig {
 	userConfigUrl?: string;
 	hfToken?: string;
 	staticGradioEndpoints?: GradioEndpoint[];
+}
+
+function withNormalizedFlags(settings: AppSettings): AppSettings {
+	const normalizedBuiltInTools = normalizeBuiltInTools(settings.builtInTools);
+	const isIdentical =
+		normalizedBuiltInTools.length === settings.builtInTools.length &&
+		normalizedBuiltInTools.every((value, index) => value === settings.builtInTools[index]);
+	return isIdentical ? settings : { ...settings, builtInTools: normalizedBuiltInTools };
 }
 
 export class McpApiClient extends EventEmitter {
@@ -56,24 +65,24 @@ export class McpApiClient extends EventEmitter {
 			case 'polling':
 				if (!this.config.baseUrl) {
 					logger.error('baseUrl required for polling mode');
-					return BOUQUET_FALLBACK;
+					return withNormalizedFlags(BOUQUET_FALLBACK);
 				}
 				try {
 					const response = await fetch(`${this.config.baseUrl}/api/settings`);
 					if (!response.ok) {
 						logger.error(`Failed to fetch settings: ${response.status.toString()} ${response.statusText}`);
-						return BOUQUET_FALLBACK;
+						return withNormalizedFlags(BOUQUET_FALLBACK);
 					}
-					return (await response.json()) as AppSettings;
+					return withNormalizedFlags((await response.json()) as AppSettings);
 				} catch (error) {
 					logger.error({ error }, 'Error fetching settings from local API');
-					return BOUQUET_FALLBACK;
+					return withNormalizedFlags(BOUQUET_FALLBACK);
 				}
 
 			case 'external':
 				if (!this.config.externalUrl) {
 					logger.error('externalUrl required for external mode');
-					return BOUQUET_FALLBACK;
+					return withNormalizedFlags(BOUQUET_FALLBACK);
 				}
 				try {
 					const token = overrideToken || this.config.hfToken;
@@ -81,7 +90,7 @@ export class McpApiClient extends EventEmitter {
 						// Record anonymous access (successful fallback usage)
 						apiMetrics.recordCall(false, 200);
 						logger.debug('No HF token available for external config API - using fallback');
-						return BOUQUET_FALLBACK;
+						return withNormalizedFlags(BOUQUET_FALLBACK);
 					}
 
 					const headers: Record<string, string> = {};
@@ -114,20 +123,20 @@ export class McpApiClient extends EventEmitter {
 						logger.debug(
 							`Failed to fetch external settings: ${response.status.toString()} ${response.statusText} - using fallback bouquet`
 						);
-						return BOUQUET_FALLBACK;
+						return withNormalizedFlags(BOUQUET_FALLBACK);
 					}
 
 					// Record metrics for successful responses
 					apiMetrics.recordCall(hasToken, response.status);
-					return (await response.json()) as AppSettings;
+					return withNormalizedFlags((await response.json()) as AppSettings);
 				} catch (error) {
 					logger.warn({ error }, 'Error fetching settings from external API - defaulting to fallback bouquet');
-					return BOUQUET_FALLBACK;
+					return withNormalizedFlags(BOUQUET_FALLBACK);
 				}
 
 			default:
 				logger.error(`Unknown API client type: ${String(this.config.type)}`);
-				return BOUQUET_FALLBACK;
+				return withNormalizedFlags(BOUQUET_FALLBACK);
 		}
 	}
 
@@ -149,20 +158,20 @@ export class McpApiClient extends EventEmitter {
 			logger.trace({ gradioEndpoints: this.gradioEndpoints }, 'Updated gradio endpoints from external API');
 		}
 
-    // Create tool states: enabled tools = true, rest = false
-    const toolStates: Record<string, boolean> = {};
-    for (const toolId of ALL_BUILTIN_TOOL_IDS) {
-        toolStates[toolId] = settings.builtInTools.includes(toolId);
-    }
+		// Create tool states: enabled tools = true, rest = false
+		const toolStates: Record<string, boolean> = {};
+		for (const toolId of ALL_BUILTIN_TOOL_IDS) {
+			toolStates[toolId] = settings.builtInTools.includes(toolId);
+		}
 
-    // Include virtual/behavior flags that aren't real tools (e.g., INCLUDE_README)
-    // Anything present in builtInTools but not in ALL_BUILTIN_TOOL_IDS is treated as an enabled flag.
-    for (const id of settings.builtInTools) {
-        if (!(id in toolStates)) {
-            toolStates[id] = true;
-        }
-    }
-    return toolStates;
+		// Include virtual/behavior flags that aren't real tools (e.g., ALLOW_README_INCLUDE)
+		// Anything present in builtInTools but not in ALL_BUILTIN_TOOL_IDS is treated as an enabled flag.
+		for (const id of settings.builtInTools) {
+			if (!(id in toolStates)) {
+				toolStates[id] = true;
+			}
+		}
+		return toolStates;
 	}
 
 	getGradioEndpoints(): GradioEndpoint[] {

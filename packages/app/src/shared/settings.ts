@@ -4,6 +4,7 @@
  */
 
 import { ALL_BUILTIN_TOOL_IDS } from '@llmindset/hf-mcp';
+import { normalizeBuiltInTools } from './tool-normalizer.js';
 
 // Define the settings types
 export interface SpaceTool {
@@ -38,7 +39,7 @@ export const DEFAULT_SPACE_TOOLS: SpaceTool[] = [
 
 // Default settings
 const defaultSettings: AppSettings = {
-	builtInTools: [...ALL_BUILTIN_TOOL_IDS],
+	builtInTools: normalizeBuiltInTools([...ALL_BUILTIN_TOOL_IDS]),
 	spaceTools: [...DEFAULT_SPACE_TOOLS],
 };
 
@@ -58,9 +59,10 @@ export const settingsService = {
 	 * Update built-in tools array
 	 */
 	updateBuiltInTools(builtInTools: string[]): AppSettings {
+		const normalized = normalizeBuiltInTools(builtInTools);
 		settings = {
 			...settings,
-			builtInTools: [...builtInTools],
+			builtInTools: [...normalized],
 		};
 		return { ...settings };
 	},
