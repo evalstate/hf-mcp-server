@@ -1,5 +1,5 @@
 import asyncio
-from mcp_agent.core.fastagent import FastAgent
+from fast_agent import FastAgent
 
 # Create the application
 fast = FastAgent("mcp server tests")
