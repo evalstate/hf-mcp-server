@@ -1,8 +1,36 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { DocFetchTool, normalizeDocUrl } from './doc-fetch.js';
+
+const createMockResponse = ({
+	content,
+	contentType = 'text/html',
+	status = 200,
+	statusText = 'OK',
+}: {
+	content: string;
+	contentType?: string;
+	status?: number;
+	statusText?: string;
+}) =>
+	new Response(content, {
+		status,
+		statusText,
+		headers: { 'content-type': contentType },
+	});
+
+const stubFetch = (factory: () => Response) => {
+	const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(factory()));
+	vi.stubGlobal('fetch', fetchMock);
+	return fetchMock;
+};
 
 describe('DocFetchTool', () => {
     const tool = new DocFetchTool();
+
+	afterEach(() => {
+		vi.clearAllMocks();
+		vi.unstubAllGlobals();
+	});
 
 	describe('URL validation', () => {
 		it('should accept valid HF and Gradio docs URLs', () => {
@@ -38,13 +66,30 @@ describe('DocFetchTool', () => {
 	});
 
 	describe('document chunking', () => {
+		it('uses markdown content from host when available', async () => {
+			const markdown = '# Heading\nBody content';
+			const fetchMock = stubFetch(() =>
+				createMockResponse({
+					content: markdown,
+					contentType: 'text/markdown',
+				}),
+			);
+
+			const result = await tool.fetch({ doc_url: 'https://huggingface.co/docs/test' });
+			expect(fetchMock).toHaveBeenCalledWith('https://huggingface.co/docs/test', {
+				headers: { accept: 'text/markdown' },
+			});
+			expect(result).toBe(markdown);
+		});
+
 		it('should return small documents without chunking', async () => {
 			
 			// Mock fetch to return HTML that converts to short markdown
-			global.fetch = vi.fn().mockResolvedValue({
-				ok: true,
-				text: () => Promise.resolve('<h1>Short Document</h1><p>This is a short document.</p>'),
-			});
+			stubFetch(() =>
+				createMockResponse({
+					content: '<h1>Short Document</h1><p>This is a short document.</p>',
+				}),
+			);
 
 			const result = await tool.fetch({ doc_url: 'https://huggingface.co/docs/test' });
 			
@@ -57,10 +102,11 @@ describe('DocFetchTool', () => {
 			// Mock fetch to return HTML that converts to long markdown
 			const longHtml = '<h1>Long Document</h1>' + '<p>This is a very long sentence that will be repeated many times to create a document that exceeds the 7500 token limit for testing chunking functionality.</p>'.repeat(200);
 			
-			global.fetch = vi.fn().mockResolvedValue({
-				ok: true,
-				text: () => Promise.resolve(longHtml),
-			});
+			stubFetch(() =>
+				createMockResponse({
+					content: longHtml,
+				}),
+			);
 
 			const result = await tool.fetch({ doc_url: 'https://huggingface.co/docs/test' });
 			
@@ -85,10 +131,11 @@ describe('DocFetchTool', () => {
 			// Mock fetch to return the same long HTML
 			const longHtml = '<h1>Long Document</h1>' + '<p>This is a very long sentence that will be repeated many times to create a document that exceeds the 7500 token limit for testing chunking functionality.</p>'.repeat(200);
 			
-			global.fetch = vi.fn().mockResolvedValue({
-				ok: true,
-				text: () => Promise.resolve(longHtml),
-			});
+			stubFetch(() =>
+				createMockResponse({
+					content: longHtml,
+				}),
+			);
 
 			// Get first chunk
 			const firstChunk = await tool.fetch({ doc_url: 'https://huggingface.co/docs/test' });
@@ -106,10 +153,11 @@ describe('DocFetchTool', () => {
 		});
 
 		it('should handle offset beyond document length', async () => {
-			global.fetch = vi.fn().mockResolvedValue({
-				ok: true,
-				text: () => Promise.resolve('<h1>Short Document</h1><p>This is short.</p>'),
-			});
+			stubFetch(() =>
+				createMockResponse({
+					content: '<h1>Short Document</h1><p>This is short.</p>',
+				}),
+			);
 
 			const result = await tool.fetch({ doc_url: 'https://huggingface.co/docs/test', offset: 10000 });
 			
