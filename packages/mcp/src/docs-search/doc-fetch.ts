@@ -147,7 +147,6 @@ export class DocFetchTool {
 			this.validateUrl(normalizedUrl);
 
 			const response = await fetch(normalizedUrl, { headers: { accept: 'text/markdown' } });
-			console.error(response.headers);
 			if (!response.ok) {
 				throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
 			}
