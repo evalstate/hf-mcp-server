@@ -67,7 +67,8 @@ export class DocFetchTool {
 			const nodeName = ((node as unknown as { nodeName?: string }).nodeName || '').toLowerCase();
 			if (nodeName === 'img') {
 				try {
-					const src = (node as unknown as { getAttribute?: (name: string) => string | null }).getAttribute?.('src') ??
+					const src =
+						(node as unknown as { getAttribute?: (name: string) => string | null }).getAttribute?.('src') ??
 						((node as unknown as { src?: string }).src || '');
 					if (
 						/\.svg(\?|$)/i.test(src) ||
@@ -87,13 +88,22 @@ export class DocFetchTool {
 		this.turndownService.addRule('dropHeadingAnchors', {
 			filter: (node) => {
 				try {
-					const n = node as unknown as { nodeName?: string; getAttribute?: (k: string) => string | null; textContent?: string; childNodes?: Array<{ nodeName?: string }> };
+					const n = node as unknown as {
+						nodeName?: string;
+						getAttribute?: (k: string) => string | null;
+						textContent?: string;
+						childNodes?: Array<{ nodeName?: string }>;
+					};
 					if ((n.nodeName || '').toLowerCase() !== 'a') return false;
 					const href = n.getAttribute?.('href') || '';
 					if (!href || !href.startsWith('#')) return false;
 					const text = (n.textContent || '').trim();
 					const children = (n as unknown as { childNodes?: Array<{ nodeName?: string }> }).childNodes || [];
-					const onlyIcons = children.length > 0 && children.every((c) => ((c.nodeName || '').toLowerCase() === 'img' || (c.nodeName || '').toLowerCase() === 'svg'));
+					const onlyIcons =
+						children.length > 0 &&
+						children.every(
+							(c) => (c.nodeName || '').toLowerCase() === 'img' || (c.nodeName || '').toLowerCase() === 'svg'
+						);
 					const looksLikeEncodedSvg = /data:image\/svg\+xml|%3csvg|svg%2bxml/i.test(text);
 					const noAlnumText = text.length <= 3 && !/[a-z0-9]/i.test(text);
 					return onlyIcons || looksLikeEncodedSvg || noAlnumText;
@@ -101,7 +111,7 @@ export class DocFetchTool {
 					return false;
 				}
 			},
-			replacement: () => ''
+			replacement: () => '',
 		});
 	}
 
@@ -136,36 +146,34 @@ export class DocFetchTool {
 			const normalizedUrl = normalizeDocUrl(params.doc_url);
 			this.validateUrl(normalizedUrl);
 
-			const response = await fetch(normalizedUrl);
-
+			const response = await fetch(normalizedUrl, { headers: { accept: 'text/markdown' } });
 			if (!response.ok) {
 				throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
 			}
+			let content = await response.text();
+			const contentType = response.headers.get('content-type') || '';
+			const isPlainOrMarkdown = contentType.includes('text/plain') || contentType.includes('text/markdown');
+			if (!isPlainOrMarkdown) {
+				// attempt conversion to markdown
+				content = this.turndownService.turndown(content);
 
-			const htmlContent = await response.text();
+				// Post-process: strip any leftover SVG images that slipped past DOM filters
+				//  - Markdown images pointing to data:image/svg+xml or *.svg
+				//  - Empty links left behind after image removal: [](...)
+				content = content
+					.replace(/!\[[^\]]*\]\(\s*(?:data:image\/svg\+xml[^)]*|[^)]*\.svg(?:\?[^)]*)?)\s*\)/gi, '')
+					.replace(/\[\s*\]\(\s*[^)]*\s*\)/g, '');
 
-			// Convert HTML to Markdown
-			let fullMarkdownContent = this.turndownService.turndown(htmlContent);
-
-			// Post-process: strip any leftover SVG images that slipped past DOM filters
-			//  - Markdown images pointing to data:image/svg+xml or *.svg
-			//  - Empty links left behind after image removal: [](...)
-			fullMarkdownContent = fullMarkdownContent
-				.replace(/!\[[^\]]*\]\(\s*(?:data:image\/svg\+xml[^)]*|[^)]*\.svg(?:\?[^)]*)?)\s*\)/gi, '')
-				.replace(/\[\s*\]\(\s*[^)]*\s*\)/g, '');
-
-			// Remove anchors whose link text still contains encoded SVG payloads (edge cases)
-			fullMarkdownContent = fullMarkdownContent
-				.replace(/\[[^\]]*(?:data:image\/svg\+xml|%3csvg|svg%2bxml)[^\]]*\]\([^)]*\)/gi, '');
+				// Remove anchors whose link text still contains encoded SVG payloads (edge cases)
+				content = content.replace(/\[[^\]]*(?:data:image\/svg\+xml|%3csvg|svg%2bxml)[^\]]*\]\([^)]*\)/gi, '');
+			}
 
 			// Apply chunking logic
-			return this.applyChunking(fullMarkdownContent, params.offset || 0);
+			return this.applyChunking(content, params.offset || 0);
 		} catch (error) {
 			throw new Error(`Failed to fetch document: ${error instanceof Error ? error.message : 'Unknown error'}`);
 		}
 	}
-
-
 
 	/**
 	 * Apply chunking logic to markdown content
@@ -213,15 +221,23 @@ export class DocFetchTool {
  * - Convert gradio.app → www.gradio.app so pages resolve correctly
  */
 export function normalizeDocUrl(input: string): string {
-    try {
-        const url = new URL(input);
-        const host = url.hostname.toLowerCase();
-        if (host === 'gradio.app') {
-            url.hostname = 'www.gradio.app';
-            return url.toString();
-        }
-        return input;
-    } catch {
-        return input;
-    }
+	try {
+		const trimmed = input.trim();
+		if (trimmed.startsWith('/docs')) {
+			return `https://huggingface.co${trimmed}`;
+		}
+		if (trimmed.startsWith('./docs')) {
+			return `https://huggingface.co/${trimmed.slice(2)}`;
+		}
+
+		const url = new URL(trimmed);
+		const host = url.hostname.toLowerCase();
+		if (host === 'gradio.app') {
+			url.hostname = 'www.gradio.app';
+			return url.toString();
+		}
+		return trimmed;
+	} catch {
+		return input;
+	}
 }
