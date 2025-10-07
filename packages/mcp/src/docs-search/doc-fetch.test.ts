@@ -120,11 +120,40 @@ describe('DocFetchTool', () => {
 				{ in: 'https://gradio.app/guides/x', out: 'https://www.gradio.app/guides/x' },
 				{ in: 'https://www.gradio.app/guides/x', out: 'https://www.gradio.app/guides/x' },
 				{ in: 'https://huggingface.co/docs/transformers', out: 'https://huggingface.co/docs/transformers' },
+				{ in: '/docs/diffusers/index', out: 'https://huggingface.co/docs/diffusers/index' },
+				{ in: './docs/diffusers/index', out: 'https://huggingface.co/docs/diffusers/index' },
 				{ in: 'not a url', out: 'not a url' },
 			];
 			for (const c of cases) {
 				expect(normalizeDocUrl(c.in)).toBe(c.out);
 			}
+		});
+
+		it('normalizes relative doc paths to the huggingface docs host', async () => {
+			const fetchMock = stubFetch(() =>
+				createMockResponse({
+					content: '<h1>Title</h1><p>Body</p>',
+				}),
+			);
+
+			const result = await tool.fetch({ doc_url: '/docs/test' });
+			expect(fetchMock).toHaveBeenCalledWith('https://huggingface.co/docs/test', {
+				headers: { accept: 'text/markdown' },
+			});
+			expect(result).toContain('# Title');
+		});
+
+		it('normalizes ./docs paths to the huggingface docs host', async () => {
+			const fetchMock = stubFetch(() =>
+				createMockResponse({
+					content: '<h1>Another Title</h1><p>Body</p>',
+				}),
+			);
+
+			await tool.fetch({ doc_url: './docs/another' });
+			expect(fetchMock).toHaveBeenCalledWith('https://huggingface.co/docs/another', {
+				headers: { accept: 'text/markdown' },
+			});
 		});
 
 		it('should return subsequent chunks with offset', async () => {

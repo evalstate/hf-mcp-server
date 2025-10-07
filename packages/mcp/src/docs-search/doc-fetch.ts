@@ -222,13 +222,21 @@ export class DocFetchTool {
  */
 export function normalizeDocUrl(input: string): string {
 	try {
-		const url = new URL(input);
+		const trimmed = input.trim();
+		if (trimmed.startsWith('/docs')) {
+			return `https://huggingface.co${trimmed}`;
+		}
+		if (trimmed.startsWith('./docs')) {
+			return `https://huggingface.co/${trimmed.slice(2)}`;
+		}
+
+		const url = new URL(trimmed);
 		const host = url.hostname.toLowerCase();
 		if (host === 'gradio.app') {
 			url.hostname = 'www.gradio.app';
 			return url.toString();
 		}
-		return input;
+		return trimmed;
 	} catch {
 		return input;
 	}
