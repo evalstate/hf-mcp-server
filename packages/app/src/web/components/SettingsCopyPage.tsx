@@ -1102,7 +1102,7 @@ export function SettingsCopyPage() {
 									<div>
 										<h4 className="font-semibold text-sm text-foreground">
 											<a
-												href="https://github.com/evalstate/hf-mcp-server"
+												href="https://github.com/huggingface/hf-mcp-server"
 												target="_blank"
 												rel="noopener noreferrer"
 												className="hover:text-primary hover:underline transition-colors duration-200 inline-flex items-center space-x-1"
