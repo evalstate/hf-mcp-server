@@ -82,8 +82,8 @@ If you prefer to use configure manually or specify an Authorization Token, use t
 
 Once installed, navigate to https://huggingface.co/settings/mcp to configure your Tools and Spaces.
 
-[!TIP]
-Add ?no_image_content=true to the URL to remove ImageContent blocks from Gradio Servers.
+> [!TIP]
+> Add ?no_image_content=true to the URL to remove ImageContent blocks from Gradio Servers.
 
 
 ![hf_mcp_server_small](https://github.com/user-attachments/assets/d30f9f56-b08c-4dfc-a68f-a164a93db564)
