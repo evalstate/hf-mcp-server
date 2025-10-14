@@ -37,3 +37,6 @@ packages/e2e-python/fastagent.secrets.yaml
 packages/e2e-python/fastagent.jsonl
 .env.test-analytics
 packages/e2e-python/qwen-test/fastagent.secrets.yaml
+
+# Generated files
+packages/app/src/server/resources/gradio-widget-content.ts

@@ -6,13 +6,16 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 
 // https://vite.dev/config/
 export default defineConfig(() => {
-	// Conditionally apply singlefile plugin only to mcp-welcome build
+	// Conditionally apply singlefile plugin for specific build targets
 	const plugins = [react(), tailwindcss()];
 
-	// Check if we're building the mcp-welcome page specifically
-	const isMcpWelcomeBuild = process.env.VITE_BUILD_TARGET === 'mcp-welcome';
+	// Check which specific build target is being used
+	const buildTarget = process.env.VITE_BUILD_TARGET;
+	const isMcpWelcomeBuild = buildTarget === 'mcp-welcome';
+	const isGradioWidgetBuild = buildTarget === 'gradio-widget';
+	const isSingleFileBuild = isMcpWelcomeBuild || isGradioWidgetBuild;
 
-	if (isMcpWelcomeBuild) {
+	if (isSingleFileBuild) {
 		plugins.push(viteSingleFile());
 	}
 
@@ -29,10 +32,13 @@ export default defineConfig(() => {
 			rollupOptions: {
 				input: isMcpWelcomeBuild
 					? { mcpWelcome: path.resolve(__dirname, './src/web/mcp-welcome.html') }
-					: {
-							main: path.resolve(__dirname, './src/web/index.html'),
-							mcpWelcome: path.resolve(__dirname, './src/web/mcp-welcome.html'),
-						},
+					: isGradioWidgetBuild
+						? { gradioWidget: path.resolve(__dirname, './src/web/gradio-widget.html') }
+						: {
+								main: path.resolve(__dirname, './src/web/index.html'),
+								mcpWelcome: path.resolve(__dirname, './src/web/mcp-welcome.html'),
+								gradioWidget: path.resolve(__dirname, './src/web/gradio-widget.html'),
+							},
 			},
 		},
 		root: path.resolve(__dirname, './src/web'),

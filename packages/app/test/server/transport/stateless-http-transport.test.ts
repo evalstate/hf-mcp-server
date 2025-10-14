@@ -45,14 +45,19 @@ describe('StatelessHttpTransport', () => {
 			expect(result).toBe(true);
 		});
 
-		it('should not handle resources/list requests', () => {
+		it('should handle resources/list requests', () => {
 			const result = (transport as any).shouldHandle({ method: 'resources/list' });
-			expect(result).toBe(false);
+			expect(result).toBe(true);
 		});
 
-		it('should not handle resources/read requests', () => {
+		it('should handle resources/read requests', () => {
 			const result = (transport as any).shouldHandle({ method: 'resources/read' });
-			expect(result).toBe(false);
+			expect(result).toBe(true);
+		});
+
+		it('should handle resources/templates/list requests', () => {
+			const result = (transport as any).shouldHandle({ method: 'resources/templates/list' });
+			expect(result).toBe(true);
 		});
 
 		it('should handle undefined method gracefully', () => {

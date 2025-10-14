@@ -65,18 +65,18 @@ export class StatelessHttpTransport extends BaseTransport {
 		const body = requestBody as { method?: string } | undefined;
 		const method = body?.method;
 
-		// Always handle tool-related requests
-		if (method === 'tools/list' || method === 'tools/call') {
-			return true;
-		}
+		const methodsRequiringFullServer = new Set([
+			'tools/list',
+			'tools/call',
+			'prompts/list',
+			'prompts/get',
+			'resources/list',
+			'resources/read',
+			'resources/templates/list',
+			'initialize',
+		]);
 
-		// Always handle prompt-related requests
-		if (method === 'prompts/list' || method === 'prompts/get') {
-			return true;
-		}
-
-		// Handle initialize to set up client tracking
-		if (method === 'initialize') {
+		if (method && methodsRequiringFullServer.has(method)) {
 			return true;
 		}
 

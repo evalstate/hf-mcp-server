@@ -63,6 +63,8 @@ import { DEFAULT_SPACE_TOOLS, type AppSettings } from '../shared/settings.js';
 import { extractAuthBouquetAndMix } from './utils/auth-utils.js';
 import { ToolSelectionStrategy, type ToolSelectionContext } from './utils/tool-selection-strategy.js';
 import { hasReadmeFlag } from '../shared/behavior-flags.js';
+import { registerCapabilities } from './utils/capability-utils.js';
+import { createGradioWidgetResourceConfig } from './resources/gradio-widget-resource.js';
 
 // Fallback settings when API fails (enables all tools)
 export const BOUQUET_FALLBACK: AppSettings = {
@@ -174,9 +176,15 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			: 'Hugging Face tools are being used anonymously and may be rate limited. Call this tool for instructions on joining and authenticating.';
 
 		const response = userDetails ? `You are authenticated as ${username ?? 'unknown'}.` : CONFIG_GUIDANCE;
-		server.tool('hf_whoami', whoDescription, {}, { title: 'Hugging Face User Info' }, () => {
-			return { content: [{ type: 'text', text: response }] };
-		});
+		server.tool(
+			'hf_whoami',
+			whoDescription,
+			{},
+			{ readOnlyHint: true, openWorldHint: false, title: 'Hugging Face User Info' },
+			() => {
+				return { content: [{ type: 'text', text: response }] };
+			}
+		);
 
 		/** always leave tool active so flow can complete / allow uid change */
 		if (process.env.AUTHENTICATE_TOOL === 'true') {
@@ -642,6 +650,22 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 			}
 		);
 
+		// Register Gradio widget resource for OpenAI MCP client (skybridge)
+		if (sessionInfo?.clientInfo?.name === 'openai-mcp') {
+			logger.debug('Registering Gradio widget resource for skybridge client');
+			const widgetConfig = createGradioWidgetResourceConfig(version);
+			server.registerResource(widgetConfig.name, widgetConfig.uri, {}, async () => ({
+				contents: [
+					{
+						uri: widgetConfig.uri,
+						mimeType: widgetConfig.mimeType,
+						text: widgetConfig.htmlContent,
+						_meta: widgetConfig.metadata,
+					},
+				],
+			}));
+		}
+
 		// Declare the function to apply tool states (we only need to call it if we are
 		// applying the tool states either because we have a Gradio tool call (grNN_) or
 		// we are responding to a ListToolsRequest). This also helps if there is a
@@ -649,8 +673,6 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		// NB: That may not always be the case, consider carefully whether you want a tool
 		// included in the skipGradio check.
 		const applyToolStates = async () => {
-			// Use the already computed toolSelection
-
 			logger.info(
 				{
 					mode: toolSelection.mode,
@@ -674,23 +696,10 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 
 		// Always register capabilities consistently for stateless vs stateful modes
 		const transportInfo = sharedApiClient.getTransportInfo();
-		server.server.registerCapabilities({
-			tools: {
-				listChanged: !transportInfo?.jsonResponseEnabled,
-			},
-			prompts: {
-				listChanged: false,
-			},
-		});
 
-		// Remove the completions capability that was auto-added by prompt registration
-		// The MCP SDK automatically adds this when prompts are registered, but we don't want it
-		// @ts-expect-error quick workaround for an SDK issue (adding prompt/resource adds completions)
-		if (server.server._capabilities?.completions) {
-			// @ts-expect-error quick workaround for an SDK issue (adding prompt/resource adds completions)
-			delete server.server._capabilities.completions;
-			logger.debug('Removed auto-added completions capability');
-		}
+		registerCapabilities(server, sharedApiClient, {
+			hasResources: sessionInfo?.clientInfo?.name === 'openai-mcp',
+		});
 
 		if (!skipGradio) {
 			void applyToolStates();
