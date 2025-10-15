@@ -8,9 +8,18 @@ interface GradioToolOutput {
 }
 
 const LOADING_ANIMATIONS = {
-	'huggy-pop': 'https://chunte-hfba.static.hf.space/images/modern%20Huggies/Huggy%20Pop.gif',
-	vibing: 'https://chunte-hfba.static.hf.space/images/modern%20Huggies/Vibing%20Huggy.gif',
-	doodle: 'https://chunte-hfba.static.hf.space/images/modern%20Huggies/Doodle%20Huggy.gif',
+	'huggy-pop': {
+		url: 'https://chunte-hfba.static.hf.space/images/modern%20Huggies/Huggy%20Pop.gif',
+		scale: 'scale-250',
+	},
+	vibing: {
+		url: 'https://chunte-hfba.static.hf.space/images/modern%20Huggies/Vibing%20Huggy.gif',
+		scale: 'scale-100',
+	},
+	doodle: {
+		url: 'https://chunte-hfba.static.hf.space/images/modern%20Huggies/Doodle%20Huggy.gif',
+		scale: 'scale-90',
+	},
 };
 
 export function GradioWidgetApp() {
@@ -47,10 +56,7 @@ export function GradioWidgetApp() {
 	const textTertiary = isDark ? 'text-gray-500' : 'text-gray-500';
 
 	return (
-		<div
-			className={`flex flex-col items-center justify-center p-4 ${bgGradient}`}
-			style={containerStyle}
-		>
+		<div className={`flex flex-col items-center justify-center p-4 ${bgGradient}`} style={containerStyle}>
 			<div className="max-w-2xl w-full">
 				{!toolOutput ? (
 					<>
@@ -58,9 +64,9 @@ export function GradioWidgetApp() {
 						<div className="flex justify-center mb-6">
 							<div className="w-32 h-32 overflow-hidden flex items-center justify-center">
 								<img
-									src={loadingAnimation}
+									src={loadingAnimation.url}
 									alt="Hugging Face"
-									className="w-full h-full object-cover scale-110"
+									className={`w-full h-full object-cover ${loadingAnimation.scale}`}
 								/>
 							</div>
 						</div>
@@ -140,9 +146,7 @@ export function GradioWidgetApp() {
 				) : (
 					<div className={`${cardBg} rounded-lg shadow-lg p-6 text-center`}>
 						<p className={textSecondary}>
-							{toolOutput.url
-								? 'Content available but no preview available for this type.'
-								: 'No content to display.'}
+							{toolOutput.url ? 'Content available but no preview available for this type.' : 'No content to display.'}
 						</p>
 						{toolOutput.url && !isAudioUrl && !isImageUrl && (
 							<p className={`text-sm ${textSecondary} mt-2 break-all`}>{toolOutput.url}</p>
