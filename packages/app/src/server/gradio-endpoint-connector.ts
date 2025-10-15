@@ -428,7 +428,11 @@ function extractUrlFromContent(content: unknown[]): string | undefined {
 
 		// Check for text field that looks like a URL
 		if (typeof candidate.text === 'string') {
-			const text = candidate.text.trim();
+			let text = candidate.text.trim();
+
+			// Remove "Image URL:" or "Image URL :" prefix if present (case insensitive)
+			text = text.replace(/^image\s+url\s*:\s*/i, '');
+
 			if (/^https?:\/\//i.test(text)) {
 				return text;
 			}
@@ -615,7 +619,10 @@ function createToolHandler(
 								const extractedUrl = extractUrlFromContent(mcpuiResult.content);
 								if (extractedUrl) {
 									logger.debug({ tool: tool.name, url: extractedUrl }, 'Setting structuredContent for _mcpui tool');
-									(mcpuiResult as any).structuredContent = { url: extractedUrl };
+									(mcpuiResult as any).structuredContent = {
+										url: extractedUrl,
+										spaceName: connection.name,
+									};
 								}
 							}
 
@@ -637,13 +644,14 @@ function createToolHandler(
 				});
 
 				// For openai-mcp client, check if result contains a URL and set structuredContent
-				console.error(`ABOUT TO ATTEMPT STRUCTURED for ${sessionInfo?.clientInfo?.name}`);
 				if (sessionInfo?.clientInfo?.name == 'openai-mcp') {
 					const extractedUrl = extractUrlFromContent(finalResult.content);
 					if (extractedUrl) {
-						console.error(`SET STRUCTURED CONTENT ${extractedUrl}`);
 						logger.debug({ tool: tool.name, url: extractedUrl }, 'Setting structuredContent with extracted URL');
-						(finalResult as any).structuredContent = { url: extractedUrl };
+						(finalResult as any).structuredContent = {
+							url: extractedUrl,
+							spaceName: connection.name,
+						};
 					}
 				}
 

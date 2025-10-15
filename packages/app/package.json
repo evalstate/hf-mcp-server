@@ -1,6 +1,6 @@
 {
 	"name": "@llmindset/hf-mcp-server",
-	"version": "9.11.30",
+	"version": "0.0.0",
 	"description": "Official Hugging Face MCP Server",
 	"type": "module",
 	"main": "./dist/server/streamableHttp.js",
@@ -39,6 +39,7 @@
 		"build:gradio-widget": "cross-env VITE_BUILD_TARGET=gradio-widget vite build && node scripts/html-to-ts.js",
 		"dev": "pnpm run build:server && cross-env NODE_ENV=development node dist/server/streamableHttp.js",
 		"dev:vite": "vite dev",
+		"dev:widget": "vite dev",
 		"dev:stdio": "pnpm run build:server && cross-env NODE_ENV=development node dist/server/stdio.js",
 		"dev:sse": "pnpm run build:server && cross-env NODE_ENV=development node dist/server/sse.js",
 		"dev:json": "pnpm run build:server && cross-env NODE_ENV=development node dist/server/streamableHttp.js --json",

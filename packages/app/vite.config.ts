@@ -38,6 +38,7 @@ export default defineConfig(() => {
 								main: path.resolve(__dirname, './src/web/index.html'),
 								mcpWelcome: path.resolve(__dirname, './src/web/mcp-welcome.html'),
 								gradioWidget: path.resolve(__dirname, './src/web/gradio-widget.html'),
+								gradioWidgetDev: path.resolve(__dirname, './src/web/gradio-widget-dev.html'),
 							},
 			},
 		},

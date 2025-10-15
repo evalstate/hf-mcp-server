@@ -13,6 +13,7 @@ const CSP_DOMAINS = {
 		'https://static.huggingface.co',
 		'https://*.hf.space',
 		'https://cdnjs.cloudflare.com',
+		'https://cas-bridge.xethub.hf.co',
 	],
 	resource_domains: [
 		'https://huggingface.co',
@@ -20,12 +21,14 @@ const CSP_DOMAINS = {
 		'https://static.huggingface.co',
 		'https://*.hf.space',
 		'https://cdnjs.cloudflare.com',
+		'https://cas-bridge.xethub.hf.co',
 	],
 	frame_domains: [
 		'https://huggingface.co',
 		'https://cdn-lfs.huggingface.co',
 		'https://static.huggingface.co',
 		'https://*.hf.space',
+		'https://cas-bridge.xethub.hf.co',
 	],
 };
 

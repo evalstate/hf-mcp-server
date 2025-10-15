@@ -45,18 +45,33 @@ describe('StatelessHttpTransport', () => {
 			expect(result).toBe(true);
 		});
 
-		it('should handle resources/list requests', () => {
+		it('should NOT handle resources/list requests for non-openai-mcp clients', () => {
 			const result = (transport as any).shouldHandle({ method: 'resources/list' });
+			expect(result).toBe(false);
+		});
+
+		it('should handle resources/list requests for openai-mcp client', () => {
+			const result = (transport as any).shouldHandle({ method: 'resources/list' }, 'openai-mcp');
 			expect(result).toBe(true);
 		});
 
-		it('should handle resources/read requests', () => {
+		it('should NOT handle resources/read requests for non-openai-mcp clients', () => {
 			const result = (transport as any).shouldHandle({ method: 'resources/read' });
+			expect(result).toBe(false);
+		});
+
+		it('should handle resources/read requests for openai-mcp client', () => {
+			const result = (transport as any).shouldHandle({ method: 'resources/read' }, 'openai-mcp');
 			expect(result).toBe(true);
 		});
 
-		it('should handle resources/templates/list requests', () => {
+		it('should NOT handle resources/templates/list requests for non-openai-mcp clients', () => {
 			const result = (transport as any).shouldHandle({ method: 'resources/templates/list' });
+			expect(result).toBe(false);
+		});
+
+		it('should handle resources/templates/list requests for openai-mcp client', () => {
+			const result = (transport as any).shouldHandle({ method: 'resources/templates/list' }, 'openai-mcp');
 			expect(result).toBe(true);
 		});
 
