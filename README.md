@@ -132,6 +132,19 @@ docker run --rm -p 3000:3000 ghcr.io/evalstate/hf-mcp-server:latest
 
 All commands above start the Management Web interface on http://localhost:3000/. The Streamable HTTP server is accessible on  http://localhost:3000/mcp. See [Environment Variables](#Environment Variables) for configuration options. Docker defaults to Streamable HTTP (JSON RPC) mode.
 
+### Developing OpenAI Apps SDK Components
+
+To build and test the Apps SDK component, run 
+
+```bash
+cd packages/app
+npm run dev:widget
+```
+
+Then open `http://localhost:5173/gradio-widget-dev.html`. This will bring up a browser with HMR where you can send Structured Content to the components for testing. 
+
+![skybridge-viewer](./docs/skybridge-dev.png)
+
 
 ## Development
 
