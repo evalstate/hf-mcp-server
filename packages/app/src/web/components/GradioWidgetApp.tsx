@@ -1,4 +1,4 @@
-import { useWidgetProps, useDisplayMode, useMaxHeight, useTheme } from '../hooks';
+import { useWidgetProps, useMaxHeight, useTheme } from '../hooks';
 
 interface GradioToolOutput {
 	url?: string;
@@ -9,7 +9,6 @@ interface GradioToolOutput {
 export function GradioWidgetApp() {
 	// Use the new hooks from openai-apps-sdk patterns
 	const toolOutput = useWidgetProps<GradioToolOutput>();
-	const displayMode = useDisplayMode();
 	const maxHeight = useMaxHeight();
 	const theme = useTheme();
 

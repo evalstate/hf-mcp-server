@@ -619,7 +619,7 @@ function createToolHandler(
 								const extractedUrl = extractUrlFromContent(mcpuiResult.content);
 								if (extractedUrl) {
 									logger.debug({ tool: tool.name, url: extractedUrl }, 'Setting structuredContent for _mcpui tool');
-									(mcpuiResult as any).structuredContent = {
+									(mcpuiResult as typeof CallToolResultSchema._type & { structuredContent?: { url: string; spaceName?: string } }).structuredContent = {
 										url: extractedUrl,
 										spaceName: connection.name,
 									};
@@ -648,7 +648,7 @@ function createToolHandler(
 					const extractedUrl = extractUrlFromContent(finalResult.content);
 					if (extractedUrl) {
 						logger.debug({ tool: tool.name, url: extractedUrl }, 'Setting structuredContent with extracted URL');
-						(finalResult as any).structuredContent = {
+						(finalResult as typeof CallToolResultSchema._type & { structuredContent?: { url: string; spaceName?: string } }).structuredContent = {
 							url: extractedUrl,
 							spaceName: connection.name,
 						};
