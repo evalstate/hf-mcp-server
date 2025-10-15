@@ -619,7 +619,11 @@ function createToolHandler(
 								const extractedUrl = extractUrlFromContent(mcpuiResult.content);
 								if (extractedUrl) {
 									logger.debug({ tool: tool.name, url: extractedUrl }, 'Setting structuredContent for _mcpui tool');
-									(mcpuiResult as typeof CallToolResultSchema._type & { structuredContent?: { url: string; spaceName?: string } }).structuredContent = {
+									(
+										mcpuiResult as typeof CallToolResultSchema._type & {
+											structuredContent?: { url: string; spaceName?: string };
+										}
+									).structuredContent = {
 										url: extractedUrl,
 										spaceName: connection.name,
 									};
@@ -648,7 +652,11 @@ function createToolHandler(
 					const extractedUrl = extractUrlFromContent(finalResult.content);
 					if (extractedUrl) {
 						logger.debug({ tool: tool.name, url: extractedUrl }, 'Setting structuredContent with extracted URL');
-						(finalResult as typeof CallToolResultSchema._type & { structuredContent?: { url: string; spaceName?: string } }).structuredContent = {
+						(
+							finalResult as typeof CallToolResultSchema._type & {
+								structuredContent?: { url: string; spaceName?: string };
+							}
+						).structuredContent = {
 							url: extractedUrl,
 							spaceName: connection.name,
 						};
@@ -770,8 +778,8 @@ export function registerRemoteTools(
 		if (sessionInfo?.clientInfo?.name == 'openai-mcp') {
 			theTool._meta = {
 				'openai/outputTemplate': options.gradioWidgetUri || '',
-				'openai/toolInvocation/invoking': 'Calling the Hugging Face Space',
-				'openai/toolInvocation/invoked': 'Hugging Face Space completed',
+				'openai/toolInvocation/invoking': `Calling the Hugging Face Space ${connection.name || connection.endpointId}`,
+				'openai/toolInvocation/invoked': `Your content is being generated`,
 			};
 		}
 	});

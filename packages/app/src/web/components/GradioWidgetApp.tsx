@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useWidgetProps, useMaxHeight, useTheme } from '../hooks';
 
 interface GradioToolOutput {
@@ -6,11 +7,25 @@ interface GradioToolOutput {
 	[key: string]: unknown;
 }
 
+const LOADING_ANIMATIONS = {
+	'huggy-pop': 'https://chunte-hfba.static.hf.space/images/modern%20Huggies/Huggy%20Pop.gif',
+	vibing: 'https://chunte-hfba.static.hf.space/images/modern%20Huggies/Vibing%20Huggy.gif',
+	doodle: 'https://chunte-hfba.static.hf.space/images/modern%20Huggies/Doodle%20Huggy.gif',
+};
+
 export function GradioWidgetApp() {
 	// Use the new hooks from openai-apps-sdk patterns
 	const toolOutput = useWidgetProps<GradioToolOutput>();
 	const maxHeight = useMaxHeight();
 	const theme = useTheme();
+
+	// Select loading animation with weighted randomness (60% Huggy Pop, 30% Vibing, 10% Doodle)
+	const loadingAnimation = useMemo(() => {
+		const rand = Math.random() * 100;
+		if (rand < 60) return LOADING_ANIMATIONS['huggy-pop'];
+		if (rand < 90) return LOADING_ANIMATIONS.vibing;
+		return LOADING_ANIMATIONS.doodle;
+	}, []);
 
 	// Determine content type based on URL
 	const isAudioUrl = toolOutput?.url?.match(/\.wav$/i);
@@ -24,9 +39,9 @@ export function GradioWidgetApp() {
 	// Determine theme-based classes
 	const isDark = theme === 'dark';
 	const bgGradient = isDark
-		? 'bg-gradient-to-b from-gray-900 to-gray-800'
+		? 'bg-gradient-to-b from-neutral-900 to-neutral-800'
 		: 'bg-gradient-to-b from-gray-50 to-gray-100';
-	const cardBg = isDark ? 'bg-gray-800' : 'bg-white';
+	const cardBg = isDark ? 'bg-neutral-800' : 'bg-white';
 	const textPrimary = isDark ? 'text-gray-100' : 'text-gray-800';
 	const textSecondary = isDark ? 'text-gray-400' : 'text-gray-600';
 	const textTertiary = isDark ? 'text-gray-500' : 'text-gray-500';
@@ -39,13 +54,15 @@ export function GradioWidgetApp() {
 			<div className="max-w-2xl w-full">
 				{!toolOutput ? (
 					<>
-						{/* Show Huggy Pop logo only when loading */}
+						{/* Show random Huggy animation while loading */}
 						<div className="flex justify-center mb-6">
-							<img
-								src="https://chunte-hfba.static.hf.space/images/modern%20Huggies/Huggy%20Pop.gif"
-								alt="Hugging Face"
-								className="w-32 h-32 object-contain"
-							/>
+							<div className="w-32 h-32 overflow-hidden flex items-center justify-center">
+								<img
+									src={loadingAnimation}
+									alt="Hugging Face"
+									className="w-full h-full object-cover scale-110"
+								/>
+							</div>
 						</div>
 						<div className="text-center">
 							<p className={textSecondary}>Loading...</p>

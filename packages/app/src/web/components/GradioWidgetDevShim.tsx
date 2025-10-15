@@ -406,6 +406,36 @@ export function GradioWidgetDevShim() {
 						>
 							Empty (no content)
 						</button>
+						<button
+							onClick={() => {
+								setToolOutputJson('');
+								const iframe = iframeRef.current;
+								if (iframe?.contentWindow) {
+									const iframeWindow = iframe.contentWindow as any;
+									if (iframeWindow.openai) {
+										iframeWindow.openai.toolOutput = null;
+										const event = new CustomEvent('openai:set_globals', {
+											detail: {
+												globals: {
+													toolOutput: null,
+													widgetState: widgetStateJson.trim()
+														? JSON.parse(widgetStateJson)
+														: null,
+													displayMode,
+													maxHeight,
+													theme,
+												},
+											},
+										});
+										iframeWindow.dispatchEvent(event);
+										console.log('[Shim] Loading state activated');
+									}
+								}
+							}}
+							className="w-full px-3 py-2 text-sm bg-purple-100 hover:bg-purple-200 rounded text-left"
+						>
+							Show Loading
+						</button>
 					</div>
 				</div>
 			</div>
