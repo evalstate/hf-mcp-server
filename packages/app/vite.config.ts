@@ -35,9 +35,9 @@ export default defineConfig(() => {
 					: isGradioWidgetBuild
 						? { gradioWidget: path.resolve(__dirname, './src/web/gradio-widget.html') }
 						: {
+								// Exclude mcp-welcome and gradio-widget from main build
+								// They are built separately with viteSingleFile plugin
 								main: path.resolve(__dirname, './src/web/index.html'),
-								mcpWelcome: path.resolve(__dirname, './src/web/mcp-welcome.html'),
-								gradioWidget: path.resolve(__dirname, './src/web/gradio-widget.html'),
 								gradioWidgetDev: path.resolve(__dirname, './src/web/gradio-widget-dev.html'),
 							},
 			},
