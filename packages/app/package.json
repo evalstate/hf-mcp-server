@@ -31,7 +31,7 @@
 		"url": "https://github.com/evalstate/hf-mcp-server/issues"
 	},
 	"scripts": {
-		"build": "pnpm run build:server && pnpm run build:web && pnpm run build:singlefiles",
+		"build": "pnpm run build:web && pnpm run build:singlefiles && pnpm run build:server",
 		"build:server": "tsc -p tsconfig.server.json",
 		"build:web": "vite build",
 		"build:singlefiles": "pnpm run build:mcp-welcome && pnpm run build:gradio-widget",
