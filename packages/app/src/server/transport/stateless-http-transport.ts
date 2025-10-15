@@ -61,22 +61,26 @@ export class StatelessHttpTransport extends BaseTransport {
 	 * Determines if a request should be handled by the full server
 	 * or can be handled by the stub responder
 	 */
-	private shouldHandle(requestBody: unknown): boolean {
+	private shouldHandle(requestBody: unknown, clientName?: string): boolean {
 		const body = requestBody as { method?: string } | undefined;
 		const method = body?.method;
 
-		// Always handle tool-related requests
-		if (method === 'tools/list' || method === 'tools/call') {
-			return true;
+		const methodsRequiringFullServer = new Set([
+			'tools/list',
+			'tools/call',
+			'prompts/list',
+			'prompts/get',
+			'initialize',
+		]);
+
+		// Only handle resource methods for openai-mcp client
+		if (clientName === 'openai-mcp') {
+			methodsRequiringFullServer.add('resources/list');
+			methodsRequiringFullServer.add('resources/read');
+			methodsRequiringFullServer.add('resources/templates/list');
 		}
 
-		// Always handle prompt-related requests
-		if (method === 'prompts/list' || method === 'prompts/get') {
-			return true;
-		}
-
-		// Handle initialize to set up client tracking
-		if (method === 'initialize') {
+		if (method && methodsRequiringFullServer.has(method)) {
 			return true;
 		}
 
@@ -270,10 +274,6 @@ export class StatelessHttpTransport extends BaseTransport {
 				);
 			}
 
-			// Determine which server to use
-			const useFullServer = this.shouldHandle(requestBody);
-			let directResponse = true;
-
 			// Get session metadata for query logging
 			const isAuthenticated = authResult.userIdentified;
 			const analyticsSession = sessionId ? this.analyticsSessions.get(sessionId) : undefined;
@@ -283,6 +283,10 @@ export class StatelessHttpTransport extends BaseTransport {
 			if (extractedClientInfo) {
 				clientInfo = extractedClientInfo;
 			}
+
+			// Determine which server to use, passing client name for resource method filtering
+			const useFullServer = this.shouldHandle(requestBody, clientInfo?.name);
+			let directResponse = true;
 
 			if (useFullServer) {
 				// Create new server instance using factory with request headers and bouquet

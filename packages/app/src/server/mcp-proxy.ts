@@ -14,6 +14,8 @@ import { GRADIO_FILES_TOOL_CONFIG, GradioFilesTool } from '@llmindset/hf-mcp';
 import { logSearchQuery } from './utils/query-logger.js';
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { createRequire } from 'module';
+import { createGradioWidgetResourceConfig } from './resources/gradio-widget-resource.js';
 
 // Define the Qwen Image prompt configuration
 const QWEN_IMAGE_PROMPT_CONFIG = {
@@ -127,11 +129,17 @@ export const createProxyServerFactory = (
 	): Promise<ServerFactoryResult> => {
 		logger.debug({ skipGradio }, '=== PROXY FACTORY CALLED ===');
 
+		// Get version for widget URI (needed for OpenAI MCP client)
+		const require = createRequire(import.meta.url);
+		const { version } = require('../../package.json') as { version: string };
+		const gradioWidgetUri = sessionInfo?.clientInfo?.name === 'openai-mcp'
+			? createGradioWidgetResourceConfig(version).uri
+			: undefined;
+
 		// Extract auth, bouquet, and gradio using shared utility
 		const { hfToken, bouquet, gradio } = extractAuthBouquetAndMix(headers);
 		const rawNoImageHeader = headers ? headers['x-mcp-no-image-content'] : undefined;
-		const noImageFromHeader =
-			typeof rawNoImageHeader === 'string' && rawNoImageHeader.toLowerCase() === 'true';
+		const noImageFromHeader = typeof rawNoImageHeader === 'string' && rawNoImageHeader.toLowerCase() === 'true';
 
 		// Skip expensive operations for requests that skip Gradio
 		let settings = userSettings;
@@ -234,7 +242,10 @@ export const createProxyServerFactory = (
 		for (const connection of connections) {
 			if (!connection.success) continue;
 
-			registerRemoteTools(server, connection.connection, hfToken, sessionInfo, { stripImageContent });
+			registerRemoteTools(server, connection.connection, hfToken, sessionInfo, {
+				stripImageContent,
+				gradioWidgetUri
+			});
 
 			// Register Qwen Image prompt enhancer for specific tool
 			if (connection.connection.name?.toLowerCase() === 'mcp-tools/qwen-image') {

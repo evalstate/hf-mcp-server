@@ -330,6 +330,26 @@ describe('stripImageContentFromResult', () => {
 		// Ensure original payload remains unchanged for type safety consumers
 		expect(result.content).toHaveLength(2);
 	});
+
+	it('should preserve structuredContent through spread operator', () => {
+		const result = {
+			isError: false,
+			content: [
+				{ type: 'text', text: 'hello' },
+				{ type: 'image', mimeType: 'image/png', data: 'base64data' },
+			],
+			structuredContent: { url: 'https://example.com/result' },
+		} as typeof CallToolResultSchema._type;
+
+		const filtered = stripImageContentFromResult(result, { ...baseOptions, enabled: true });
+
+		// Content should be filtered
+		expect(filtered.content).toHaveLength(1);
+		expect(filtered.content?.[0]).toEqual({ type: 'text', text: 'hello' });
+
+		// structuredContent should be preserved via spread operator
+		expect((filtered as any).structuredContent).toEqual({ url: 'https://example.com/result' });
+	});
 });
 
 describe('convertJsonSchemaToZod', () => {

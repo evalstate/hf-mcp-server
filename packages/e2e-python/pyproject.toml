@@ -2,11 +2,11 @@
 name = "hf-mcp-e2e-python"
 version = "0.1.0"
 description = "End-to-end tests for HF MCP Server"
-requires-python = ">=3.13"
+requires-python = ">=3.13.5"
 dependencies = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
-    "fast-agent-mcp>=0.3.11",
+    "fast-agent-mcp>=0.3.14",
     "huggingface_hub>=0.34.0"
 ]
 

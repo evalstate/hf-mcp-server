@@ -53,6 +53,7 @@ interface EndpointConnection {
 
 interface RegisterRemoteToolsOptions {
 	stripImageContent?: boolean;
+	gradioWidgetUri?: string;
 }
 
 interface ImageFilterOptions {
@@ -89,10 +90,7 @@ export function stripImageContentFromResult(
 	}
 
 	const removedCount = content.length - filteredContent.length;
-	logger.debug(
-		{ tool: toolName, outwardFacingName, removedCount },
-		'Stripped image content from remote tool response'
-	);
+	logger.debug({ tool: toolName, outwardFacingName, removedCount }, 'Stripped image content from remote tool response');
 
 	if (filteredContent.length === 0) {
 		filteredContent.push({
@@ -408,6 +406,43 @@ function createToolDisplayInfo(connection: EndpointConnection, tool: Tool): { ti
 }
 
 /**
+ * Extracts a URL from the result content if present
+ */
+function extractUrlFromContent(content: unknown[]): string | undefined {
+	if (!Array.isArray(content) || content.length === 0) {
+		return undefined;
+	}
+
+	// Check each content item for a URL-like string
+	for (const item of content) {
+		if (!item || typeof item !== 'object') {
+			continue;
+		}
+
+		const candidate = item as { type?: string; text?: string; url?: string };
+
+		// Check for explicit url field
+		if (typeof candidate.url === 'string' && /^https?:\/\//i.test(candidate.url.trim())) {
+			return candidate.url.trim();
+		}
+
+		// Check for text field that looks like a URL
+		if (typeof candidate.text === 'string') {
+			let text = candidate.text.trim();
+
+			// Remove "Image URL:" or "Image URL :" prefix if present (case insensitive)
+			text = text.replace(/^image\s+url\s*:\s*/i, '');
+
+			if (/^https?:\/\//i.test(text)) {
+				return text;
+			}
+		}
+	}
+
+	return undefined;
+}
+
+/**
  * Creates the tool handler function
  */
 function createToolHandler(
@@ -494,7 +529,8 @@ function createToolHandler(
 				success = !result.isError;
 				if (result.isError) {
 					// Extract a meaningful error message from MCP content items
-					const first = Array.isArray(result.content) && result.content.length > 0 ? (result.content[0] as unknown) : undefined;
+					const first =
+						Array.isArray(result.content) && result.content.length > 0 ? (result.content[0] as unknown) : undefined;
 					let message: string | undefined;
 					if (typeof first === 'string') {
 						message = first;
@@ -572,11 +608,29 @@ function createToolHandler(
 								content: [result.content[0], uiResource],
 							} as typeof CallToolResultSchema._type;
 
-							return stripImageContentFromResult(decoratedResult, {
+							const mcpuiResult = stripImageContentFromResult(decoratedResult, {
 								enabled: !!options.stripImageContent,
 								toolName: tool.name,
 								outwardFacingName,
 							});
+
+							// For openai-mcp client, check if result contains a URL and set structuredContent
+							if (sessionInfo?.clientInfo?.name == 'openai-mcp') {
+								const extractedUrl = extractUrlFromContent(mcpuiResult.content);
+								if (extractedUrl) {
+									logger.debug({ tool: tool.name, url: extractedUrl }, 'Setting structuredContent for _mcpui tool');
+									(
+										mcpuiResult as typeof CallToolResultSchema._type & {
+											structuredContent?: { url: string; spaceName?: string };
+										}
+									).structuredContent = {
+										url: extractedUrl,
+										spaceName: connection.name,
+									};
+								}
+							}
+
+							return mcpuiResult;
 						}
 					}
 				} catch (e) {
@@ -586,11 +640,30 @@ function createToolHandler(
 					);
 				}
 
-				return stripImageContentFromResult(result, {
+				// Strip image content first
+				const finalResult = stripImageContentFromResult(result, {
 					enabled: !!options.stripImageContent,
 					toolName: tool.name,
 					outwardFacingName,
 				});
+
+				// For openai-mcp client, check if result contains a URL and set structuredContent
+				if (sessionInfo?.clientInfo?.name == 'openai-mcp') {
+					const extractedUrl = extractUrlFromContent(finalResult.content);
+					if (extractedUrl) {
+						logger.debug({ tool: tool.name, url: extractedUrl }, 'Setting structuredContent with extracted URL');
+						(
+							finalResult as typeof CallToolResultSchema._type & {
+								structuredContent?: { url: string; spaceName?: string };
+							}
+						).structuredContent = {
+							url: extractedUrl,
+							spaceName: connection.name,
+						};
+					}
+				}
+
+				return finalResult;
 			} catch (callError) {
 				// Handle request errors
 				success = false;
@@ -599,11 +672,20 @@ function createToolHandler(
 			}
 		} catch (err) {
 			// Ensure meaningful error output instead of [object Object]
-			const errObj = err instanceof Error
-				? err
-				: new Error(typeof err === 'string' ? err : (() => {
-					try { return JSON.stringify(err); } catch { return String(err); }
-				})());
+			const errObj =
+				err instanceof Error
+					? err
+					: new Error(
+							typeof err === 'string'
+								? err
+								: (() => {
+										try {
+											return JSON.stringify(err);
+										} catch {
+											return String(err);
+										}
+									})()
+						);
 			logger.error({ tool: tool.name, err: errObj, errMessage: errObj.message }, 'Remote tool call failed');
 			const metricsName = getMetricsSafeName(outwardFacingName);
 			gradioMetrics.recordFailure(metricsName);
@@ -682,7 +764,7 @@ export function registerRemoteTools(
 		);
 
 		// Register the tool
-		server.tool(
+		const theTool = server.tool(
 			outwardFacingName,
 			description,
 			schemaShape,
@@ -692,6 +774,14 @@ export function registerRemoteTools(
 			},
 			handler
 		);
+
+		if (sessionInfo?.clientInfo?.name == 'openai-mcp') {
+			theTool._meta = {
+				'openai/outputTemplate': options.gradioWidgetUri || '',
+				'openai/toolInvocation/invoking': `Calling the Hugging Face Space ${connection.name || connection.endpointId}`,
+				'openai/toolInvocation/invoked': `Your content is being generated`,
+			};
+		}
 	});
 }
 
