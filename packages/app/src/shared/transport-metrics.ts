@@ -78,6 +78,14 @@ export interface ClientMetrics {
 }
 
 /**
+ * Metrics per client for a specific method
+ */
+export interface ClientMethodMetrics {
+	clientName: string;
+	count: number;
+}
+
+/**
  * Metrics per MCP method
  */
 export interface MethodMetrics {
@@ -87,6 +95,7 @@ export interface MethodMetrics {
 	lastCalled: Date;
 	averageResponseTime?: number;
 	errors: number;
+	byClient: Map<string, ClientMethodMetrics>;
 }
 
 /**
@@ -205,6 +214,10 @@ export interface TransportMetricsResponse {
 		averageResponseTime?: number; // milliseconds
 		errors: number;
 		errorRate: number; // percentage
+		byClient: Array<{
+			clientName: string;
+			count: number;
+		}>;
 	}>;
 
 	// API call metrics (only shown in external API mode)
@@ -263,6 +276,10 @@ export function formatMetricsForAPI(
 			firstCalled: method.firstCalled.toISOString(),
 			lastCalled: method.lastCalled.toISOString(),
 			errorRate: method.count > 0 ? (method.errors / method.count) * 100 : 0,
+			byClient: Array.from(method.byClient.values()).map((client) => ({
+				clientName: client.clientName,
+				count: client.count,
+			})),
 		})),
 	};
 }
@@ -528,7 +545,12 @@ export class MetricsCounter {
 	/**
 	 * Track a method call
 	 */
-	trackMethod(method: string | null, responseTime?: number, isError: boolean = false): void {
+	trackMethod(
+		method: string | null,
+		responseTime?: number,
+		isError: boolean = false,
+		clientInfo?: { name: string; version: string }
+	): void {
 		if (!method) return;
 		let methodMetrics = this.metrics.methods.get(method);
 
@@ -539,12 +561,29 @@ export class MetricsCounter {
 				firstCalled: new Date(),
 				lastCalled: new Date(),
 				errors: 0,
+				byClient: new Map(),
 			};
 			this.metrics.methods.set(method, methodMetrics);
 		}
 
 		methodMetrics.count++;
 		methodMetrics.lastCalled = new Date();
+
+		// Track per-client breakdown
+		if (clientInfo) {
+			const clientName = clientInfo.name;
+			let clientMethodMetrics = methodMetrics.byClient.get(clientName);
+
+			if (!clientMethodMetrics) {
+				clientMethodMetrics = {
+					clientName,
+					count: 0,
+				};
+				methodMetrics.byClient.set(clientName, clientMethodMetrics);
+			}
+
+			clientMethodMetrics.count++;
+		}
 
 		if (isError) {
 			methodMetrics.errors++;

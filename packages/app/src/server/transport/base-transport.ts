@@ -269,9 +269,14 @@ export abstract class BaseTransport {
 	/**
 	 * Track a method call with timing and error status
 	 */
-	protected trackMethodCall(methodName: string | null, startTime: number, isError: boolean = false): void {
+	protected trackMethodCall(
+		methodName: string | null,
+		startTime: number,
+		isError: boolean = false,
+		clientInfo?: { name: string; version: string }
+	): void {
 		const duration = Date.now() - startTime;
-		this.metrics.trackMethod(methodName, duration, isError);
+		this.metrics.trackMethod(methodName, duration, isError, clientInfo);
 	}
 
 	/**
@@ -763,7 +768,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 		// Check if server is shutting down
 		if (this.isShuttingDown) {
 			this.trackError(503);
-			this.metrics.trackMethod(trackingName, undefined, true);
+			this.metrics.trackMethod(trackingName, undefined, true, undefined);
 			return {
 				isValid: false,
 				errorResponse: JsonRpcErrors.serverShuttingDown(extractJsonRpcId(requestBody)),
@@ -775,7 +780,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 		// Check session ID requirements
 		if (!sessionId && !allowMissingSession) {
 			this.trackError(400);
-			this.metrics.trackMethod(trackingName, undefined, true);
+			this.metrics.trackMethod(trackingName, undefined, true, undefined);
 			return {
 				isValid: false,
 				errorResponse: JsonRpcErrors.invalidParams('sessionId is required', extractJsonRpcId(requestBody)),
@@ -787,7 +792,7 @@ export abstract class StatefulTransport<TSession extends BaseSession = BaseSessi
 		// Check session existence
 		if (sessionId && !this.sessions.has(sessionId)) {
 			this.trackError(404);
-			this.metrics.trackMethod(trackingName, undefined, true);
+			this.metrics.trackMethod(trackingName, undefined, true, undefined);
 			return {
 				isValid: false,
 				errorResponse: JsonRpcErrors.sessionNotFound(sessionId, extractJsonRpcId(requestBody)),

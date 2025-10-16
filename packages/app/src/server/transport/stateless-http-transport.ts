@@ -248,7 +248,10 @@ export class StatelessHttpTransport extends BaseTransport {
 		this.trackNewConnection();
 
 		if (isJSONRPCNotification(req.body)) {
-			this.trackMethodCall(trackingName, startTime, false);
+			// For notifications, try to get client info from analytics session
+			const analyticsSession = sessionId ? this.analyticsSessions.get(sessionId) : undefined;
+			const clientInfo = analyticsSession?.metadata.clientInfo;
+			this.trackMethodCall(trackingName, startTime, false, clientInfo);
 			res.status(202).json({ jsonrpc: '2.0', result: null });
 			return;
 		}
@@ -348,8 +351,8 @@ export class StatelessHttpTransport extends BaseTransport {
 
 			await transport.handleRequest(req, res, req.body);
 
-			// Track successful method call
-			this.trackMethodCall(trackingName, startTime, false);
+			// Track successful method call with client info
+			this.trackMethodCall(trackingName, startTime, false, clientInfo);
 
 			logger.debug(
 				{
@@ -378,8 +381,10 @@ export class StatelessHttpTransport extends BaseTransport {
 				'Error handling request'
 			);
 
-			// Track failed method call
-			this.trackMethodCall(trackingName, startTime, true);
+			// Track failed method call - try to get client info from analytics session
+			const analyticsSession = sessionId ? this.analyticsSessions.get(sessionId) : undefined;
+			const clientInfo = analyticsSession?.metadata.clientInfo;
+			this.trackMethodCall(trackingName, startTime, true, clientInfo);
 
 			this.trackError(500, error instanceof Error ? error : new Error(String(error)));
 
