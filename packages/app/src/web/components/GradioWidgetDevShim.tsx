@@ -9,6 +9,16 @@ const DEFAULT_WIDGET_STATE = {
 	lastPlayed: null,
 };
 
+type MockOpenAiApi = Partial<OpenAiGlobals> & {
+	setWidgetState: (state: unknown) => Promise<void>;
+	callTool: (name: string, args: Record<string, unknown>) => Promise<{ result: string }>;
+	sendFollowUpMessage: (args: { prompt: string }) => Promise<void>;
+	openExternal: (payload: { href: string }) => void;
+	requestDisplayMode: (args: { mode: DisplayMode }) => Promise<{ mode: DisplayMode }>;
+};
+
+type OpenAiHostWindow = Window & { openai?: MockOpenAiApi };
+
 export function GradioWidgetDevShim() {
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const [toolOutputJson, setToolOutputJson] = useState(
@@ -56,13 +66,14 @@ export function GradioWidgetDevShim() {
 		const iframe = iframeRef.current;
 		if (!iframe?.contentWindow) return;
 
-		const iframeWindow = iframe.contentWindow as any;
-		if (!iframeWindow.openai) return;
+		const iframeWindow = iframe.contentWindow as OpenAiHostWindow;
+		const openaiApi = iframeWindow.openai;
+		if (!openaiApi) return;
 
 		// Update the globals
-		iframeWindow.openai.displayMode = displayMode;
-		iframeWindow.openai.maxHeight = maxHeight;
-		iframeWindow.openai.theme = theme;
+		openaiApi.displayMode = displayMode;
+		openaiApi.maxHeight = maxHeight;
+		openaiApi.theme = theme;
 
 		// Dispatch event to trigger hooks
 		const event = new CustomEvent('openai:set_globals', {
@@ -74,40 +85,35 @@ export function GradioWidgetDevShim() {
 				},
 			},
 		});
-		iframeWindow.dispatchEvent(event);
+			iframeWindow.dispatchEvent(event);
 
-		console.log('[Shim] Auto-updated displayMode, maxHeight, theme');
-	}, [displayMode, maxHeight, theme]);
+			console.log('[Shim] Auto-updated displayMode, maxHeight, theme');
+		}, [displayMode, maxHeight, theme]);
 
 	// Initialize window.openai in iframe when it loads
-	useEffect(() => {
-		const iframe = iframeRef.current;
-		if (!iframe) return;
+		useEffect(() => {
+			const iframe = iframeRef.current;
+			if (!iframe) return;
 
-		const handleLoad = () => {
-			const iframeWindow = iframe.contentWindow;
-			if (!iframeWindow) return;
+			const handleLoad = () => {
+				const iframeWindow = iframe.contentWindow;
+				if (!iframeWindow) return;
 
-			// Helper to dispatch custom events in iframe
-			const dispatchGlobalsEvent = (globals: Partial<OpenAiGlobals>) => {
-				const event = new CustomEvent('openai:set_globals', {
-					detail: { globals },
-				});
-				iframeWindow.dispatchEvent(event);
-			};
+				// Helper to dispatch custom events in iframe
+				const dispatchGlobalsEvent = (globals: Partial<OpenAiGlobals>) => {
+					const event = new CustomEvent('openai:set_globals', {
+						detail: { globals },
+					});
+					iframeWindow.dispatchEvent(event);
+				};
 
-			// Mock the window.openai API
-			const mockOpenAi: Partial<OpenAiGlobals> & {
-				callTool: (name: string, args: Record<string, unknown>) => Promise<{ result: string }>;
-				sendFollowUpMessage: (args: { prompt: string }) => Promise<void>;
-				openExternal: (payload: { href: string }) => void;
-				requestDisplayMode: (args: { mode: DisplayMode }) => Promise<{ mode: DisplayMode }>;
-			} = {
-				theme,
-				locale: 'en-US',
-				displayMode,
-				maxHeight,
-				toolInput: {},
+				// Mock the window.openai API
+				const mockOpenAi: MockOpenAiApi = {
+					theme,
+					locale: 'en-US',
+					displayMode,
+					maxHeight,
+					toolInput: {},
 				toolOutput: null,
 				toolResponseMetadata: null,
 				widgetState: null,
@@ -116,11 +122,11 @@ export function GradioWidgetDevShim() {
 					capabilities: { hover: true, touch: false },
 				},
 				safeArea: {
-					insets: { top: 0, bottom: 0, left: 0, right: 0 },
-				},
-				setWidgetState: async (state: unknown) => {
-					console.log('[Shim] setWidgetState called:', state);
-					setWidgetStateJson(JSON.stringify(state, null, 2));
+						insets: { top: 0, bottom: 0, left: 0, right: 0 },
+					},
+					setWidgetState: async (state: unknown) => {
+						console.log('[Shim] setWidgetState called:', state);
+						setWidgetStateJson(JSON.stringify(state, null, 2));
 					mockOpenAi.widgetState = state;
 					dispatchGlobalsEvent({ widgetState: state });
 				},
@@ -139,13 +145,14 @@ export function GradioWidgetDevShim() {
 					console.log('[Shim] requestDisplayMode called:', args);
 					setDisplayMode(args.mode);
 					return { mode: args.mode };
-				},
-			};
+					},
+				};
 
-			// Inject into iframe's window BEFORE the widget loads
-			(iframeWindow as any).openai = mockOpenAi;
+				// Inject into iframe's window BEFORE the widget loads
+				const hostWindow = iframeWindow as OpenAiHostWindow;
+				hostWindow.openai = mockOpenAi;
 
-			console.log('[Shim] window.openai initialized in iframe');
+				console.log('[Shim] window.openai initialized in iframe');
 
 			// Auto-send initial data after a short delay to ensure React is ready
 			setTimeout(() => {
@@ -155,13 +162,13 @@ export function GradioWidgetDevShim() {
 						? JSON.parse(widgetStateJson)
 						: null;
 
-					mockOpenAi.toolOutput = toolOutput;
-					mockOpenAi.widgetState = widgetState;
+						mockOpenAi.toolOutput = toolOutput;
+						mockOpenAi.widgetState = widgetState;
 
-					dispatchGlobalsEvent({
-						toolOutput,
-						widgetState,
-						displayMode,
+						dispatchGlobalsEvent({
+							toolOutput,
+							widgetState,
+							displayMode,
 						maxHeight,
 						theme,
 					});
@@ -171,38 +178,40 @@ export function GradioWidgetDevShim() {
 					console.error('[Shim] Failed to send initial data:', e);
 				}
 			}, 100);
-		};
+			};
 
-		iframe.addEventListener('load', handleLoad);
-		return () => iframe.removeEventListener('load', handleLoad);
-	}, []); // Only run on mount
+			iframe.addEventListener('load', handleLoad);
+			return () => iframe.removeEventListener('load', handleLoad);
+			// eslint-disable-next-line react-hooks/exhaustive-deps
+		}, []);
 
 	const sendUpdate = () => {
 		setError(null);
-		const iframe = iframeRef.current;
-		if (!iframe?.contentWindow) {
-			setError('Iframe not loaded');
-			return;
-		}
+			const iframe = iframeRef.current;
+			if (!iframe?.contentWindow) {
+				setError('Iframe not loaded');
+				return;
+			}
 
-		try {
+			try {
 			const toolOutput = JSON.parse(toolOutputJson);
 			const widgetState = widgetStateJson.trim()
 				? JSON.parse(widgetStateJson)
 				: null;
 
-			const iframeWindow = iframe.contentWindow as any;
-			if (!iframeWindow.openai) {
-				setError('window.openai not initialized');
-				return;
-			}
+				const iframeWindow = iframe.contentWindow as OpenAiHostWindow;
+				const openaiApi = iframeWindow.openai;
+				if (!openaiApi) {
+					setError('window.openai not initialized');
+					return;
+				}
 
 			// Update the globals
-			iframeWindow.openai.toolOutput = toolOutput;
-			iframeWindow.openai.widgetState = widgetState;
-			iframeWindow.openai.displayMode = displayMode;
-			iframeWindow.openai.maxHeight = maxHeight;
-			iframeWindow.openai.theme = theme;
+				openaiApi.toolOutput = toolOutput;
+				openaiApi.widgetState = widgetState;
+				openaiApi.displayMode = displayMode;
+				openaiApi.maxHeight = maxHeight;
+				openaiApi.theme = theme;
 
 			// Dispatch event to trigger hooks
 			const event = new CustomEvent('openai:set_globals', {
@@ -215,13 +224,13 @@ export function GradioWidgetDevShim() {
 						theme,
 					},
 				},
-			});
-			iframeWindow.dispatchEvent(event);
+				});
+				iframeWindow.dispatchEvent(event);
 
-			console.log('[Shim] Update sent to widget');
-		} catch (e) {
-			setError(`Invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
-		}
+				console.log('[Shim] Update sent to widget');
+			} catch (e) {
+				setError(`Invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
+			}
 	};
 
 	return (
@@ -409,29 +418,30 @@ export function GradioWidgetDevShim() {
 						<button
 							onClick={() => {
 								setToolOutputJson('');
-								const iframe = iframeRef.current;
-								if (iframe?.contentWindow) {
-									const iframeWindow = iframe.contentWindow as any;
-									if (iframeWindow.openai) {
-										iframeWindow.openai.toolOutput = null;
-										const event = new CustomEvent('openai:set_globals', {
-											detail: {
-												globals: {
-													toolOutput: null,
-													widgetState: widgetStateJson.trim()
+									const iframe = iframeRef.current;
+									if (iframe?.contentWindow) {
+										const iframeWindow = iframe.contentWindow as OpenAiHostWindow;
+										const openaiApi = iframeWindow.openai;
+										if (openaiApi) {
+											openaiApi.toolOutput = null;
+											const event = new CustomEvent('openai:set_globals', {
+												detail: {
+													globals: {
+														toolOutput: null,
+														widgetState: widgetStateJson.trim()
 														? JSON.parse(widgetStateJson)
 														: null,
 													displayMode,
 													maxHeight,
 													theme,
+													},
 												},
-											},
-										});
-										iframeWindow.dispatchEvent(event);
-										console.log('[Shim] Loading state activated');
+											});
+											iframeWindow.dispatchEvent(event);
+											console.log('[Shim] Loading state activated');
+										}
 									}
-								}
-							}}
+								}}
 							className="w-full px-3 py-2 text-sm bg-purple-100 hover:bg-purple-200 rounded text-left"
 						>
 							Show Loading

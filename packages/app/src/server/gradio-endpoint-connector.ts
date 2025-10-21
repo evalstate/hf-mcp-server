@@ -594,7 +594,7 @@ function createToolHandler(
 
 							const title = `${connection.name || 'MCP UI tool'}`;
 							const uriSafeName = (connection.name || 'audio').replace(/[^a-z0-9-_]+/gi, '-');
-							const uiUri = `ui://huggingface-mcp/${uriSafeName}/${Date.now().toString()}`;
+							const uiUri: `ui://${string}` = `ui://huggingface-mcp/${uriSafeName}/${Date.now().toString()}`;
 
 							const uiResource = createAudioPlayerUIResource(uiUri, {
 								title,

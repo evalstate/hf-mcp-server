@@ -10,23 +10,34 @@ import type { ToolResult } from '../types/tool-result.js';
 export const DOCS_SEMANTIC_SEARCH_CONFIG = {
 	name: 'hf_doc_search',
 	description:
-		'Search documentation about all of Hugging Face products and libraries (Transformers, Datasets, Diffusers, Gradio, Hub, and more). Use this for the most up-to-date information ' +
-		'Returns excerpts grouped by Product and Document.',
+		'Search and Discover Hugging Face Product and Library documentation. Use an empty query to discover structure and navigation hints and tips. ' +
+		'You MUST consult this tool for the most up-to-date information when using Hugging Face libraries. Combine with the Product filter to focus results.',
 	schema: z.object({
 		query: z
 			.string()
-			.min(3, 'Supply at least one search term')
 			.max(200, 'Query too long')
-			.describe('Semantic search query'),
-		product: z
-			.string()
-			.optional()
+			.superRefine((value, ctx) => {
+				const trimmed = value.trim();
+				if (trimmed.length === 0) {
+					return;
+				}
+				if (trimmed.length < 3) {
+					ctx.addIssue({
+						code: z.ZodIssueCode.too_small,
+						type: 'string',
+						minimum: 3,
+						inclusive: true,
+						message: 'Supply at least one search term',
+					});
+				}
+			})
 			.describe(
-				'Filter by Product (e.g., "hub", "dataset-viewer", "transformers"). Supply when known for focused results'
+				'Start with an empty query for structure, endpoint discovery and navigation tips. Use semantic queries for targetted searches.'
 			),
+		product: z.string().optional().describe('Filter by Product. Supply when known for focused results'),
 	}),
 	annotations: {
-		title: 'Hugging Face Documentation Library Search',
+		title: 'Hugging Face Documentation Search',
 		destructiveHint: false,
 		readOnlyHint: true,
 		openWorldHint: true,
@@ -49,9 +60,16 @@ interface DocSearchApiParams {
 	product?: string;
 }
 
+interface DocsIndexEntry {
+	id: string;
+	url: string;
+	category: string;
+}
+
 // Token budget defaults
 const DEFAULT_TOKEN_BUDGET = 12500;
 const TRUNCATE_EXCERPT_LENGTH = 400; // chars for truncated excerpts
+const DOCS_INDEX_URL = 'https://huggingface.co/api/docs';
 
 /**
  * Use the Hugging Face Semantic Document Search API
@@ -75,13 +93,13 @@ export class DocSearchTool extends HfApiCall<DocSearchApiParams, DocSearchResult
 	 */
 	async search(params: DocSearchParams): Promise<ToolResult> {
 		try {
-			if (!params.query) return {
-				formatted: 'No query provided',
-				totalResults: 0,
-				resultsShared: 0
-			};
+			const query = params.query?.trim() ?? '';
+			if (query.length === 0) {
+				const docsIndex = await this.fetchFromApi<DocsIndexEntry[]>(DOCS_INDEX_URL);
+				return formatDocsIndex(docsIndex);
+			}
 
-			const apiParams: DocSearchApiParams = { q: params.query.toLowerCase() };
+			const apiParams: DocSearchApiParams = { q: query.toLowerCase() };
 			if (params.product) {
 				apiParams.product = params.product;
 			}
@@ -91,14 +109,14 @@ export class DocSearchTool extends HfApiCall<DocSearchApiParams, DocSearchResult
 			if (results.length === 0) {
 				return {
 					formatted: params.product
-						? `No documentation found for query '${params.query}' in product '${params.product}'`
-						: `No documentation found for query '${params.query}'`,
+						? `No documentation found for query '${query}' in product '${params.product}'`
+						: `No documentation found for query '${query}'`,
 					totalResults: 0,
-					resultsShared: 0
+					resultsShared: 0,
 				};
 			}
 
-			return formatSearchResults(params.query, results, params.product, this.tokenBudget);
+			return formatSearchResults(query, results, params.product, this.tokenBudget);
 		} catch (error) {
 			if (error instanceof Error) {
 				throw new Error(`Failed to search documentation: ${error.message}`);
@@ -136,6 +154,39 @@ function groupResults(results: DocSearchResult[]): Map<string, Map<string, DocSe
 	}
 
 	return grouped;
+}
+
+/**
+ * Format the documentation root index response for empty queries
+ */
+function formatDocsIndex(docsIndex: DocsIndexEntry[]): ToolResult {
+	if (!docsIndex.length) {
+		return {
+			formatted:
+				'No documentation categories are currently available. Try running the search again with specific terms.',
+			totalResults: 0,
+			resultsShared: 0,
+		};
+	}
+
+	const header = '### Hugging Face Documentation Products\n';
+	const tableHeader = '| Product | Category | Documentation |\n| --- | --- | --- |\n';
+	const rows = docsIndex
+		.map((entry) => {
+			const docsUrl = `https://huggingface.co${entry.url}`;
+			return `| \`${entry.id}\` | ${escapeMarkdown(entry.category)} | ${docsUrl} |`;
+		})
+		.join('\n');
+
+	const llmsNote =
+		'\n\nEach documentation root exposes an `llms.txt` endpoint (e.g. add `/llms.txt` to the documentation URL). ' +
+		'Use semantic search when you have a specific question for faster, more targeted results.';
+
+	return {
+		formatted: `${header}${tableHeader}${rows}${llmsNote}`,
+		totalResults: docsIndex.length,
+		resultsShared: docsIndex.length,
+	};
 }
 
 /**
@@ -323,6 +374,6 @@ function formatSearchResults(
 	return {
 		formatted: lines.join('\n'),
 		totalResults: results.length,
-		resultsShared: results.length
+		resultsShared: results.length,
 	};
 }

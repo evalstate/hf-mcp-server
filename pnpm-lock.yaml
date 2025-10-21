@@ -48,8 +48,8 @@ importers:
         specifier: workspace:^
         version: link:../mcp
       '@mcp-ui/server':
-        specifier: ^5.10.0
-        version: 5.11.0
+        specifier: ^5.12.0
+        version: 5.12.0
       '@modelcontextprotocol/sdk':
         specifier: ^1.20.0
         version: 1.20.0
@@ -196,8 +196,8 @@ importers:
         specifier: ^2.1.0
         version: 2.6.6
       '@mcp-ui/server':
-        specifier: ^5.10.0
-        version: 5.11.0
+        specifier: ^5.12.0
+        version: 5.12.0
       turndown:
         specifier: ^7.2.0
         version: 7.2.1
@@ -500,8 +500,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@mcp-ui/server@5.11.0':
-    resolution: {integrity: sha512-DLakzSNA17XsViC+YYQxy2ViVtdJu0SDxQeAIviguXFq58qACvDC5tMFTNn2c0vMB5qfXqz0HLZImE3hHd3C8g==}
+  '@mcp-ui/server@5.12.0':
+    resolution: {integrity: sha512-ZAAHsvzfrBgA0gkyIOjoKNTBTsD0VSJT4KXKHe+Fx/kBASctG6mrzK5gvxD/LLLliantN2UWLTKtEeI4DH4FRQ==}
 
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
@@ -3050,7 +3050,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@mcp-ui/server@5.11.0':
+  '@mcp-ui/server@5.12.0':
     dependencies:
       '@modelcontextprotocol/sdk': 1.20.0
     transitivePeerDependencies:
