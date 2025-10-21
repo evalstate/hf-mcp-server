@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { HfApiCall } from './hf-api-call.js';
 import { spaceInfo, type SpaceEntry } from '@huggingface/hub';
 import type { ToolResult } from './types/tool-result.js';
-import './types/mcp-ui-server-shim.js';
 import { createUIResource } from '@mcp-ui/server';
 // Define the return type that matches MCP server expectations
 interface UseSpaceResult {

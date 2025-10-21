@@ -161,7 +161,7 @@ export function buildAudioPlayerHTML({
 /**
  * Convenience helper to wrap the HTML as a UIResource for MCP-UI transports.
  */
-export function createAudioPlayerUIResource(uri: string, options: AudioPlayerOptions): UIResource {
+export function createAudioPlayerUIResource(uri: `ui://${string}`, options: AudioPlayerOptions): UIResource {
 	return createUIResource({
 		uri,
 		encoding: 'text',
