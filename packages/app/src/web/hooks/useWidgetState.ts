@@ -27,20 +27,19 @@ export function useWidgetState<T extends UnknownObject>(
 		_setWidgetState(widgetStateFromWindow);
 	}, [widgetStateFromWindow]);
 
-	const setWidgetState = useCallback(
-		(state: SetStateAction<T | null>) => {
-			_setWidgetState((prevState) => {
-				const newState = typeof state === 'function' ? state(prevState) : state;
+	const setWidgetState = useCallback((state: SetStateAction<T | null>) => {
+		const setWidgetStateFn = window.openai?.setWidgetState;
 
-				if (newState != null) {
-					window.openai.setWidgetState(newState);
-				}
+		_setWidgetState((prevState) => {
+			const newState = typeof state === 'function' ? state(prevState) : state;
 
-				return newState;
-			});
-		},
-		[window.openai.setWidgetState]
-	);
+			if (newState != null && typeof setWidgetStateFn === 'function') {
+				void setWidgetStateFn(newState);
+			}
+
+			return newState;
+		});
+	}, []);
 
 	return [widgetState, setWidgetState] as const;
 }
