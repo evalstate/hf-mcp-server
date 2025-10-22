@@ -1,0 +1,62 @@
+name: Publish to MCP Registry
+
+on:
+  push:
+    tags: ["v*"]  # Triggers on version tags like v1.0.0
+
+jobs:
+  publish-mcp:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for OIDC authentication
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Wait for NPM publish
+        run: |
+          # Extract version from tag
+          VERSION=${GITHUB_REF#refs/tags/v}
+          PACKAGE_NAME="@llmindset/hf-mcp-server"
+          
+          echo "Waiting for $PACKAGE_NAME@$VERSION to be available on npm..."
+          
+          # Wait up to 5 minutes for the package to appear
+          for i in {1..30}; do
+            if npm view "$PACKAGE_NAME@$VERSION" version &>/dev/null; then
+              echo "✓ Package $PACKAGE_NAME@$VERSION is now available on npm"
+              exit 0
+            fi
+            echo "Attempt $i/30: Package not yet available, waiting 10 seconds..."
+            sleep 10
+          done
+          
+          echo "✗ Package $PACKAGE_NAME@$VERSION not found on npm after 5 minutes"
+          echo "This might be expected if the release workflow publishes to npm after this job."
+          echo "The MCP registry publish will continue anyway as validation will be retried."
+
+      - name: Update server.json version
+        run: |
+          # Extract version from tag (remove 'v' prefix)
+          VERSION=${GITHUB_REF#refs/tags/v}
+          
+          # Update version in server.json
+          jq --arg v "$VERSION" '.version = $v | .packages[0].version = $v' server.json > server.json.tmp
+          mv server.json.tmp server.json
+          
+          echo "Updated server.json to version $VERSION"
+          cat server.json
+
+      - name: Install MCP Publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          chmod +x mcp-publisher
+          ./mcp-publisher --version
+
+      - name: Login to MCP Registry
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish to MCP Registry
+        run: ./mcp-publisher publish

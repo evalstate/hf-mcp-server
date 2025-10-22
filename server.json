@@ -1,0 +1,32 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "name": "co.huggingface/hf-mcp-server",
+  "title": "Hugging Face",
+  "description": "Connect to Hugging Face Hub and thousands of Gradio AI Applications",
+  "version": "0.2.33",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://huggingface.co/mcp?login",
+      "headers": []
+    },
+    {
+      "type": "streamable-http",
+      "url": "https://huggingface.co/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Hugging Face API token for authentication",
+          "placeholder": "Bearer hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    },
+    {
+      "type": "streamable-http",
+      "url": "https://huggingface.co/mcp",
+      "headers": []
+    }
+  ]
+}
