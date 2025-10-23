@@ -120,6 +120,12 @@ export class HfApiCall<TParams = Record<string, string | undefined>, TResponse =
 					// Ignore if we can't read the body
 				}
 
+				// Log the error for debugging
+				console.error(`[API Error] ${response.status} ${response.statusText}`);
+				if (responseBody) {
+					console.error('[API Error] Response:', responseBody);
+				}
+
 				throw new HfApiError(
 					`API request failed: ${response.status.toString()} ${response.statusText}`,
 					response.status,

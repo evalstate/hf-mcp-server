@@ -21,6 +21,7 @@ import {
 	DOCS_SEMANTIC_SEARCH_CONFIG,
 	DOC_FETCH_CONFIG,
 	USE_SPACE_TOOL_CONFIG,
+	HF_JOBS_TOOL_CONFIG,
 } from './index.js';
 
 // Extract tool IDs from their configs (single source of truth)
@@ -41,6 +42,7 @@ export const USER_SUMMARY_PROMPT_ID = USER_SUMMARY_PROMPT_CONFIG.name;
 export const PAPER_SUMMARY_PROMPT_ID = PAPER_SUMMARY_PROMPT_CONFIG.name;
 export const MODEL_DETAIL_PROMPT_ID = MODEL_DETAIL_PROMPT_CONFIG.name;
 export const DATASET_DETAIL_PROMPT_ID = DATASET_DETAIL_PROMPT_CONFIG.name;
+export const HF_JOBS_TOOL_ID = HF_JOBS_TOOL_CONFIG.name;
 
 // Complete list of all built-in tool IDs
 export const ALL_BUILTIN_TOOL_IDS = [
@@ -57,6 +59,7 @@ export const ALL_BUILTIN_TOOL_IDS = [
 	DOCS_SEMANTIC_SEARCH_TOOL_ID,
 	DOC_FETCH_TOOL_ID,
 	USE_SPACE_TOOL_ID,
+	HF_JOBS_TOOL_ID,
 ] as const;
 // Grouped tool IDs for bouquet configurations
 export const TOOL_ID_GROUPS = {
@@ -67,7 +70,13 @@ export const TOOL_ID_GROUPS = {
 		PAPER_SEARCH_TOOL_ID,
 		DOCS_SEMANTIC_SEARCH_TOOL_ID,
 	] as const,
-	spaces: [SPACE_SEARCH_TOOL_ID, DUPLICATE_SPACE_TOOL_ID, SPACE_INFO_TOOL_ID, SPACE_FILES_TOOL_ID, USE_SPACE_TOOL_ID] as const,
+	spaces: [
+		SPACE_SEARCH_TOOL_ID,
+		DUPLICATE_SPACE_TOOL_ID,
+		SPACE_INFO_TOOL_ID,
+		SPACE_FILES_TOOL_ID,
+		USE_SPACE_TOOL_ID,
+	] as const,
 	detail: [MODEL_DETAIL_TOOL_ID, DATASET_DETAIL_TOOL_ID, HUB_INSPECT_TOOL_ID] as const,
 	docs: [DOCS_SEMANTIC_SEARCH_TOOL_ID, DOC_FETCH_TOOL_ID] as const,
 	hf_api: [
@@ -77,6 +86,7 @@ export const TOOL_ID_GROUPS = {
 		PAPER_SEARCH_TOOL_ID,
 		HUB_INSPECT_TOOL_ID,
 		DOCS_SEMANTIC_SEARCH_TOOL_ID,
+		//		HF_JOBS_TOOL_ID,
 	] as const,
 	all: [...ALL_BUILTIN_TOOL_IDS] as const,
 } as const;

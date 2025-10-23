@@ -166,6 +166,13 @@ hf_jobs("run", {
   "command": "python -c \\"print('Hello world!')\\"",
   "flavor": "cpu-basic"
 })
+
+# Use a Hugging Face Space as the image
+hf_jobs("run", {
+  "image": "hf.co/spaces/username/spacename",
+  "command": ["python", "app.py"],
+  "flavor": "cpu-basic"
+})
 \`\`\`
 
 ### Run multiline Python scripts
@@ -232,6 +239,11 @@ hf_jobs("scheduled run", {
 - Parsed with POSIX shell semantics (quotes, escaping)
 - Good for simple commands: \`"python script.py"\`
 - Shell operators (|, &&, >, etc.) are NOT supported - use array with \`bash -c\` instead
+- Variable tokens like \`$HF_TOKEN\` are kept literal—the remote container expands them at runtime
+
+**Multiline inline scripts:**
+- Automatically wrapped in \`["/bin/sh", "-lc", "..."]\` for shell execution
+- Paste entire Python/bash snippets—they execute as if typed in a shell
 
 ## Tips
 
