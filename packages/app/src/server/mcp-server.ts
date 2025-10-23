@@ -52,6 +52,8 @@ import {
 	DOC_FETCH_CONFIG,
 	DocFetchTool,
 	type DocFetchParams,
+	HF_JOBS_TOOL_CONFIG,
+	HfJobsTool,
 } from '@llmindset/hf-mcp';
 
 import type { ServerFactory, ServerFactoryResult } from './transport/base-transport.js';
@@ -646,6 +648,37 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				);
 				return {
 					content: result.content,
+				};
+			}
+		);
+
+		toolInstances[HF_JOBS_TOOL_CONFIG.name] = server.tool(
+			HF_JOBS_TOOL_CONFIG.name,
+			HF_JOBS_TOOL_CONFIG.description,
+			HF_JOBS_TOOL_CONFIG.schema.shape,
+			HF_JOBS_TOOL_CONFIG.annotations,
+			async (params: z.infer<typeof HF_JOBS_TOOL_CONFIG.schema>) => {
+				// Jobs require authentication - check if user has token
+				const isAuthenticated = !!hfToken;
+				const jobsTool = new HfJobsTool(hfToken, isAuthenticated, username);
+				const result = await jobsTool.execute(params);
+
+				// Log the query with command and result metrics
+				logSearchQuery(
+					HF_JOBS_TOOL_CONFIG.name,
+					params.command || 'no-command',
+					params.args || {},
+					{
+						...getLoggingOptions(),
+						totalResults: result.totalResults,
+						resultsShared: result.resultsShared,
+						responseCharCount: result.formatted.length,
+					}
+				);
+
+				return {
+					content: [{ type: 'text', text: result.formatted }],
+					...(result.isError && { isError: true }),
 				};
 			}
 		);
