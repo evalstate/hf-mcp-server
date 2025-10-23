@@ -21,4 +21,10 @@ export interface ToolResult {
 	 * For prompts: 1 if generated successfully
 	 */
 	resultsShared: number;
+
+	/**
+	 * Indicates whether this result represents an error condition
+	 * When true, formatted contains an error message
+	 */
+	isError?: boolean;
 }

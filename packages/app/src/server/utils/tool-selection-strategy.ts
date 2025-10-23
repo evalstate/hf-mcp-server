@@ -1,6 +1,6 @@
 import { logger } from './logger.js';
 import type { AppSettings, SpaceTool } from '../../shared/settings.js';
-import { ALL_BUILTIN_TOOL_IDS, HUB_INSPECT_TOOL_ID, TOOL_ID_GROUPS, USE_SPACE_TOOL_ID } from '@llmindset/hf-mcp';
+import { ALL_BUILTIN_TOOL_IDS, HUB_INSPECT_TOOL_ID, TOOL_ID_GROUPS, USE_SPACE_TOOL_ID, HF_JOBS_TOOL_ID } from '@llmindset/hf-mcp';
 import type { McpApiClient } from './mcp-api-client.js';
 import { extractAuthBouquetAndMix } from '../utils/auth-utils.js';
 import { GRADIO_IMAGE_FILTER_FLAG, README_INCLUDE_FLAG } from '../../shared/behavior-flags.js';
@@ -65,6 +65,10 @@ export const BOUQUETS: Record<string, AppSettings> = {
 	},
 	mcp_ui: {
 		builtInTools: [USE_SPACE_TOOL_ID],
+		spaceTools: [],
+	},
+	jobs: {
+		builtInTools: [HF_JOBS_TOOL_ID],
 		spaceTools: [],
 	},
 };

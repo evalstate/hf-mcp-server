@@ -34,12 +34,14 @@
 	"dependencies": {
 		"@huggingface/hub": "^2.1.0",
 		"@mcp-ui/server": "^5.12.0",
+		"shell-quote": "^1.8.3",
 		"turndown": "^7.2.0",
 		"zod": "^3.24.4"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.25.0",
 		"@types/node": "^22.15.18",
+		"@types/shell-quote": "^1.7.5",
 		"@types/turndown": "^5.0.5",
 		"eslint": "^9.25.0",
 		"globals": "^16.0.0",

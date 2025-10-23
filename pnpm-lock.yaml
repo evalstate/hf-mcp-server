@@ -198,6 +198,9 @@ importers:
       '@mcp-ui/server':
         specifier: ^5.12.0
         version: 5.12.0
+      shell-quote:
+        specifier: ^1.8.3
+        version: 1.8.3
       turndown:
         specifier: ^7.2.0
         version: 7.2.1
@@ -211,6 +214,9 @@ importers:
       '@types/node':
         specifier: ^22.15.18
         version: 22.18.6
+      '@types/shell-quote':
+        specifier: ^1.7.5
+        version: 1.7.5
       '@types/turndown':
         specifier: ^5.0.5
         version: 5.0.5
@@ -1223,6 +1229,9 @@ packages:
 
   '@types/serve-static@1.15.8':
     resolution: {integrity: sha512-roei0UY3LhpOJvjbIP6ZZFngyLKl5dskOtDhxY5THRSpO+ZI+nzJ+m5yUMzGrp89YRa7lvknKkMYjqQFGwA7Sg==}
+
+  '@types/shell-quote@1.7.5':
+    resolution: {integrity: sha512-+UE8GAGRPbJVQDdxi16dgadcBfQ+KG2vgZhV1+3A1XmHbmwcdwhCUwIdy+d3pAGrbvgRoVSjeI9vOWyq376Yzw==}
 
   '@types/turndown@5.0.5':
     resolution: {integrity: sha512-TL2IgGgc7B5j78rIccBtlYAnkuv8nUQqhQc+DSYV5j9Be9XOcm/SKOVRuA47xAVI3680Tk9B1d8flK2GWT2+4w==}
@@ -3680,6 +3689,8 @@ snapshots:
       '@types/http-errors': 2.0.5
       '@types/node': 22.18.6
       '@types/send': 0.17.5
+
+  '@types/shell-quote@1.7.5': {}
 
   '@types/turndown@5.0.5': {}
 

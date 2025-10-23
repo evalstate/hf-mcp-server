@@ -1,0 +1,189 @@
+import type {
+	ScheduledRunArgs,
+	ScheduledUvArgs,
+	ScheduledPsArgs,
+	ScheduledJobArgs,
+	ScheduledJobSpec,
+} from '../types.js';
+import type { JobsApiClient } from '../api-client.js';
+import { formatScheduledJobsTable, formatScheduledJobDetails } from '../formatters.js';
+import { createJobSpec } from './utils.js';
+
+/**
+ * Execute 'scheduled run' command
+ * Creates a scheduled job
+ */
+export async function scheduledRunCommand(args: ScheduledRunArgs, client: JobsApiClient): Promise<string> {
+	// Create job spec
+	const jobSpec = createJobSpec({
+		image: args.image,
+		command: args.command,
+		flavor: args.flavor,
+		env: args.env,
+		secrets: args.secrets,
+		timeout: args.timeout,
+	});
+
+	// Create scheduled job spec
+	const scheduledSpec: ScheduledJobSpec = {
+		schedule: args.schedule,
+		suspend: args.suspend,
+		jobSpec,
+	};
+
+	// Submit scheduled job
+	const scheduledJob = await client.createScheduledJob(scheduledSpec, args.namespace);
+
+	return `✓ Scheduled job created successfully!
+
+**Scheduled Job ID:** ${scheduledJob.id}
+**Schedule:** ${scheduledJob.schedule}
+**Suspended:** ${scheduledJob.suspend ? 'Yes' : 'No'}
+**Next Run:** ${scheduledJob.nextRun || 'N/A'}
+
+To inspect: \`hf_jobs("scheduled inspect", {"scheduled_job_id": "${scheduledJob.id}"})\`
+To list all: \`hf_jobs("scheduled ps")\``;
+}
+
+/**
+ * Execute 'scheduled uv' command
+ * Creates a scheduled UV job
+ */
+export async function scheduledUvCommand(args: ScheduledUvArgs, client: JobsApiClient): Promise<string> {
+	// For UV, use standard UV image
+	const image = 'ghcr.io/astral-sh/uv:python3.12-bookworm';
+
+	// Build UV command (similar to regular uv command)
+	const scriptSource = args.script;
+	let command: string;
+
+	if (scriptSource.startsWith('http://') || scriptSource.startsWith('https://')) {
+		command = buildUvCommand(scriptSource, args);
+	} else if (scriptSource.includes('\n')) {
+		const encoded = Buffer.from(scriptSource).toString('base64');
+		const deps =
+			args.with_deps && args.with_deps.length > 0 ? args.with_deps.map((dep) => `--with ${dep}`).join(' ') + ' ' : '';
+		command = `echo "${encoded}" | base64 -d | uv run ${deps}${args.python ? `-p ${args.python}` : ''} -`;
+	} else {
+		command = buildUvCommand(scriptSource, args);
+	}
+
+	// Convert to scheduled run args
+	const scheduledRunArgs: ScheduledRunArgs = {
+		schedule: args.schedule,
+		suspend: args.suspend,
+		image,
+		command,
+		flavor: args.flavor,
+		env: args.env,
+		secrets: args.secrets,
+		timeout: args.timeout,
+		detach: args.detach,
+		namespace: args.namespace,
+	};
+
+	return scheduledRunCommand(scheduledRunArgs, client);
+}
+
+/**
+ * Build UV command with options
+ */
+function buildUvCommand(
+	script: string,
+	args: { with_deps?: string[]; python?: string; script_args?: string[] }
+): string {
+	const parts: string[] = ['uv', 'run'];
+
+	if (args.with_deps && args.with_deps.length > 0) {
+		for (const dep of args.with_deps) {
+			parts.push('--with', dep);
+		}
+	}
+
+	if (args.python) {
+		parts.push('-p', args.python);
+	}
+
+	parts.push(script);
+
+	if (args.script_args && args.script_args.length > 0) {
+		parts.push(...args.script_args);
+	}
+
+	return parts.join(' ');
+}
+
+/**
+ * Execute 'scheduled ps' command
+ * Lists scheduled jobs
+ */
+export async function scheduledPsCommand(args: ScheduledPsArgs, client: JobsApiClient): Promise<string> {
+	// Fetch all scheduled jobs
+	const allJobs = await client.listScheduledJobs(args.namespace);
+
+	// Filter jobs
+	let jobs = allJobs;
+
+	// Default: hide suspended jobs unless --all is specified
+	if (!args.all) {
+		jobs = jobs.filter((job) => !job.suspend);
+	}
+
+	// Format as markdown table
+	const table = formatScheduledJobsTable(jobs);
+
+	if (jobs.length === 0) {
+		if (args.all) {
+			return 'No scheduled jobs found.';
+		}
+		return 'No active scheduled jobs found. Use `{"all": true}` to show suspended jobs.';
+	}
+
+	return `**Scheduled Jobs (${jobs.length} of ${allJobs.length} total):**
+
+${table}`;
+}
+
+/**
+ * Execute 'scheduled inspect' command
+ * Gets details of a scheduled job
+ */
+export async function scheduledInspectCommand(args: ScheduledJobArgs, client: JobsApiClient): Promise<string> {
+	const job = await client.getScheduledJob(args.scheduled_job_id, args.namespace);
+	const formattedDetails = formatScheduledJobDetails(job);
+	return `**Scheduled Job Details:**\n\n${formattedDetails}`;
+}
+
+/**
+ * Execute 'scheduled delete' command
+ * Deletes a scheduled job
+ */
+export async function scheduledDeleteCommand(args: ScheduledJobArgs, client: JobsApiClient): Promise<string> {
+	await client.deleteScheduledJob(args.scheduled_job_id, args.namespace);
+
+	return `✓ Scheduled job ${args.scheduled_job_id} has been deleted.`;
+}
+
+/**
+ * Execute 'scheduled suspend' command
+ * Suspends a scheduled job
+ */
+export async function scheduledSuspendCommand(args: ScheduledJobArgs, client: JobsApiClient): Promise<string> {
+	await client.suspendScheduledJob(args.scheduled_job_id, args.namespace);
+
+	return `✓ Scheduled job ${args.scheduled_job_id} has been suspended.
+
+To resume: \`hf_jobs("scheduled resume", {"scheduled_job_id": "${args.scheduled_job_id}"})\``;
+}
+
+/**
+ * Execute 'scheduled resume' command
+ * Resumes a suspended scheduled job
+ */
+export async function scheduledResumeCommand(args: ScheduledJobArgs, client: JobsApiClient): Promise<string> {
+	await client.resumeScheduledJob(args.scheduled_job_id, args.namespace);
+
+	return `✓ Scheduled job ${args.scheduled_job_id} has been resumed.
+
+To inspect: \`hf_jobs("scheduled inspect", {"scheduled_job_id": "${args.scheduled_job_id}"})\``;
+}
