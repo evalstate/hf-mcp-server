@@ -2,6 +2,7 @@ import type { RunArgs, UvArgs } from '../types.js';
 import type { JobsApiClient } from '../api-client.js';
 import { createJobSpec } from './utils.js';
 import { fetchJobLogs } from '../sse-handler.js';
+import { buildUvCommand, UV_DEFAULT_IMAGE, wrapInlineScript } from './uv-utils.js';
 
 /**
  * Execute the 'run' command
@@ -64,26 +65,18 @@ To inspect: \`hf_jobs("inspect", {"job_id": "${job.id}"})\``;
  */
 export async function uvCommand(args: UvArgs, client: JobsApiClient, token?: string): Promise<string> {
 	// UV jobs use a standard UV image unless overridden
-	const image = 'ghcr.io/astral-sh/uv:latest'; // Standard UV image
+	const image = UV_DEFAULT_IMAGE;
 
 	// Detect script source and build command
 	const scriptSource = args.script;
 	let command: string | string[];
 
-	// Check if script is a URL
 	if (scriptSource.startsWith('http://') || scriptSource.startsWith('https://')) {
 		// URL - download and run
 		command = buildUvCommand(scriptSource, args);
 	} else if (scriptSource.includes('\n')) {
 		// Inline multi-line script - encode it
-		const encoded = Buffer.from(scriptSource).toString('base64');
-		const depsPart =
-			args.with_deps && args.with_deps.length > 0
-				? args.with_deps.map(dep => `--with ${dep}`).join(' ')
-				: '';
-		const pythonPart = args.python ? `-p ${args.python}` : '';
-		const uvArgs = [depsPart, pythonPart].filter(Boolean).join(' ');
-		const shellSnippet = `echo "${encoded}" | base64 -d | uv run${uvArgs ? ` ${uvArgs}` : ''} -`;
+		const shellSnippet = wrapInlineScript(scriptSource, args);
 		command = ['/bin/sh', '-lc', shellSnippet];
 	} else {
 		// Assume it's a URL or path - UV will handle it
@@ -103,33 +96,4 @@ export async function uvCommand(args: UvArgs, client: JobsApiClient, token?: str
 	};
 
 	return runCommand(runArgs, client, token);
-}
-
-/**
- * Build UV command with options
- */
-function buildUvCommand(script: string, args: UvArgs): string {
-	const parts: string[] = ['uv', 'run'];
-
-	// Add dependencies
-	if (args.with_deps && args.with_deps.length > 0) {
-		for (const dep of args.with_deps) {
-			parts.push('--with', dep);
-		}
-	}
-
-	// Add Python version
-	if (args.python) {
-		parts.push('-p', args.python);
-	}
-
-	// Add script
-	parts.push(script);
-
-	// Add script arguments
-	if (args.script_args && args.script_args.length > 0) {
-		parts.push(...args.script_args);
-	}
-
-	return parts.join(' ');
 }
