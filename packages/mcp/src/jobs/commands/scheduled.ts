@@ -8,6 +8,7 @@ import type {
 import type { JobsApiClient } from '../api-client.js';
 import { formatScheduledJobsTable, formatScheduledJobDetails } from '../formatters.js';
 import { createJobSpec } from './utils.js';
+import { buildUvCommand, UV_DEFAULT_IMAGE, wrapInlineScript } from './uv-utils.js';
 
 /**
  * Execute 'scheduled run' command
@@ -60,7 +61,7 @@ export async function scheduledUvCommand(
 	token?: string
 ): Promise<string> {
 	// For UV, use standard UV image
-	const image = 'ghcr.io/astral-sh/uv:python3.12-bookworm';
+	const image = UV_DEFAULT_IMAGE;
 
 	// Build UV command (similar to regular uv command)
 	const scriptSource = args.script;
@@ -69,10 +70,7 @@ export async function scheduledUvCommand(
 	if (scriptSource.startsWith('http://') || scriptSource.startsWith('https://')) {
 		command = buildUvCommand(scriptSource, args);
 	} else if (scriptSource.includes('\n')) {
-		const encoded = Buffer.from(scriptSource).toString('base64');
-		const deps =
-			args.with_deps && args.with_deps.length > 0 ? args.with_deps.map((dep) => `--with ${dep}`).join(' ') + ' ' : '';
-		command = `echo "${encoded}" | base64 -d | uv run ${deps}${args.python ? `-p ${args.python}` : ''} -`;
+		command = wrapInlineScript(scriptSource, args);
 	} else {
 		command = buildUvCommand(scriptSource, args);
 	}
@@ -92,34 +90,6 @@ export async function scheduledUvCommand(
 	};
 
 	return scheduledRunCommand(scheduledRunArgs, client, token);
-}
-
-/**
- * Build UV command with options
- */
-function buildUvCommand(
-	script: string,
-	args: { with_deps?: string[]; python?: string; script_args?: string[] }
-): string {
-	const parts: string[] = ['uv', 'run'];
-
-	if (args.with_deps && args.with_deps.length > 0) {
-		for (const dep of args.with_deps) {
-			parts.push('--with', dep);
-		}
-	}
-
-	if (args.python) {
-		parts.push('-p', args.python);
-	}
-
-	parts.push(script);
-
-	if (args.script_args && args.script_args.length > 0) {
-		parts.push(...args.script_args);
-	}
-
-	return parts.join(' ');
 }
 
 /**
