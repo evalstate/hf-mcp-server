@@ -239,7 +239,7 @@ hf_jobs("scheduled run", {
 - Parsed with POSIX shell semantics (quotes, escaping)
 - Good for simple commands: \`"python script.py"\`
 - Shell operators (|, &&, >, etc.) are NOT supported - use array with \`bash -c\` instead
-- Variable tokens like \`$HF_TOKEN\` are kept literal—the remote container expands them at runtime
+- \`$HF_TOKEN\` stays literal in the command. To forward your authenticated token, add \`secrets: { "HF_TOKEN": "$HF_TOKEN" }\`.
 
 **Multiline inline scripts:**
 - Automatically wrapped in \`["/bin/sh", "-lc", "..."]\` for shell execution
@@ -249,7 +249,7 @@ hf_jobs("scheduled run", {
 
 - Jobs default to detached mode (return immediately with job ID)
 - Use Hub resources directly: \`load_dataset('squad')\`, \`AutoModel.from_pretrained('bert-base')\`
-- Pass HF_TOKEN via secrets for private resources
+ - To access private Hub assets, include \`secrets: { "HF_TOKEN": "$HF_TOKEN" }\` (or \`${'${HF_TOKEN}'}\`) so the server injects your bearer token.
 - Logs are time-limited (10s max) - check job page for full logs
 - For shell pipes/operators, use: \`["bash", "-c", "cmd1 | cmd2"]\`
 `;
@@ -360,11 +360,11 @@ export class HfJobsTool {
 					break;
 
 				case 'scheduled run':
-					result = await scheduledRunCommand(args as ScheduledRunArgs, this.client);
+					result = await scheduledRunCommand(args as ScheduledRunArgs, this.client, this.hfToken);
 					break;
 
 				case 'scheduled uv':
-					result = await scheduledUvCommand(args as ScheduledUvArgs, this.client);
+					result = await scheduledUvCommand(args as ScheduledUvArgs, this.client, this.hfToken);
 					break;
 
 				case 'scheduled ps':

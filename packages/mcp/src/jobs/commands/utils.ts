@@ -122,6 +122,36 @@ export function parseCommand(command: string | string[]): { command: string[]; a
 }
 
 /**
+ * Replace HF token placeholder with actual token if available
+ */
+function replaceTokenPlaceholder(value: string, hfToken?: string): string {
+	if (!hfToken) {
+		return value;
+	}
+
+	if (value === '$HF_TOKEN' || value === '${HF_TOKEN}') {
+		return hfToken;
+	}
+
+	return value;
+}
+
+function transformEnvMap(
+	map: Record<string, string> | undefined,
+	hfToken?: string
+): Record<string, string> | undefined {
+	if (!map) {
+		return undefined;
+	}
+
+	const transformedEntries = Object.entries(map).map<[string, string]>(([key, value]) => [
+		key,
+		replaceTokenPlaceholder(value, hfToken),
+	]);
+	return Object.fromEntries(transformedEntries) as Record<string, string>;
+}
+
+/**
  * Create a JobSpec from run command arguments
  */
 export function createJobSpec(args: {
@@ -131,6 +161,7 @@ export function createJobSpec(args: {
 	env?: Record<string, string>;
 	secrets?: Record<string, string>;
 	timeout?: string;
+	hfToken?: string;
 }): JobSpec {
 	// Validate required fields
 	if (!args.image) {
@@ -143,14 +174,16 @@ export function createJobSpec(args: {
 	const imageSource = parseImageSource(args.image);
 	const { command, arguments: cmdArgs } = parseCommand(args.command);
 	const timeoutSeconds = args.timeout ? parseTimeout(args.timeout) : undefined;
+	const environment = transformEnvMap(args.env, args.hfToken) || {};
+	const secrets = transformEnvMap(args.secrets, args.hfToken) || {};
 
 	const spec: JobSpec = {
 		...imageSource,
 		command,
 		arguments: cmdArgs,
 		flavor: args.flavor || 'cpu-basic',
-		environment: args.env || {}, // API requires object, not undefined
-		secrets: args.secrets || {}, // Same for secrets
+		environment,
+		secrets,
 		timeoutSeconds,
 	};
 

@@ -245,6 +245,60 @@ describe('Jobs Command Translation', () => {
 			expect(spec.secrets).toEqual({ API_KEY: 'secret123' });
 		});
 
+		it('should keep HF_TOKEN literal when no expansion token provided', () => {
+			const spec = createJobSpec({
+				image: 'python:3.12',
+				command: 'echo $HF_TOKEN',
+			});
+
+			expect(spec.command).toEqual(['echo', '$HF_TOKEN']);
+		});
+
+		it('should keep command literal even when hfToken provided', () => {
+			const spec = createJobSpec({
+				image: 'python:3.12',
+				command: 'echo $HF_TOKEN',
+				hfToken: 'hf_secret_999',
+			});
+
+			expect(spec.command).toEqual(['echo', '$HF_TOKEN']);
+		});
+
+		it('should inject HF_TOKEN into secrets when placeholder provided', () => {
+			const spec = createJobSpec({
+				image: 'python:3.12',
+				command: 'python script.py',
+				secrets: { HF_TOKEN: '$HF_TOKEN', OTHER: 'keep' },
+				hfToken: 'hf_secret_123',
+			});
+
+			expect(spec.secrets).toEqual({ HF_TOKEN: 'hf_secret_123', OTHER: 'keep' });
+		});
+
+		it('should inject HF_TOKEN into env when placeholder provided', () => {
+			const spec = createJobSpec({
+				image: 'python:3.12',
+				command: 'python script.py',
+				env: { HF_TOKEN: '${HF_TOKEN}', NAME: 'demo' },
+				hfToken: 'hf_env_456',
+			});
+
+			expect(spec.environment).toEqual({ HF_TOKEN: 'hf_env_456', NAME: 'demo' });
+		});
+
+		it('should leave other env values unchanged', () => {
+			const spec = createJobSpec({
+				image: 'python:3.12',
+				command: 'python script.py',
+				env: { NAME: 'demo' },
+				secrets: { API_KEY: 'secret123' },
+				hfToken: 'hf_env_456',
+			});
+
+			expect(spec.environment).toEqual({ NAME: 'demo' });
+			expect(spec.secrets).toEqual({ API_KEY: 'secret123' });
+		});
+
 		it('should parse and include timeout', () => {
 			const spec = createJobSpec({
 				image: 'python:3.12',
