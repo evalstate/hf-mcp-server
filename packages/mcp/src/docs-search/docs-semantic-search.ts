@@ -10,7 +10,7 @@ import type { ToolResult } from '../types/tool-result.js';
 export const DOCS_SEMANTIC_SEARCH_CONFIG = {
 	name: 'hf_doc_search',
 	description:
-		'Search and Discover Hugging Face Product and Library documentation. Use an empty query to discover structure and navigation hints and tips. ' +
+		'Search and Discover Hugging Face Product and Library documentation. Send an empty query to discover structure and navigation instructions. ' +
 		'You MUST consult this tool for the most up-to-date information when using Hugging Face libraries. Combine with the Product filter to focus results.',
 	schema: z.object({
 		query: z

@@ -53,23 +53,15 @@ export class JobsApiClient extends HfApiCall {
 		const url = `https://huggingface.co/api/jobs/${ns}`;
 
 		// Debug logging (will be visible in server logs)
-		console.error('[Jobs API] POST', url);
-		console.error('[Jobs API] Payload:', JSON.stringify(jobSpec, null, 2));
 
-		try {
-			const result = await this.fetchFromApi<JobInfo>(url, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(jobSpec),
-			});
-			console.error('[Jobs API] Success:', result.id);
-			return result;
-		} catch (error) {
-			console.error('[Jobs API] Error:', error);
-			throw error;
-		}
+		const result = await this.fetchFromApi<JobInfo>(url, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(jobSpec),
+		});
+		return result;
 	}
 
 	/**

@@ -13,7 +13,11 @@ import { createJobSpec } from './utils.js';
  * Execute 'scheduled run' command
  * Creates a scheduled job
  */
-export async function scheduledRunCommand(args: ScheduledRunArgs, client: JobsApiClient): Promise<string> {
+export async function scheduledRunCommand(
+	args: ScheduledRunArgs,
+	client: JobsApiClient,
+	token?: string
+): Promise<string> {
 	// Create job spec
 	const jobSpec = createJobSpec({
 		image: args.image,
@@ -22,6 +26,7 @@ export async function scheduledRunCommand(args: ScheduledRunArgs, client: JobsAp
 		env: args.env,
 		secrets: args.secrets,
 		timeout: args.timeout,
+		hfToken: token,
 	});
 
 	// Create scheduled job spec
@@ -49,7 +54,11 @@ To list all: \`hf_jobs("scheduled ps")\``;
  * Execute 'scheduled uv' command
  * Creates a scheduled UV job
  */
-export async function scheduledUvCommand(args: ScheduledUvArgs, client: JobsApiClient): Promise<string> {
+export async function scheduledUvCommand(
+	args: ScheduledUvArgs,
+	client: JobsApiClient,
+	token?: string
+): Promise<string> {
 	// For UV, use standard UV image
 	const image = 'ghcr.io/astral-sh/uv:python3.12-bookworm';
 
@@ -82,7 +91,7 @@ export async function scheduledUvCommand(args: ScheduledUvArgs, client: JobsApiC
 		namespace: args.namespace,
 	};
 
-	return scheduledRunCommand(scheduledRunArgs, client);
+	return scheduledRunCommand(scheduledRunArgs, client, token);
 }
 
 /**

@@ -5,8 +5,7 @@
 // Transport types
 export type TransportType = 'stdio' | 'sse' | 'streamableHttp' | 'streamableHttpJson' | 'unknown';
 
-export const OAUTH_RESOURCE_BASE_URL =
-	'https://huggingface.co/.well-known/oauth-protected-resource/mcp';
+export const OAUTH_RESOURCE_BASE_URL = 'https://huggingface.co/.well-known/oauth-protected-resource/mcp';
 export const OAUTH_RESOURCE = `Bearer resource_metadata="${OAUTH_RESOURCE_BASE_URL}"`;
 
 // Server port (now using single port for both web app and MCP API)

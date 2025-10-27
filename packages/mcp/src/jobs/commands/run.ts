@@ -16,6 +16,7 @@ export async function runCommand(args: RunArgs, client: JobsApiClient, token?: s
 		env: args.env,
 		secrets: args.secrets,
 		timeout: args.timeout,
+		hfToken: token,
 	});
 
 	// Submit job

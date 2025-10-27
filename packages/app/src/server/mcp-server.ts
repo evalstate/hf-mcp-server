@@ -494,7 +494,7 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 		// Compute README availability; adjust description and schema accordingly
 		const hubInspectReadmeAllowed = hasReadmeFlag(toolSelection.enabledToolIds);
 		const hubInspectDescription = hubInspectReadmeAllowed
-			? `${HUB_INSPECT_TOOL_CONFIG.description} README file is included from the external repository.`
+			? `${HUB_INSPECT_TOOL_CONFIG.description} README file may be requested from the external repository.`
 			: HUB_INSPECT_TOOL_CONFIG.description;
 		const hubInspectBaseShape = HUB_INSPECT_TOOL_CONFIG.schema.shape as z.ZodRawShape;
 		const hubInspectSchemaShape: z.ZodRawShape = hubInspectReadmeAllowed
@@ -664,17 +664,12 @@ export const createServerFactory = (_webServerInstance: WebServer, sharedApiClie
 				const result = await jobsTool.execute(params);
 
 				// Log the query with command and result metrics
-				logSearchQuery(
-					HF_JOBS_TOOL_CONFIG.name,
-					params.command || 'no-command',
-					params.args || {},
-					{
-						...getLoggingOptions(),
-						totalResults: result.totalResults,
-						resultsShared: result.resultsShared,
-						responseCharCount: result.formatted.length,
-					}
-				);
+				logSearchQuery(HF_JOBS_TOOL_CONFIG.name, params.command || 'no-command', params.args || {}, {
+					...getLoggingOptions(),
+					totalResults: result.totalResults,
+					resultsShared: result.resultsShared,
+					responseCharCount: result.formatted.length,
+				});
 
 				return {
 					content: [{ type: 'text', text: result.formatted }],

@@ -42,8 +42,8 @@ importers:
   packages/app:
     dependencies:
       '@huggingface/hub':
-        specifier: ^2.1.0
-        version: 2.6.6
+        specifier: ^2.6.12
+        version: 2.6.12
       '@llmindset/hf-mcp':
         specifier: workspace:^
         version: link:../mcp
@@ -193,8 +193,8 @@ importers:
   packages/mcp:
     dependencies:
       '@huggingface/hub':
-        specifier: ^2.1.0
-        version: 2.6.6
+        specifier: ^2.6.12
+        version: 2.6.12
       '@mcp-ui/server':
         specifier: ^5.12.0
         version: 5.12.0
@@ -450,13 +450,13 @@ packages:
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
 
-  '@huggingface/hub@2.6.6':
-    resolution: {integrity: sha512-h2TWBjoIjfI+W4flOE1sUKMZfa74mTK5mR5DA4JqDciD3WmmRlHVHaAedsk92fba3L/Oi/zSmFIQ/hEwRZMhlw==}
+  '@huggingface/hub@2.6.12':
+    resolution: {integrity: sha512-/AZN2LAtrt4B8S83/Ru4wMorHY4NPwIYXo60SkuD6c/Mr135t1UqffD1vqcqtDYVf0hhLiyVmm1LMU1CXi8iKQ==}
     engines: {node: '>=18'}
     hasBin: true
 
-  '@huggingface/tasks@0.19.48':
-    resolution: {integrity: sha512-9OIMhl6lSvuim0EisMPbwO4fUmMlbAXh5/GIMVAQALoByouockaaDxMuzJ9IffHRsl3qjS+QSD/mPe65kuPeyQ==}
+  '@huggingface/tasks@0.19.58':
+    resolution: {integrity: sha512-nZbg2tFPTYWr0JnsfJi+RzzTeCH6E1EMjtghHIY+etz12+GxaxjFt0bdpOsLK4NxV+7xv20P8GAEkcKbG8B5tw==}
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -3002,13 +3002,13 @@ snapshots:
 
   '@floating-ui/utils@0.2.10': {}
 
-  '@huggingface/hub@2.6.6':
+  '@huggingface/hub@2.6.12':
     dependencies:
-      '@huggingface/tasks': 0.19.48
+      '@huggingface/tasks': 0.19.58
     optionalDependencies:
       cli-progress: 3.12.0
 
-  '@huggingface/tasks@0.19.48': {}
+  '@huggingface/tasks@0.19.58': {}
 
   '@humanfs/core@0.19.1': {}
 
