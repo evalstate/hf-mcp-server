@@ -8,7 +8,7 @@ import type {
 import type { JobsApiClient } from '../api-client.js';
 import { formatScheduledJobsTable, formatScheduledJobDetails } from '../formatters.js';
 import { createJobSpec } from './utils.js';
-import { buildUvCommand, UV_DEFAULT_IMAGE, wrapInlineScript } from './uv-utils.js';
+import { resolveUvCommand, UV_DEFAULT_IMAGE } from './uv-utils.js';
 
 /**
  * Execute 'scheduled run' command
@@ -64,16 +64,7 @@ export async function scheduledUvCommand(
 	const image = UV_DEFAULT_IMAGE;
 
 	// Build UV command (similar to regular uv command)
-	const scriptSource = args.script;
-	let command: string;
-
-	if (scriptSource.startsWith('http://') || scriptSource.startsWith('https://')) {
-		command = buildUvCommand(scriptSource, args);
-	} else if (scriptSource.includes('\n')) {
-		command = wrapInlineScript(scriptSource, args);
-	} else {
-		command = buildUvCommand(scriptSource, args);
-	}
+	const command = resolveUvCommand(args);
 
 	// Convert to scheduled run args
 	const scheduledRunArgs: ScheduledRunArgs = {

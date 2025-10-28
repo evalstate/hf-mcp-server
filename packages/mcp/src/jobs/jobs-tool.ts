@@ -14,7 +14,9 @@ import {
 	scheduledSuspendCommand,
 	scheduledResumeCommand,
 } from './commands/scheduled.js';
+import { formatCommandHelp } from './schema-help.js';
 import type { ToolResult } from '../types/tool-result.js';
+import { CPU_FLAVORS, GPU_FLAVORS, SPECIALIZED_FLAVORS } from './types.js';
 import type {
 	RunArgs,
 	UvArgs,
@@ -65,6 +67,37 @@ const COMMAND_SCHEMAS = {
 	'scheduled resume': scheduledJobArgsSchema,
 } as const;
 
+const HELP_FLAG = 'help';
+
+const CPU_FLAVOR_LIST = CPU_FLAVORS.join(', ');
+const GPU_FLAVOR_LIST = GPU_FLAVORS.join(', ');
+const SPECIALIZED_FLAVOR_LIST = SPECIALIZED_FLAVORS.join(', ');
+const HARDWARE_FLAVORS_SECTION = [
+	`**CPU:** ${CPU_FLAVOR_LIST}`,
+	GPU_FLAVORS.length ? `**GPU:** ${GPU_FLAVOR_LIST}` : undefined,
+	SPECIALIZED_FLAVORS.length ? `**Specialized:** ${SPECIALIZED_FLAVOR_LIST}` : undefined,
+]
+	.filter((line): line is string => Boolean(line))
+	.join('\n');
+
+function isHelpRequested(args: Record<string, unknown> | undefined): boolean {
+	if (!args) {
+		return false;
+	}
+
+	const helpValue = args[HELP_FLAG];
+	return helpValue === true || helpValue === 'true';
+}
+
+function removeHelpFlag(args: Record<string, unknown> | undefined): Record<string, unknown> {
+	if (!args || !(HELP_FLAG in args)) {
+		return args ?? {};
+	}
+
+	const { [HELP_FLAG]: _ignored, ...rest } = args;
+	return rest;
+}
+
 /**
  * Validate command arguments against a Zod schema
  * Returns a ToolResult with detailed error message if validation fails
@@ -104,13 +137,7 @@ function validateArgs(
 		errorMessage += `Invalid parameters:\n${invalidFields.join('\n')}\n\n`;
 	}
 
-	// Show what was provided
-	const providedKeys = args && typeof args === 'object' ? Object.keys(args) : [];
-	if (providedKeys.length > 0) {
-		errorMessage += `You provided: ${JSON.stringify(args, null, 2)}`;
-	} else {
-		errorMessage += `You provided: {} (no parameters)`;
-	}
+	errorMessage += `Call hf_jobs("${commandName}", {"help": true}) to see valid arguments.`;
 
 	return {
 		success: false,
@@ -153,21 +180,15 @@ Manage compute jobs on Hugging Face infrastructure.
 
 ### Run a simple job
 \`\`\`
-# Command as array (recommended, especially for complex commands)
 hf_jobs("run", {
   "image": "python:3.12",
   "command": ["python", "-c", "print('Hello from HF Jobs!')"],
   "flavor": "cpu-basic"
 })
+\`\`\`
 
-# Command as string (parsed with POSIX shell semantics)
-hf_jobs("run", {
-  "image": "python:3.12",
-  "command": "python -c \\"print('Hello world!')\\"",
-  "flavor": "cpu-basic"
-})
-
-# Use a Hugging Face Space as the image
+### Use a Hugging Face Space as the image
+\`\`\`
 hf_jobs("run", {
   "image": "hf.co/spaces/username/spacename",
   "command": ["python", "app.py"],
@@ -177,7 +198,6 @@ hf_jobs("run", {
 
 ### Run multiline Python scripts
 \`\`\`
-# Use array format with newlines in the -c argument
 hf_jobs("run", {
   "image": "python:3.12",
   "command": ["python", "-c", "import sys\\nprint('Line 1')\\nprint('Line 2')"],
@@ -185,11 +205,29 @@ hf_jobs("run", {
 })
 \`\`\`
 
+### Run a Python Script from a URL with UV
+\`\`\`
+hf_jobs("uv", {
+  "script": "https://huggingface.co/datasets/uv-scripts/classification/blob/main/classify-dataset.py",
+  "with_deps": ["pandas"],
+  "script_args": ["--input", "data.csv"],
+  "flavor": "cpu-basic"
+})
+\`\`\`
+
+### Run an inline Python script with UV
+\`\`\`
+hf_jobs("uv", {
+  "script": "import math\\nprint('area:', math.pi * 4**2)"
+})
+\`\`\`
+
+
 ### Run bash/shell commands
 \`\`\`
 hf_jobs("run", {
   "image": "ubuntu:22.04",
-  "command": ["bash", "-c", "apt-get update && apt-get install -y curl"],
+  "command": ["/bin/sh", "-lc", "apt-get update && apt-get install -y curl"],
   "flavor": "cpu-basic"
 })
 \`\`\`
@@ -222,36 +260,48 @@ hf_jobs("scheduled run", {
 })
 \`\`\`
 
+### Schedule a UV script
+\`\`\`
+hf_jobs("scheduled uv", {
+  "schedule": "0 9 * * 1-5",
+  "script": "https://huggingface.co/datasets/uv-scripts/classification/blob/main/classify-dataset.py",
+  "with_deps": ["pandas"],
+  "script_args": ["--input", "data.csv"]
+})
+\`\`\`
+
 ## Hardware Flavors
 
-**CPU:** cpu-basic, cpu-upgrade, cpu-performance, cpu-xl
-**GPU:** t4-small, t4-medium, l4x1, a10g-small, a10g-large, a100-large, h100
-**Specialized:** inf2x6 (AWS Inferentia)
+${HARDWARE_FLAVORS_SECTION}
 
 ## Command Format Guidelines
 
-**Array format (recommended):**
-- Use for complex commands, multiline scripts, or commands with special characters
-- No quoting/escaping needed: \`["python", "-c", "print('hello')"]\`
-- Works with any language: Python, bash, npm, etc.
+**Array format (default):**
+- Recommended for every command—JSON keeps arguments intact (URLs with \`&\`, spaces, etc.)
+- Use \`["/bin/sh", "-lc", "..."]\` when you need shell operators like \`&&\`, \`|\`, or redirections
+- Works with any language: Python, bash, node, npm, uv, etc.
 
-**String format:**
-- Parsed with POSIX shell semantics (quotes, escaping)
-- Good for simple commands: \`"python script.py"\`
-- Shell operators (|, &&, >, etc.) are NOT supported - use array with \`bash -c\` instead
-- \`$HF_TOKEN\` stays literal in the command. To forward your authenticated token, add \`secrets: { "HF_TOKEN": "$HF_TOKEN" }\`.
+**String format (simple cases only):**
+- Still accepted for backwards compatibility, parsed with POSIX shell semantics
+- Rejects shell operators and can mis-handle characters such as \`&\`; switch to arrays when things turn complex
+- \`$HF_TOKEN\` stays literal—forward it via \`secrets: { "HF_TOKEN": "$HF_TOKEN" }\`
 
 **Multiline inline scripts:**
-- Automatically wrapped in \`["/bin/sh", "-lc", "..."]\` for shell execution
-- Paste entire Python/bash snippets—they execute as if typed in a shell
+- Include newline characters directly in the argument (e.g., \`"first line\\nsecond line"\`)
+- UV inline scripts are automatically base64-decoded inside the container; just send the raw script text
+
+### Show command-specific help
+\`\`\`
+hf_jobs("<command>", {"help": true})
+\`\`\`
 
 ## Tips
 
-- Jobs default to detached mode (return immediately with job ID)
-- Use Hub resources directly: \`load_dataset('squad')\`, \`AutoModel.from_pretrained('bert-base')\`
- - To access private Hub assets, include \`secrets: { "HF_TOKEN": "$HF_TOKEN" }\` (or \`${'${HF_TOKEN}'}\`) so the server injects your bearer token.
+- The uv-scripts organisation contains examples for common tasks. dataset_search {'author':'uv-scripts'}
+- Jobs default to detached mode, returning after 10 seconds..
+- Prefer array commands to avoid shell parsing surprises
+- To access private Hub assets, include \`secrets: { "HF_TOKEN": "$HF_TOKEN" }\` (or \`${'${HF_TOKEN}'}\`) to inject your auth token.
 - Logs are time-limited (10s max) - check job page for full logs
-- For shell pipes/operators, use: \`["bash", "-c", "cmd1 | cmd2"]\`
 `;
 
 /**
@@ -260,9 +310,10 @@ hf_jobs("scheduled run", {
 export const HF_JOBS_TOOL_CONFIG = {
 	name: 'hf_jobs',
 	description:
-		'Manage HuggingFace compute jobs. Run any command in Docker containers (Python, Node.js, bash, etc.), ' +
-		'execute Python scripts with UV package manager, manage scheduled jobs, and monitor job status and logs. ' +
-		'Supports CPU and GPU hardware. Call with no arguments for full usage instructions and examples.',
+		'Manage HuggingFace compute jobs. Run commands in Docker containers, ' +
+		'execute Python scripts with UV, schedule and monitor jobs, status and logs. ' +
+		'Call hf_jobs with no command for full usage instructions and examples. ' +
+		'Supports CPU and GPU hardware.',
 	schema: z.object({
 		command: z
 			.string()
@@ -275,8 +326,7 @@ export const HF_JOBS_TOOL_CONFIG = {
 		args: z.record(z.any()).optional().describe('Command-specific arguments as a JSON object'),
 	}),
 	annotations: {
-		title: 'HuggingFace Jobs',
-		destructiveHint: false,
+		title: 'Hugging Face Jobs', // omit destructive hint.
 		readOnlyHint: false,
 		openWorldHint: true,
 	},
@@ -320,10 +370,29 @@ export class HfJobsTool {
 		}
 
 		const command = params.command.toLowerCase();
-		const args = params.args || {};
+		const rawArgs = params.args || {};
+		const schema = COMMAND_SCHEMAS[command as keyof typeof COMMAND_SCHEMAS];
+		const helpRequested = isHelpRequested(rawArgs);
+
+		if (helpRequested) {
+			if (!schema) {
+				return {
+					formatted: `No help available for '${params.command}'.`,
+					totalResults: 0,
+					resultsShared: 0,
+				};
+			}
+
+			return {
+				formatted: formatCommandHelp(command, schema),
+				totalResults: 1,
+				resultsShared: 1,
+			};
+		}
+
+		const args = removeHelpFlag(rawArgs);
 
 		// Validate command arguments if schema exists
-		const schema = COMMAND_SCHEMAS[command as keyof typeof COMMAND_SCHEMAS];
 		if (schema) {
 			const validation = validateArgs(schema, args, command);
 			if (!validation.success) {
@@ -390,7 +459,6 @@ export class HfJobsTool {
 				default:
 					return {
 						formatted: `Unknown command: "${params.command}"
-
 Available commands:
 - run, uv, ps, logs, inspect, cancel
 - scheduled run, scheduled uv, scheduled ps, scheduled inspect, scheduled delete, scheduled suspend, scheduled resume

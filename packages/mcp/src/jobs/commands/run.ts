@@ -2,7 +2,7 @@ import type { RunArgs, UvArgs } from '../types.js';
 import type { JobsApiClient } from '../api-client.js';
 import { createJobSpec } from './utils.js';
 import { fetchJobLogs } from '../sse-handler.js';
-import { buildUvCommand, UV_DEFAULT_IMAGE, wrapInlineScript } from './uv-utils.js';
+import { resolveUvCommand, UV_DEFAULT_IMAGE } from './uv-utils.js';
 
 /**
  * Execute the 'run' command
@@ -68,20 +68,7 @@ export async function uvCommand(args: UvArgs, client: JobsApiClient, token?: str
 	const image = UV_DEFAULT_IMAGE;
 
 	// Detect script source and build command
-	const scriptSource = args.script;
-	let command: string | string[];
-
-	if (scriptSource.startsWith('http://') || scriptSource.startsWith('https://')) {
-		// URL - download and run
-		command = buildUvCommand(scriptSource, args);
-	} else if (scriptSource.includes('\n')) {
-		// Inline multi-line script - encode it
-		const shellSnippet = wrapInlineScript(scriptSource, args);
-		command = ['/bin/sh', '-lc', shellSnippet];
-	} else {
-		// Assume it's a URL or path - UV will handle it
-		command = buildUvCommand(scriptSource, args);
-	}
+	const command = resolveUvCommand(args);
 
 	// Convert to run args
 	const runArgs: RunArgs = {

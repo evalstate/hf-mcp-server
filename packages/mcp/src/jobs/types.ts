@@ -147,17 +147,16 @@ export const runArgsSchema = commonArgsSchema.extend({
 		.default('cpu-basic')
 		.describe(`Hardware flavor. Options: ${ALL_FLAVORS.join(', ')}`),
 	env: z.record(z.string()).optional().describe('Environment variables as key-value pairs'),
-	secrets: z.record(z.string()).optional().describe('Secret environment variables (encrypted server-side)'),
-	timeout: z
-		.string()
+	secrets: z
+		.record(z.string())
 		.optional()
-		.describe('Max duration (e.g., "5m", "2h", "30s"). Default: 30m')
-		.default('30m'),
+		.describe('Secrets as key-value pairs. Use HF_TOKEN=$HF_TOKEN to include your token'),
+	timeout: z.string().optional().describe('Max duration (e.g., "5m", "2h", "30s"). Default: 30m').default('30m'),
 	detach: z
 		.boolean()
 		.optional()
 		.default(true)
-		.describe('Run in background and return immediately (default: true)'),
+		.describe('Run in background and return after 10 seconds (default: true)'),
 });
 
 // UV command args
@@ -165,21 +164,24 @@ export const uvArgsSchema = commonArgsSchema.extend({
 	script: z
 		.string()
 		.describe('Python script: local file path, URL, or inline code. UV will handle dependencies automatically.'),
-	repo: z.string().optional().describe('Persistent repository name for script storage'),
+	//	repo: z.string().optional().describe('Persistent repository name for script storage'), // consider reinstating if we decide to cache scripts
 	with_deps: z.array(z.string()).optional().describe('Additional package dependencies'),
 	script_args: z.array(z.string()).optional().describe('Arguments to pass to the script'),
 	python: z.string().optional().describe('Python interpreter version (e.g., "3.12")'),
 	flavor: z.enum(ALL_FLAVORS).optional().default('cpu-basic').describe('Hardware flavor'),
-	env: z.record(z.string()).optional().describe('Environment variables'),
-	secrets: z.record(z.string()).optional().describe('Secret environment variables'),
+	env: z.record(z.string()).optional().describe('Environment variables as key-value pairs'),
+	secrets: z
+		.record(z.string())
+		.optional()
+		.describe('Secrets as key-value pairs. Use HF_TOKEN=$HF_TOKEN to include your token'),
 	timeout: z.string().optional().default('30m').describe('Max duration'),
-	detach: z.boolean().optional().default(true).describe('Run in background'),
+	detach: z.boolean().optional().default(true).describe('Run in background and return after 10 seconds'),
 });
 
 // PS command args
 export const psArgsSchema = commonArgsSchema.extend({
 	all: z.boolean().optional().default(false).describe('Show all jobs (default: only running)'),
-	status: z.string().optional().describe('Filter by status (e.g., "RUNNING", "COMPLETED")'),
+	status: z.string().optional().describe('Filter by status ("RUNNING", "COMPLETED", "CANCELED", "ERROR", "DELETED")'),
 });
 
 // Logs command args
@@ -200,9 +202,7 @@ export const cancelArgsSchema = commonArgsSchema.extend({
 
 // Scheduled run args
 export const scheduledRunArgsSchema = runArgsSchema.extend({
-	schedule: z
-		.string()
-		.describe('Schedule: cron expression or shorthand (@hourly, @daily, @weekly, @monthly, @yearly)'),
+	schedule: z.string().describe('Schedule: cron expression or shorthand (@hourly, @daily, @weekly, @monthly, @yearly)'),
 	suspend: z.boolean().optional().default(false).describe('Create in suspended state'),
 });
 

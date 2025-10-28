@@ -19,7 +19,7 @@ export * from './docs-search/docs-semantic-search.js';
 export * from './docs-search/doc-fetch.js';
 export * from './readme-utils.js';
 export * from './use-space.js';
-export * from './jobs/tool.js';
+export * from './jobs/jobs-tool.js';
 
 // Export shared types
 export * from './types/tool-result.js';
