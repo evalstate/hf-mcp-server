@@ -52,8 +52,6 @@ export class JobsApiClient extends HfApiCall {
 		const ns = await this.getNamespace(namespace);
 		const url = `https://huggingface.co/api/jobs/${ns}`;
 
-		// Debug logging (will be visible in server logs)
-
 		const result = await this.fetchFromApi<JobInfo>(url, {
 			method: 'POST',
 			headers: {
