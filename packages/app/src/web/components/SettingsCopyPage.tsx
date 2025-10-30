@@ -596,6 +596,101 @@ const CLIENT_CONFIGS: ClientConfig[] = [
 		],
 	},
 	{
+		id: 'gemini-cli',
+		name: 'Gemini CLI',
+		icon: (
+			<svg
+				className="h-5 w-5"
+				width="1em"
+				height="1em"
+				viewBox="0 0 548 548"
+				fill="none"
+				xmlns="http://www.w3.org/2000/svg"
+			>
+				<g clipPath="url(#clip0_172_122)">
+					<rect width="548" height="548" rx="100" fill="#1E1E2E" />
+					<path
+						d="M449.292 0.0078125C503.925 0.699564 548 45.2028 548 100V448L547.992 449.292C547.3 503.925 502.797 548 448 548H100C44.7715 548 0 503.228 0 448V100C4.09157e-06 45.2032 44.0744 0.700077 98.707 0.0078125L100 0H448L449.292 0.0078125ZM100 32C62.4446 32 32 62.4446 32 100V448C32 485.555 62.4446 516 100 516H448C485.555 516 516 485.555 516 448V100C516 62.4446 485.555 32 448 32H100ZM383.091 238.818V322.455L165.637 427V366.364L343.782 280.637L165.637 194.909V134.273L383.091 238.818Z"
+						fill="url(#paint0_linear_172_122)"
+					/>
+					<path
+						d="M449.292 0.0078125C503.925 0.699564 548 45.2028 548 100V448L547.992 449.292C547.3 503.925 502.797 548 448 548H100C44.7715 548 0 503.228 0 448V100C4.09157e-06 45.2032 44.0744 0.700077 98.707 0.0078125L100 0H448L449.292 0.0078125ZM100 32C62.4446 32 32 62.4446 32 100V448C32 485.555 62.4446 516 100 516H448C485.555 516 516 485.555 516 448V100C516 62.4446 485.555 32 448 32H100ZM383.091 238.818V322.455L165.637 427V366.364L343.782 280.637L165.637 194.909V134.273L383.091 238.818Z"
+						fill="url(#paint1_linear_172_122)"
+					/>
+				</g>
+				<defs>
+					<linearGradient id="paint0_linear_172_122" x1="128" y1="276" x2="421" y2="276" gradientUnits="userSpaceOnUse">
+						<stop offset="0.0196292" stopColor="#406AFB" />
+						<stop offset="0.226827" stopColor="#078EFB" />
+						<stop offset="0.418757" stopColor="#939AFF" />
+						<stop offset="0.584515" stopColor="#D698FC" />
+						<stop offset="0.774264" stopColor="#FA6178" />
+						<stop offset="0.97928" stopColor="#F2554F" />
+					</linearGradient>
+					<linearGradient id="paint1_linear_172_122" x1="0" y1="276" x2="548" y2="276" gradientUnits="userSpaceOnUse">
+						<stop stopColor="#217BFE" />
+						<stop offset="0.335283" stopColor="#078EFB" />
+						<stop offset="0.7" stopColor="#AC87EB" />
+						<stop offset="1" stopColor="#EE4D5D" />
+					</linearGradient>
+					<clipPath id="clip0_172_122">
+						<rect width="548" height="548" rx="100" fill="white" />
+					</clipPath>
+				</defs>
+			</svg>
+		),
+		//		description: 'Use with Gemini CLI in your terminal',
+		instructions: [
+			{
+				type: 'text',
+				content: 'Enter the command below to install in Gemini CLI:',
+			},
+			{
+				type: 'code',
+				content: 'gemini mcp add -t http huggingface https://huggingface.co/mcp?login',
+				copyable: true,
+			},
+			{
+				type: 'text',
+				content: 'Then start Gemini CLI and follow the instructions to complete authentication.',
+			},
+		],
+		actionButtons: [
+			{
+				type: 'external',
+				label: 'Gemini CLI Docs',
+				url: 'https://geminicli.com/docs/',
+				variant: 'outline',
+			},
+		],
+		manualConfig: {
+			title: 'Using the HuggingFace Gemini CLI extension:',
+			steps: [
+				{
+					type: 'text',
+					content: 'The HuggingFace Gemini CLI extension bundles the MCP server with a context file and custom commands, teaching Gemini how to better use all tools.',
+				},
+				{
+					type: 'text',
+					content: 'Use the following command to install the extension:',
+				},
+				{
+					type: 'code',
+					content: `gemini extensions install https://github.com/huggingface/hf-mcp-server`,
+					copyable: true,
+				},
+				{
+					type: 'text',
+					content: (
+						<span>
+							Start Gemini CLI and run <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">/mcp auth huggingface</code> to authenticate.
+						</span>
+					),
+				},
+			],
+		},
+	},
+	{
 		id: 'claude-code',
 		name: 'Claude Code',
 		icon: (
